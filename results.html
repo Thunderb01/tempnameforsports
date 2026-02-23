@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Results — StatSprint</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="./">
+        <span class="brand-mark">SS</span>
+        <span class="brand-name">StatSprint</span>
+      </a>
+      <nav class="nav">
+        <a href="./">Home</a>
+      </nav>
+    </header>
+
+    <main class="results">
+      <section class="section">
+        <h1>Results</h1>
+
+        <form id="resultsSearchForm" class="search-card search-card--compact" aria-label="Search again">
+          <input id="resultsQuery" name="q" type="search" placeholder="Search again…" required />
+          <select id="resultsSport" name="sport" aria-label="Select sport">
+            <option value="all" selected>All sports</option>
+            <option value="nba">NBA</option>
+            <option value="nfl">NFL</option>
+            <option value="mlb">MLB</option>
+            <option value="nhl">NHL</option>
+            <option value="soccer">Soccer</option>
+          </select>
+          <button class="btn btn-primary" type="submit">Search</button>
+        </form>
+
+        <div class="results-meta" id="resultsMeta"></div>
+
+        <div class="cards" id="resultsList" aria-live="polite"></div>
+
+        <div class="note">
+          <p>
+            This is demo output. Next step: replace <code>mockLookup()</code> with a real API call.
+          </p>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <p>© <span id="year"></span> StatSprint</p>
+    </footer>
+
+    <script src="./results.js"></script>
+  </body>
+</html>

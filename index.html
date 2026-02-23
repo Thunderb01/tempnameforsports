@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>StatSprint — Sports Stats Lookup</title>
+    <meta name="description" content="Look up player and team stats in seconds." />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="./">
+        <span class="brand-mark">SS</span>
+        <span class="brand-name">StatSprint</span>
+      </a>
+
+      <nav class="nav">
+        <a href="#features">Features</a>
+        <a href="#how">How it works</a>
+        <a class="btn btn-ghost" href="#demo">Try it</a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div class="hero-content">
+          <h1>Sports stats lookup, without the clutter.</h1>
+          <p class="subhead">
+            Search players or teams and get clean, fast, shareable stat views.
+            Start with a name — plug in your favorite stats API later.
+          </p>
+
+          <form id="searchForm" class="search-card" aria-label="Search stats">
+            <label class="sr-only" for="query">Search players or teams</label>
+            <input
+              id="query"
+              name="q"
+              type="search"
+              placeholder="Try: LeBron James, Warriors, Messi…"
+              autocomplete="off"
+              required
+            />
+            <select id="sport" name="sport" aria-label="Select sport">
+              <option value="all" selected>All sports</option>
+              <option value="nba">NBA</option>
+              <option value="nfl">NFL</option>
+              <option value="mlb">MLB</option>
+              <option value="nhl">NHL</option>
+              <option value="soccer">Soccer</option>
+            </select>
+            <button class="btn btn-primary" type="submit">Search</button>
+
+            <p class="hint">
+              Tip: This demo routes you to <code>results.html</code> with query params.
+            </p>
+          </form>
+
+          <div class="cta-row">
+            <a class="btn btn-primary" href="#demo">Try the demo</a>
+            <a class="btn btn-ghost" href="#how">See how it works</a>
+          </div>
+        </div>
+
+        <div class="hero-panel" role="img" aria-label="Preview panel">
+          <div class="mock">
+            <div class="mock-top">
+              <span></span><span></span><span></span>
+            </div>
+            <div class="mock-body">
+              <p class="mock-kicker">Example result</p>
+              <h3 class="mock-title">Player: Jane Doe</h3>
+              <div class="mock-grid">
+                <div class="mock-stat">
+                  <div class="label">Games</div>
+                  <div class="value">82</div>
+                </div>
+                <div class="mock-stat">
+                  <div class="label">Points</div>
+                  <div class="value">1,940</div>
+                </div>
+                <div class="mock-stat">
+                  <div class="label">Assists</div>
+                  <div class="value">512</div>
+                </div>
+                <div class="mock-stat">
+                  <div class="label">Rebounds</div>
+                  <div class="value">611</div>
+                </div>
+              </div>
+              <p class="mock-note">Replace demo data with your API response.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="features" class="section">
+        <h2>Built for fans, bettors, and builders</h2>
+        <div class="cards">
+          <article class="card">
+            <h3>Fast search flow</h3>
+            <p>One box. Clean results. Shareable URLs with query parameters.</p>
+          </article>
+          <article class="card">
+            <h3>API-ready</h3>
+            <p>Swap the demo data with any stats API when you’re ready.</p>
+          </article>
+          <article class="card">
+            <h3>GitHub Pages friendly</h3>
+            <p>No build system required—just static files.</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="how" class="section">
+        <h2>How it works</h2>
+        <ol class="steps">
+          <li><strong>User searches</strong> from the landing page.</li>
+          <li><strong>We navigate</strong> to <code>results.html?q=...&sport=...</code>.</li>
+          <li><strong>Results page</strong> reads params and (later) calls your API.</li>
+        </ol>
+      </section>
+
+      <section id="demo" class="section">
+        <h2>Demo ideas to try</h2>
+        <div class="chips">
+          <button class="chip" data-demo="Stephen Curry">Stephen Curry</button>
+          <button class="chip" data-demo="Kansas City Chiefs">Kansas City Chiefs</button>
+          <button class="chip" data-demo="Lionel Messi">Lionel Messi</button>
+          <button class="chip" data-demo="Los Angeles Dodgers">Los Angeles Dodgers</button>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <p>
+        © <span id="year"></span> StatSprint. Built on GitHub Pages.
+      </p>
+    </footer>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
