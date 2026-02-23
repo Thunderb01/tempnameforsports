@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Roster Builder — Beyond the Portal</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="./">
+        <span class="brand-mark">BP</span>
+        <span class="brand-name">Beyond the Portal</span>
+      </a>
+      <nav class="nav">
+        <a href="./">Home</a>
+        <button class="btn btn-ghost" id="resetBtn" type="button">Reset Demo</button>
+      </nav>
+    </header>
+
+    <main class="app-shell">
+      <section class="section app-top">
+        <h1>Roster Builder</h1>
+
+        <div class="settings">
+          <div class="setting">
+            <label>Program</label>
+            <input id="program" type="text" value="Rutgers" />
+          </div>
+          <div class="setting">
+            <label>Scholarships Available</label>
+            <input id="scholarships" type="number" min="0" value="15" />
+          </div>
+          <div class="setting">
+            <label>NIL Budget Total</label>
+            <input id="nilTotal" type="number" min="0" value="4500000" />
+          </div>
+          <div class="setting">
+            <label>Max % per Player</label>
+            <input id="maxPct" type="number" min="0" max="1" step="0.01" value="0.30" />
+          </div>
+
+          <div class="setting setting-wide">
+            <div class="summary" id="summary"></div>
+            <div class="warnings" id="warnings"></div>
+          </div>
+
+          <div class="setting setting-wide actions">
+            <button class="btn btn-primary" id="exportBtn" type="button">Export Build (JSON)</button>
+            <label class="btn btn-ghost" style="cursor:pointer;">
+              Import Build
+              <input id="importInput" type="file" accept="application/json" hidden />
+            </label>
+          </div>
+        </div>
+      </section>
+
+      <section class="section app-grid">
+        <!-- BOARD -->
+        <div class="panel">
+          <div class="panel-head">
+            <h2>Board</h2>
+            <div class="panel-tools">
+              <input id="boardSearch" type="search" placeholder="Search…" />
+              <select id="posFilter">
+                <option value="all" selected>All positions</option>
+                <option value="Guard">Guard</option>
+                <option value="Wing">Wing</option>
+                <option value="Big">Big</option>
+              </select>
+            </div>
+          </div>
+          <div class="list" id="boardList"></div>
+        </div>
+
+        <!-- SHORTLIST -->
+        <div class="panel">
+          <div class="panel-head">
+            <h2>Shortlist</h2>
+            <p class="muted">Targets you’re actively pursuing.</p>
+          </div>
+          <div class="list" id="shortlist"></div>
+        </div>
+
+        <!-- ROSTER -->
+        <div class="panel">
+          <div class="panel-head">
+            <h2>Roster</h2>
+            <p class="muted">Players on scholarship with NIL impact.</p>
+          </div>
+          <div class="list" id="roster"></div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <p>© <span id="year"></span> Beyond the Portal</p>
+    </footer>
+
+    <script src="./data.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>

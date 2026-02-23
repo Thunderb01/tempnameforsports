@@ -2,141 +2,102 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>StatSprint — Sports Stats Lookup</title>
-    <meta name="description" content="Look up player and team stats in seconds." />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Beyond the Portal — Roster Builder</title>
+    <meta name="description" content="Build rosters, manage scholarships and NIL budgets, and organize your board." />
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
     <header class="site-header">
       <a class="brand" href="./">
-        <span class="brand-mark">SS</span>
-        <span class="brand-name">StatSprint</span>
+        <span class="brand-mark">BP</span>
+        <span class="brand-name">Beyond the Portal</span>
       </a>
 
       <nav class="nav">
         <a href="#features">Features</a>
-        <a href="#how">How it works</a>
-        <a class="btn btn-ghost" href="#demo">Try it</a>
+        <a href="#flow">How it works</a>
+        <a class="btn btn-ghost" href="./app.html">Open Tool</a>
       </nav>
     </header>
 
     <main>
       <section class="hero">
         <div class="hero-content">
-          <h1>Sports stats lookup, without the clutter.</h1>
+          <h1>Roster building that feels like a GM board.</h1>
           <p class="subhead">
-            Search players or teams and get clean, fast, shareable stat views.
-            Start with a name — plug in your favorite stats API later.
+            Move targets from board → shortlist → roster while tracking scholarships and NIL budget in real time.
           </p>
 
-          <form id="searchForm" class="search-card" aria-label="Search stats">
-            <label class="sr-only" for="query">Search players or teams</label>
-            <input
-              id="query"
-              name="q"
-              type="search"
-              placeholder="Try: LeBron James, Warriors, Messi…"
-              autocomplete="off"
-              required
-            />
-            <select id="sport" name="sport" aria-label="Select sport">
-              <option value="all" selected>All sports</option>
-              <option value="nba">NBA</option>
-              <option value="nfl">NFL</option>
-              <option value="mlb">MLB</option>
-              <option value="nhl">NHL</option>
-              <option value="soccer">Soccer</option>
-            </select>
-            <button class="btn btn-primary" type="submit">Search</button>
-
-            <p class="hint">
-              Tip: This demo routes you to <code>results.html</code> with query params.
-            </p>
-          </form>
-
           <div class="cta-row">
-            <a class="btn btn-primary" href="#demo">Try the demo</a>
-            <a class="btn btn-ghost" href="#how">See how it works</a>
+            <a class="btn btn-primary" href="./app.html">Open Roster Builder</a>
+            <a class="btn btn-ghost" href="#features">See features</a>
+          </div>
+
+          <div class="mini-proof">
+            <div class="mini-card">
+              <div class="mini-kicker">Constraints</div>
+              <div class="mini-title">Scholarships + NIL caps</div>
+              <div class="mini-text">See warnings instantly when a move breaks your rules.</div>
+            </div>
+            <div class="mini-card">
+              <div class="mini-kicker">Workflow</div>
+              <div class="mini-title">Board → Shortlist → Roster</div>
+              <div class="mini-text">A simple flow that matches how staff actually builds.</div>
+            </div>
           </div>
         </div>
 
-        <div class="hero-panel" role="img" aria-label="Preview panel">
+        <div class="hero-panel">
           <div class="mock">
-            <div class="mock-top">
-              <span></span><span></span><span></span>
-            </div>
+            <div class="mock-top"><span></span><span></span><span></span></div>
             <div class="mock-body">
-              <p class="mock-kicker">Example result</p>
-              <h3 class="mock-title">Player: Jane Doe</h3>
+              <p class="mock-kicker">Live summary</p>
+              <h3 class="mock-title">Rutgers — 15 scholarships</h3>
               <div class="mock-grid">
-                <div class="mock-stat">
-                  <div class="label">Games</div>
-                  <div class="value">82</div>
-                </div>
-                <div class="mock-stat">
-                  <div class="label">Points</div>
-                  <div class="value">1,940</div>
-                </div>
-                <div class="mock-stat">
-                  <div class="label">Assists</div>
-                  <div class="value">512</div>
-                </div>
-                <div class="mock-stat">
-                  <div class="label">Rebounds</div>
-                  <div class="value">611</div>
-                </div>
+                <div class="mock-stat"><div class="label">Roster</div><div class="value">10</div></div>
+                <div class="mock-stat"><div class="label">Shortlist</div><div class="value">6</div></div>
+                <div class="mock-stat"><div class="label">NIL Remaining</div><div class="value">$2.1M</div></div>
+                <div class="mock-stat"><div class="label">Warnings</div><div class="value">1</div></div>
               </div>
-              <p class="mock-note">Replace demo data with your API response.</p>
+              <p class="mock-note">Static demo UI — the tool page is fully interactive.</p>
             </div>
           </div>
         </div>
       </section>
 
       <section id="features" class="section">
-        <h2>Built for fans, bettors, and builders</h2>
+        <h2>Features</h2>
         <div class="cards">
           <article class="card">
-            <h3>Fast search flow</h3>
-            <p>One box. Clean results. Shareable URLs with query parameters.</p>
+            <h3>Player board</h3>
+            <p>Search + filter targets and promote them through your pipeline.</p>
           </article>
           <article class="card">
-            <h3>API-ready</h3>
-            <p>Swap the demo data with any stats API when you’re ready.</p>
+            <h3>Budget-aware roster</h3>
+            <p>Track scholarships and NIL totals, with per-player max rules.</p>
           </article>
           <article class="card">
-            <h3>GitHub Pages friendly</h3>
-            <p>No build system required—just static files.</p>
+            <h3>Shareable builds</h3>
+            <p>Export/import a JSON “build” file to collaborate.</p>
           </article>
         </div>
       </section>
 
-      <section id="how" class="section">
+      <section id="flow" class="section">
         <h2>How it works</h2>
         <ol class="steps">
-          <li><strong>User searches</strong> from the landing page.</li>
-          <li><strong>We navigate</strong> to <code>results.html?q=...&sport=...</code>.</li>
-          <li><strong>Results page</strong> reads params and (later) calls your API.</li>
+          <li><strong>Board:</strong> big pool of candidates.</li>
+          <li><strong>Shortlist:</strong> your serious targets.</li>
+          <li><strong>Roster:</strong> committed/signed + budget impact.</li>
         </ol>
-      </section>
-
-      <section id="demo" class="section">
-        <h2>Demo ideas to try</h2>
-        <div class="chips">
-          <button class="chip" data-demo="Stephen Curry">Stephen Curry</button>
-          <button class="chip" data-demo="Kansas City Chiefs">Kansas City Chiefs</button>
-          <button class="chip" data-demo="Lionel Messi">Lionel Messi</button>
-          <button class="chip" data-demo="Los Angeles Dodgers">Los Angeles Dodgers</button>
-        </div>
       </section>
     </main>
 
     <footer class="footer">
-      <p>
-        © <span id="year"></span> StatSprint. Built on GitHub Pages.
-      </p>
+      <p>© <span id="year"></span> Beyond the Portal</p>
     </footer>
 
-    <script src="./app.js"></script>
+    <script src="./landing.js"></script>
   </body>
 </html>
