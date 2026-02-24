@@ -1,3 +1,5 @@
+import { Player } from "./player.js";
+
 const STORAGE_KEY = "bp_roster_builder_v1";
 const XLSX_PATH = "./data/BeyondThePortal_GM_Tool.xlsx";
 
@@ -100,10 +102,8 @@ function getPlayerId(rowObj) {
 }
 
 function guessNilOffer(rowObj) {
-  // If your sheet has Market Low/High, use midpoint; else 0
-  const low = rowObj.marketLow ?? rowObj["Market Low"] ?? rowObj["MarketLow"] ?? rowObj["Low"];
-  const high = rowObj.marketHigh ?? rowObj["Market High"] ?? rowObj["MarketHigh"] ?? rowObj["High"];
-
+  const low = rowObj["Open Market Low"];
+  const high = rowObj["Open Market High"];
   const ln = normalizeNumber(low);
   const hn = normalizeNumber(high);
   if (Number.isFinite(ln) && Number.isFinite(hn)) return Math.round((ln + hn) / 2);
@@ -116,19 +116,33 @@ function addToRoster(rowObj) {
 
   // Make sure the board in the builder knows about this player.
   // We store a simplified player object compatible with your app.js `byId()`.
-  const player = {
-    id,
-    name: rowObj.name || rowObj.Name || rowObj.Player || rowObj["Player Name"] || "Unknown",
-    team: rowObj.team || rowObj.Team || rowObj.School || rowObj["Current Team"] || "",
-    pos: rowObj.pos || rowObj.Pos || rowObj.Position || "",
-    year: rowObj.year || rowObj.Year || rowObj.Class || "",
-    marketLow: normalizeNumber(rowObj.marketLow ?? rowObj["Market Low"]) || 0,
-    marketHigh: normalizeNumber(rowObj.marketHigh ?? rowObj["Market High"]) || 0,
-    stats: rowObj, // keep whole row accessible as stats
-  };
+  const raw = {
+    id: getPlayerId(rowObj),
+    name: rowObj.Name || rowObj.Player || rowObj["Player Name"] || "Unknown",
+    team: rowObj.Team || rowObj.School || rowObj["Current Team"] || "",
+    pos: rowObj["Primary Position"] || rowObj.Pos || rowObj.Position || "",
+    year: rowObj.Year || rowObj.Class || "",
+    marketLow: normalizeNumber(rowObj["Open Market Low"]),
+    marketHigh: normalizeNumber(rowObj["Open Market High"]),
+    stats: rowObj,
+    };
 
-  if (!Array.isArray(state.board)) state.board = [];
-  if (!state.board.some(p => p.id === id)) state.board.unshift(player);
+    const player = Player.from(raw);
+
+    // Store plain JSON in localStorage state (recommended)
+    const playerJson = {
+    id: player.id,
+    name: player.name,
+    team: player.team,
+    pos: player.pos,
+    year: player.year,
+    marketLow: player.marketLow,
+    marketHigh: player.marketHigh,
+    stats: player.stats,
+    };
+
+    if (!Array.isArray(state.board)) state.board = [];
+    if (!state.board.some(p => String(p.id) === playerJson.id)) state.board.unshift(playerJson);
 
   // Add roster entry if not already
   if (!Array.isArray(state.roster)) state.roster = [];
@@ -246,7 +260,12 @@ async function loadSheet() {
   }
 
   const json = XLSX.utils.sheet_to_json(ws, { defval: "" }); // array of objects
-  rows = json;
+    // ✅ Trim header whitespace like "Name " -> "Name"
+    rows = json.map((r) => {
+    const out = {};
+    for (const [k, v] of Object.entries(r)) out[String(k).trim()] = v;
+    return out;
+    });
 
   // Determine columns from the union of keys, keeping first row order preference
   const colSet = new Set();

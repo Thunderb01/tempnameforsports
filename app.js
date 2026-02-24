@@ -145,7 +145,7 @@ function defaultState() {
       // roster entries: { id, nilOffer }
       // example: { id: "p1", nilOffer: 900000 }
     ],
-    board: window.DEMO_BOARD || [],
+    // board: window.DEMO_BOARD || [],
     statusById: {},
   };
 }
@@ -159,13 +159,114 @@ state.settings = state.settings || defaultState().settings;
 state.statusById = state.statusById || {};
 
 // ✅ critical: repopulate board if missing/invalid/empty
-if (!Array.isArray(state.board) || state.board.length === 0) {
-  state.board = window.DEMO_BOARD || [];
-}
+// if (!Array.isArray(state.board) || state.board.length === 0) {
+//   state.board = window.DEMO_BOARD || [];
+// }
 state.board = state.board.map(Player.from);
 
 saveState(state); // optional but helps normalize stored data
 
+const XLSX_PATH = "./data/BeyondThePortal_GM_Tool.xlsx";
+const IMPORT_SHEET_NAME = "Import_Board";
+
+function normalizeNumber(v) {
+  if (v === null || v === undefined) return 0;
+  const s = String(v).trim().replaceAll(",", "").replaceAll("$", "");
+  const n = Number(s);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function makeStableId(rowObj) {
+  const explicit =
+    rowObj.id || rowObj.ID || rowObj.player_id || rowObj["Player ID"] || rowObj["player_id"];
+  if (explicit) return String(explicit);
+
+  const name = rowObj.name || rowObj.Name || rowObj.Player || rowObj["Player Name"] || "";
+  const team = rowObj.team || rowObj.Team || rowObj.School || rowObj["Current Team"] || "";
+  return `imp_${String(name).trim().toLowerCase().replace(/\s+/g, "_")}__${String(team)
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "_")}`;
+}
+
+function rowToPlayer(rowObj) {
+  const raw = {
+    id: makeStableId(rowObj),
+    name: rowObj.name || rowObj.Name || rowObj.Player || rowObj["Player Name"] || "Unknown",
+    team: rowObj.team || rowObj.Team || rowObj.School || rowObj["Current Team"] || "",
+    pos: rowObj.pos || rowObj.Pos || rowObj.Position || "",
+    year: rowObj.year || rowObj.Year || rowObj.Class || "",
+    marketLow: normalizeNumber(rowObj.marketLow ?? rowObj["Market Low"]),
+    marketHigh: normalizeNumber(rowObj.marketHigh ?? rowObj["Market High"]),
+    stats: rowObj, // keep entire row for modal / details
+  };
+
+  const p = Player.from(raw);
+
+  // store as plain object in state (safe for localStorage)
+  return {
+    id: p.id,
+    name: p.name,
+    team: p.team,
+    pos: p.pos,
+    year: p.year,
+    marketLow: p.marketLow,
+    marketHigh: p.marketHigh,
+    stats: p.stats,
+  };
+}
+
+async function importBoardIntoBuilder({ replaceBoard = false } = {}) {
+  if (!window.XLSX) {
+    alert("XLSX library not loaded. Check the script tag in app.html.");
+    return;
+  }
+
+  const res = await fetch(XLSX_PATH, { cache: "no-store" });
+  if (!res.ok) {
+    alert(`Could not fetch workbook at ${XLSX_PATH} (${res.status}). Make sure it exists in your repo.`);
+    return;
+  }
+
+  const buf = await res.arrayBuffer();
+  const wb = XLSX.read(buf, { type: "array" });
+
+  const ws = wb.Sheets[IMPORT_SHEET_NAME];
+  if (!ws) {
+    alert(`Sheet "${IMPORT_SHEET_NAME}" not found. Available: ${wb.SheetNames.join(", ")}`);
+    return;
+  }
+
+  const sheetRows = XLSX.utils.sheet_to_json(ws, { defval: "" });
+
+  const importedPlayers = sheetRows.map(rowToPlayer);
+
+  // Ensure state.board exists
+  if (!Array.isArray(state.board)) state.board = [];
+
+  if (replaceBoard) {
+    state.board = importedPlayers;
+  } else {
+    // merge unique by id
+    const existing = new Set(state.board.map(p => String(p.id)));
+    for (const p of importedPlayers) {
+      if (!existing.has(String(p.id))) state.board.push(p);
+    }
+  }
+
+  saveState(state);
+  render();
+
+  alert(`Imported ${importedPlayers.length} players from "${IMPORT_SHEET_NAME}" into the builder board.`);
+}
+
+els.importBoardBtn?.addEventListener("click", () => {
+  importBoardIntoBuilder({ replaceBoard: false });
+});
+
+
+// After state is loaded + migrations, before render()
+importBoardIntoBuilder({ replaceBoard: false }).catch(console.error);
 
 function getSettings() {
   return {

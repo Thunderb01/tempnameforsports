@@ -24,6 +24,14 @@ code{background:rgba(255,255,255,.1);padding:.15rem .35rem;border-radius:8px}
 input,select,button{font:inherit}
 .muted{color:var(--muted)}
 
+html, body { height: 100%; }
+
+body {
+  min-height: 100dvh; /* better than 100vh on modern browsers */
+  display: flex;
+  flex-direction: column;
+}
+
 .site-header{
   max-width:var(--max);
   margin:0 auto;
@@ -71,6 +79,13 @@ input,select,button{font:inherit}
 .btn-ghost{background:transparent}
 
 .section{max-width:var(--max);margin:0 auto;padding:30px 18px}
+
+.app-top{
+  flex: 0 0 auto;
+}
+
+/* Only on the roster builder page */
+
 .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
 @media (max-width:900px){.cards{grid-template-columns:1fr}}
 .card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:16px}
@@ -125,7 +140,12 @@ input,select,button{font:inherit}
 
 .footer{max-width:var(--max);margin:0 auto;padding:26px 18px 40px;color:rgba(255,255,255,.6)}
 
-.app-shell{padding-bottom:40px}
+.app-shell{
+  flex: 1 1 auto;
+  min-height: 0;          /* CRITICAL: allows children to scroll */
+  display: flex;
+  flex-direction: column;
+}
 .app-top h1{margin:0 0 12px}
 .settings{
   display:grid;
@@ -219,19 +239,12 @@ input,select,button{font:inherit}
 .warn-list{margin:0;padding-left:18px;color:rgba(255,255,255,.78)}
 .ok-box{color:rgba(200,255,220,.9)}
 
-.app-grid{
-  display:grid;
-  grid-template-columns:1.1fr .9fr .9fr;
-  gap:14px;
-}
+
+
+
+
 @media (max-width:980px){.app-grid{grid-template-columns:1fr}}
-.panel{
-  background:var(--panel);
-  border:1px solid var(--border);
-  border-radius:var(--radius);
-  padding:14px;
-  box-shadow:var(--shadow);
-}
+
 .panel-head h2{margin:0 0 6px}
 .panel-head p{margin:0}
 .panel-tools{display:flex;gap:10px;margin-top:10px}
@@ -244,7 +257,7 @@ input,select,button{font:inherit}
   color:var(--text);
   outline:none;
 }
-.list{margin-top:12px;display:flex;flex-direction:column;gap:10px}
+
 .row{
   border:1px solid rgba(255,255,255,.12);
   border-radius:16px;
@@ -272,6 +285,29 @@ input,select,button{font:inherit}
   outline:none;
 }
 
+/* Make panel content scrollable */
+
+
+.panel-head{
+  flex: 0 0 auto;
+}
+
+
+
+/* Optional: set a max height just for the Board list */
+#boardList{
+  max-height: 100%;
+}
+
+/* Sticky header inside panel while list scrolls */
+/* .panel-head{
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: rgba(11,16,32,0.85);
+  backdrop-filter: blur(6px);
+  padding-bottom: 10px;
+} */
 
 .no-scroll { overflow: hidden; }
 
@@ -344,7 +380,95 @@ input,select,button{font:inherit}
 }
 .modal-section h4{ margin: 0 0 8px; }
 
+
+
+/* ===========================
+   Roster Builder: stable layout
+   =========================== */
+
+html, body { height: 100%; }
+
+body{
+  min-height: 500dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* header stays natural height */
+.site-header{
+  flex: 0 0 auto;
+}
+
+/* main takes remaining space */
+.app-shell{
+  flex: 1 1 auto;
+  min-height: 0;              /* IMPORTANT */
+  display: flex;
+  flex-direction: column;
+}
+
+/* tighten section padding on app page so it fits */
+.app-shell .section{
+  padding-top: 14px;
+  padding-bottom: 14px;
+}
+
+/* settings section sizes to content */
+.app-top{
+  flex: 0 0 auto;
+}
+
+/* grid section gets remaining height */
+.app-grid{
+  flex: 1 1 auto;
+  min-height: 0;              /* IMPORTANT */
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr 0.9fr;
+  gap: 14px;
+}
+
+@media (max-width:980px){
+  .app-grid{ grid-template-columns: 1fr; }
+}
+
+/* panels become vertical flex containers */
+.panel{
+  min-height: 0;              /* IMPORTANT */
+  display: flex;
+  flex-direction: column;
+
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px;
+  box-shadow: var(--shadow);
+}
+
+/* header doesn't scroll */
+.panel-head{
+  flex: 0 0 auto;
+}
+
+/* list scrolls */
+.list{
+  flex: 1 1 auto;
+  min-height: 0;              /* IMPORTANT */
+  overflow: auto;
+
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* optional: make only board scroll (uncomment if desired) */
+/*
+#shortlist, #roster { overflow: visible; }
+*/
+
 /* Ensure the HTML `hidden` attribute always wins */
 [hidden] {
   display: none !important;
 }
+
+
