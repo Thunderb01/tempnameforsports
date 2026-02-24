@@ -16,13 +16,107 @@ const els = {
   exportBtn: document.getElementById("exportBtn"),
   importInput: document.getElementById("importInput"),
   resetBtn: document.getElementById("resetBtn"),
+  playerModalBackdrop: document.getElementById("playerModalBackdrop"),
+  playerModal: document.getElementById("playerModal"),
+  playerModalCloseBtn : document.getElementById("playerModalCloseBtn"),
+  playerModalTitle : document.getElementById("playerModalTitle"),
+  playerModalKicker : document.getElementById("playerModalKicker"),
+  playerModalSub : document.getElementById("playerModalSub"),
+  playerModalStats : document.getElementById("playerModalStats"),
+  playerModalMarket : document.getElementById("playerModalMarket"),
+  playerModalStatus : document.getElementById("playerModalStatus"),
 };
+
+const STATUSES = [
+  { key: "none", label: "No status" },
+  { key: "interested", label: "Interested" },
+  { key: "contacted", label: "Contacted" },
+  { key: "visit", label: "Visit" },
+  { key: "signed", label: "Signed" },
+  { key: "passed", label: "Passed" },
+];
+
+function statusLabel(key) {
+  return STATUSES.find(s => s.key === key)?.label ?? "No status";
+}
 
 if (els.year) els.year.textContent = new Date().getFullYear();
 
 function money(n) {
   const x = Number(n || 0);
   return x.toLocaleString(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 0 });
+}
+
+function formatStatValue(k, v) {
+  if (v === null || v === undefined || v === "") return "—";
+  if (k === "ts") return `${Math.round(Number(v) * 100)}%`;
+  return String(v);
+}
+
+function prettyStatKey(k) {
+  const map = {
+    ppg: "PPG",
+    rpg: "RPG",
+    apg: "APG",
+    spg: "SPG",
+    bpg: "BPG",
+    mpg: "MPG",
+    ts: "True Shooting",
+  };
+  return map[k] || k.toUpperCase();
+}
+
+function openPlayerModal(playerId) {
+  const p = byId(playerId);
+  if (!p) return;
+
+  const statusKey = state.statusById?.[p.id] || "none";
+
+  els.playerModalKicker.textContent = "Player Card";
+  els.playerModalTitle.textContent = p.name;
+  els.playerModalSub.textContent = `${p.team} • ${p.pos} • ${p.year}`;
+
+  // Stats grid
+  const stats = p.stats || {};
+  const entries = Object.entries(stats);
+
+  els.playerModalStats.innerHTML = entries.length
+    ? entries
+        .map(
+          ([k, v]) => `
+          <div class="statbox">
+            <div class="label">${escapeHtml(prettyStatKey(k))}</div>
+            <div class="value">${escapeHtml(formatStatValue(k, v))}</div>
+          </div>
+        `
+        )
+        .join("")
+    : `<div class="empty">No stats available for this player yet.</div>`;
+
+  els.playerModalMarket.textContent = `${money(p.marketLow)} – ${money(p.marketHigh)}`;
+
+  // Show status pill + select (reusing your status renderer if you added it)
+  if (typeof renderStatusPill === "function" && typeof renderStatusSelect === "function") {
+    els.playerModalStatus.innerHTML = `
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+        ${renderStatusPill(p.id)}
+        ${renderStatusSelect(p.id)}
+      </div>
+    `;
+  } else {
+    els.playerModalStatus.innerHTML = `<span class="status-pill status-${statusKey}">${escapeHtml(statusLabel?.(statusKey) || statusKey)}</span>`;
+  }
+
+  // Show modal
+  els.playerModalBackdrop.hidden = false;
+  els.playerModal.hidden = false;
+  document.body.classList.add("no-scroll");
+}
+
+function closePlayerModal() {
+  els.playerModalBackdrop.hidden = true;
+  els.playerModal.hidden = true;
+  document.body.classList.remove("no-scroll");
 }
 
 function loadState() {
@@ -55,6 +149,16 @@ function defaultState() {
 }
 
 let state = loadState() ?? defaultState();
+
+// ✅ migration / hardening for older saved builds
+state.board = state.board || (window.DEMO_BOARD || []);
+state.shortlistIds = state.shortlistIds || [];
+state.roster = state.roster || [];
+state.settings = state.settings || defaultState().settings;
+state.statusById = state.statusById || {}; // IMPORTANT
+
+saveState(state); // optional but helps normalize stored data
+
 
 function getSettings() {
   return {
@@ -258,7 +362,7 @@ function renderBoard() {
     const disabled = inRoster(p.id) ? "disabled" : "";
     const alreadyShort = inShortlist(p.id) ? "disabled" : "";
     return `
-      <div class="row">
+      <div class="row row-click" data-player-id="${p.id}">
         <div class="row-main">
           <div class="row-title">${escapeHtml(p.name)}</div>
           <div class="row-sub">${escapeHtml(p.team)} • ${escapeHtml(p.pos)} • ${escapeHtml(p.year)}</div>
@@ -285,7 +389,7 @@ function renderShortlist() {
   }
 
   els.shortlist.innerHTML = items.map(p => `
-    <div class="row">
+    <div class="row row-click" data-player-id="${p.id}">
       <div class="row-main">
         <div class="row-title">${escapeHtml(p.name)}</div>
         <div class="row-sub">${escapeHtml(p.team)} • ${escapeHtml(p.pos)} • ${escapeHtml(p.year)}</div>
@@ -309,7 +413,7 @@ function renderRoster() {
     const p = byId(entry.id);
     if (!p) return "";
     return `
-      <div class="row">
+      <div class="row row-click" data-player-id="${p.id}">
         <div class="row-main">
           <div class="row-title">${escapeHtml(p.name)}</div>
           <div class="row-sub">${escapeHtml(p.team)} • ${escapeHtml(p.pos)} • ${escapeHtml(p.year)}</div>
@@ -351,6 +455,24 @@ function escapeHtml(str) {
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
 }
+
+document.addEventListener("click", (e) => {
+  // If the click started inside any interactive/control element, do nothing.
+  // This includes your status dropdown/select and anything inside it.
+  if (e.target.closest("button, input, select, option, a, label, textarea")) return;
+
+  const row = e.target.closest("[data-player-id]");
+  if (!row) return;
+
+  openPlayerModal(row.getAttribute("data-player-id"));
+});
+
+els.playerModalCloseBtn?.addEventListener("click", closePlayerModal);
+els.playerModalBackdrop?.addEventListener("click", closePlayerModal);
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && !els.playerModal.hidden) closePlayerModal();
+});
 
 /** Event wiring */
 ["program", "scholarships", "nilTotal", "maxPct"].forEach(id => {
@@ -439,6 +561,14 @@ els.resetBtn?.addEventListener("click", () => {
   state = defaultState();
   saveState(state);
   render();
+});
+
+// ✅ Force modal closed on initial load
+closePlayerModal();
+
+// ✅ Also force close when browser restores page from cache (back button)
+window.addEventListener("pageshow", () => {
+  closePlayerModal();
 });
 
 render();
