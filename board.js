@@ -14,6 +14,7 @@ let columns = [];      // ordered column names
 let sortKey = null;
 let sortDir = "asc";   // "asc" | "desc"
 
+// helper to reduce decimal places
 function formatTwoDecimals(n) {
   return Number(n).toFixed(2);
 }
@@ -228,7 +229,7 @@ function renderTable() {
 }
 
 async function loadSheet() {
-  const sheet = (els.sheetName.value || "Import Board").trim();
+  const sheet = (els.sheetName.value || "Import_Board").trim();
 
   els.meta.textContent = "Loading workbook…";
 
