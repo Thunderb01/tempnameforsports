@@ -1,4 +1,9 @@
 import { Player } from "./player.js";
+import { parseCSV, normalizeNumber, firstVal } from "./csv.js";
+
+// Local CSV in /data (recommended). If you later publish a Google Sheet as CSV,
+// replace this with that published CSV URL.
+const CSV_URL = "./data/BeyondThePortal_GM_Tool - Import_Board.csv";
 
 const STORAGE_KEY = "bp_roster_builder_v1";
 
@@ -27,6 +32,8 @@ const els = {
   playerModalStats : document.getElementById("playerModalStats"),
   playerModalMarket : document.getElementById("playerModalMarket"),
   playerModalStatus : document.getElementById("playerModalStatus"),
+  playerModalId: document.getElementById("playerModalId"),
+  importCsvBtn: document.getElementById("importCsvBtn"),
 };
 
 const STATUSES = [
@@ -77,6 +84,7 @@ function openPlayerModal(playerId) {
   els.playerModalKicker.textContent = "Player Card";
   els.playerModalTitle.textContent = p.name;
   els.playerModalSub.textContent = `${p.team} • ${p.pos} • ${p.year}`;
+  els.playerModalId.textContent = `Player ID: ${p.id}`;
 
   // Stats grid
   const stats = p.stats || {};
@@ -139,6 +147,8 @@ function defaultState() {
       nilTotal: 4500000,
       maxPct: 0.3,
     },
+    // master list shown in the Board panel
+    board: [],
     // store IDs in pipeline lists
     shortlistIds: [],
     roster: [
@@ -158,47 +168,50 @@ state.roster = Array.isArray(state.roster) ? state.roster : [];
 state.settings = state.settings || defaultState().settings;
 state.statusById = state.statusById || {};
 
-// ✅ critical: repopulate board if missing/invalid/empty
-// if (!Array.isArray(state.board) || state.board.length === 0) {
-//   state.board = window.DEMO_BOARD || [];
-// }
-state.board = state.board.map(Player.from);
+// Board hardening + fallback
+state.board = Array.isArray(state.board) ? state.board : [];
+if (!state.board.length && Array.isArray(window.DEMO_BOARD) && window.DEMO_BOARD.length) {
+  state.board = window.DEMO_BOARD;
+}
+
+// Normalize board rows into a stable plain-object shape (safe for localStorage)
+state.board = state.board
+  .map(Player.from)
+  .map(p => ({
+    id: p.id,
+    name: p.name,
+    team: p.team,
+    pos: p.pos,
+    year: p.year,
+    marketLow: p.marketLow,
+    marketHigh: p.marketHigh,
+    stats: p.stats,
+  }));
 
 saveState(state); // optional but helps normalize stored data
 
-const XLSX_PATH = "./data/BeyondThePortal_GM_Tool.xlsx";
-const IMPORT_SHEET_NAME = "Import_Board";
+// (legacy XLSX import paths kept for reference)
+// const XLSX_PATH = "./data/BeyondThePortal_GM_Tool.xlsx";
+// const IMPORT_SHEET_NAME = "Import_Board";
 
-function normalizeNumber(v) {
-  if (v === null || v === undefined) return 0;
-  const s = String(v).trim().replaceAll(",", "").replaceAll("$", "");
-  const n = Number(s);
-  return Number.isFinite(n) ? n : 0;
+function makeStableIdFromRow(r) {
+  const name = firstVal(r.Name, r["Player Name"], r.Player, r.name);
+  const team = firstVal(r.Team, r.School, r["Current Team"], r.team);
+  const safeName = String(name || "unknown").trim().toLowerCase().replace(/\s+/g, "_");
+  const safeTeam = String(team || "unknown").trim().toLowerCase().replace(/\s+/g, "_");
+  return `imp_${safeName}__${safeTeam}`;
 }
 
-function makeStableId(rowObj) {
-  const explicit =
-    rowObj.id || rowObj.ID || rowObj.player_id || rowObj["Player ID"] || rowObj["player_id"];
-  if (explicit) return String(explicit);
-
-  const name = rowObj.name || rowObj.Name || rowObj.Player || rowObj["Player Name"] || "";
-  const team = rowObj.team || rowObj.Team || rowObj.School || rowObj["Current Team"] || "";
-  return `imp_${String(name).trim().toLowerCase().replace(/\s+/g, "_")}__${String(team)
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, "_")}`;
-}
-
-function rowToPlayer(rowObj) {
+function rowToPlayer(r) {
   const raw = {
-    id: makeStableId(rowObj),
-    name: rowObj.name || rowObj.Name || rowObj.Player || rowObj["Player Name"] || "Unknown",
-    team: rowObj.team || rowObj.Team || rowObj.School || rowObj["Current Team"] || "",
-    pos: rowObj.pos || rowObj.Pos || rowObj.Position || "",
-    year: rowObj.year || rowObj.Year || rowObj.Class || "",
-    marketLow: normalizeNumber(rowObj.marketLow ?? rowObj["Market Low"]),
-    marketHigh: normalizeNumber(rowObj.marketHigh ?? rowObj["Market High"]),
-    stats: rowObj, // keep entire row for modal / details
+    id: makeStableIdFromRow(r),
+    name: firstVal(r.Name, r["Player Name"], r.Player, r.name, "Unknown"),
+    team: firstVal(r.Team, r.School, r["Current Team"], r.team, ""),
+    pos: firstVal(r["Primary Position"], r.Position, r.Pos, r.pos, ""),
+    year: firstVal(r.Class, r.Year, r.year, ""),
+    marketLow: normalizeNumber(firstVal(r["Open Market Low"], r["Market Low"], r.marketLow, 0)),
+    marketHigh: normalizeNumber(firstVal(r["Open Market High"], r["Market High"], r.marketHigh, 0)),
+    stats: r, // keep full row for modal/stats page
   };
 
   const p = Player.from(raw);
@@ -216,40 +229,27 @@ function rowToPlayer(rowObj) {
   };
 }
 
-async function importBoardIntoBuilder({ replaceBoard = false } = {}) {
-  if (!window.XLSX) {
-    alert("XLSX library not loaded. Check the script tag in app.html.");
-    return;
+async function importBoardIntoBuilder({ replace = false } = {}) {
+  const res = await fetch(CSV_URL, { cache: "no-store" });
+  if (!res.ok) throw new Error(`Could not fetch CSV (${res.status}). Is the sheet published/public?`);
+
+  const text = await res.text();
+  const parsed = parseCSV(text);
+
+  // Basic sanity: if it fetched HTML (permissions/login page), bail
+  if (!parsed.length || Object.keys(parsed[0] || {}).length === 0) {
+    throw new Error("CSV parse returned no rows. Check the CSV URL and sharing/publish settings.");
   }
 
-  const res = await fetch(XLSX_PATH, { cache: "no-store" });
-  if (!res.ok) {
-    alert(`Could not fetch workbook at ${XLSX_PATH} (${res.status}). Make sure it exists in your repo.`);
-    return;
-  }
+  const imported = parsed.map(rowToPlayer);
 
-  const buf = await res.arrayBuffer();
-  const wb = XLSX.read(buf, { type: "array" });
-
-  const ws = wb.Sheets[IMPORT_SHEET_NAME];
-  if (!ws) {
-    alert(`Sheet "${IMPORT_SHEET_NAME}" not found. Available: ${wb.SheetNames.join(", ")}`);
-    return;
-  }
-
-  const sheetRows = XLSX.utils.sheet_to_json(ws, { defval: "" });
-
-  const importedPlayers = sheetRows.map(rowToPlayer);
-
-  // Ensure state.board exists
   if (!Array.isArray(state.board)) state.board = [];
 
-  if (replaceBoard) {
-    state.board = importedPlayers;
+  if (replace) {
+    state.board = imported;
   } else {
-    // merge unique by id
     const existing = new Set(state.board.map(p => String(p.id)));
-    for (const p of importedPlayers) {
+    for (const p of imported) {
       if (!existing.has(String(p.id))) state.board.push(p);
     }
   }
@@ -257,16 +257,14 @@ async function importBoardIntoBuilder({ replaceBoard = false } = {}) {
   saveState(state);
   render();
 
-  alert(`Imported ${importedPlayers.length} players from "${IMPORT_SHEET_NAME}" into the builder board.`);
+  return imported.length;
 }
 
-els.importBoardBtn?.addEventListener("click", () => {
-  importBoardIntoBuilder({ replaceBoard: false });
+// After state is loaded + migrations, before first render()
+// If CSV is missing or fails to parse, we keep the existing board (e.g., DEMO_BOARD).
+importBoardIntoBuilder({ replace: true }).catch((err) => {
+  console.warn("CSV import failed; using existing board.", err);
 });
-
-
-// After state is loaded + migrations, before render()
-importBoardIntoBuilder({ replaceBoard: false }).catch(console.error);
 
 function getSettings() {
   return {

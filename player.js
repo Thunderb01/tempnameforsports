@@ -9,6 +9,7 @@ export class Player {
     marketLow = 0,
     marketHigh = 0,
     stats = {},
+    tags = {}
   }) {
     this.id = String(id);
     this.name = String(name);
@@ -18,6 +19,7 @@ export class Player {
     this.marketLow = Number(marketLow) || 0;
     this.marketHigh = Number(marketHigh) || 0;
     this.stats = stats || {};
+    this.tags = {}
   }
 
   marketMid() {

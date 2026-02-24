@@ -1,25 +1,23 @@
 import { Player } from "./player.js";
+import { parseCSV, normalizeNumber, firstVal } from "./csv.js";
 
 const STORAGE_KEY = "bp_roster_builder_v1";
-const XLSX_PATH = "./data/BeyondThePortal_GM_Tool.xlsx";
+
+// ✅ Put your CSV URL here:
+const CSV_URL =
+  "./data/BeyondThePortal_GM_Tool - Import_Board.csv";
 
 const els = {
   search: document.getElementById("search"),
-  sheetName: document.getElementById("sheetName"),
   reloadBtn: document.getElementById("reloadBtn"),
   meta: document.getElementById("meta"),
   tableWrap: document.getElementById("tableWrap"),
 };
 
-let rows = [];         // array of objects (each is a row)
-let columns = [];      // ordered column names
+let rows = [];
+let columns = [];
 let sortKey = null;
-let sortDir = "asc";   // "asc" | "desc"
-
-// helper to reduce decimal places
-function formatTwoDecimals(n) {
-  return Number(n).toFixed(2);
-}
+let sortDir = "asc";
 
 function escapeHtml(str) {
   return (str ?? "")
@@ -38,137 +36,95 @@ function loadState() {
     return null;
   }
 }
-
 function saveState(state) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
-
 function ensureState() {
-  // Keep this aligned with your app.js defaultState shape
-  const existing = loadState();
-  if (existing && existing.settings && Array.isArray(existing.roster)) {
-    existing.statusById = existing.statusById || {};
-    existing.shortlistIds = Array.isArray(existing.shortlistIds) ? existing.shortlistIds : [];
-    existing.board = Array.isArray(existing.board) ? existing.board : [];
-    return existing;
+  const s = loadState();
+  if (s && s.settings && Array.isArray(s.roster)) {
+    s.statusById = s.statusById || {};
+    s.shortlistIds = Array.isArray(s.shortlistIds) ? s.shortlistIds : [];
+    s.board = Array.isArray(s.board) ? s.board : [];
+    return s;
   }
-
-  // minimal safe fallback
-  return {
-    settings: { program: "Program", scholarships: 15, nilTotal: 0, maxPct: 0.3 },
-    shortlistIds: [],
-    roster: [],
-    board: [],
-    statusById: {},
-  };
+  return { settings: { program: "Program", scholarships: 15, nilTotal: 0, maxPct: 0.3 }, shortlistIds: [], roster: [], board: [], statusById: {} };
 }
 
-function normalizeNumber(v) {
-  // turn "$1,234" -> 1234, "12.3" -> 12.3, keep non-numeric as NaN
-  if (v === null || v === undefined) return NaN;
-  const s = String(v).trim().replaceAll(",", "").replaceAll("$", "");
-  const n = Number(s);
-  return Number.isFinite(n) ? n : NaN;
-}
-
-function compareValues(a, b) {
-  // numeric if possible; else string compare
-  const an = normalizeNumber(a);
-  const bn = normalizeNumber(b);
-  const bothNumeric = Number.isFinite(an) && Number.isFinite(bn);
-
-  if (bothNumeric) return an - bn;
-
-  const as = (a ?? "").toString().toLowerCase();
-  const bs = (b ?? "").toString().toLowerCase();
-  if (as < bs) return -1;
-  if (as > bs) return 1;
-  return 0;
-}
-
-function getPlayerId(rowObj) {
-  // Prefer an existing ID column if the sheet has one
-  const explicit =
-    rowObj.id || rowObj.ID || rowObj.player_id || rowObj["Player ID"] || rowObj["player_id"];
-  if (explicit) return String(explicit);
-
-  // Otherwise create a stable-ish ID from name+team
-  const name = rowObj.name || rowObj.Name || rowObj.Player || rowObj["Player Name"] || "";
-  const team = rowObj.team || rowObj.Team || rowObj.School || rowObj["Current Team"] || "";
+function makeStableId(rowObj) {
+  const name = firstVal(rowObj.Name, rowObj["Player Name"], rowObj.Player, rowObj.name);
+  const team = firstVal(rowObj.Team, rowObj.School, rowObj["Current Team"], rowObj.team);
   return `imp_${String(name).trim().toLowerCase().replace(/\s+/g, "_")}__${String(team)
     .trim()
     .toLowerCase()
     .replace(/\s+/g, "_")}`;
 }
 
+function compareValues(a, b) {
+  const an = normalizeNumber(a);
+  const bn = normalizeNumber(b);
+  const bothNum = Number.isFinite(an) && Number.isFinite(bn) && (String(a).trim() !== "" || String(b).trim() !== "");
+  if (bothNum) return an - bn;
+
+  const as = (a ?? "").toString().toLowerCase();
+  const bs = (b ?? "").toString().toLowerCase();
+  return as < bs ? -1 : as > bs ? 1 : 0;
+}
+
+function rowToPlayer(rowObj) {
+  // Adjust these mappings to your CSV headers:
+  const raw = {
+    id: makeStableId(rowObj),
+    name: firstVal(rowObj.Name, rowObj["Player Name"], rowObj.Player, rowObj.name, "Unknown"),
+    team: firstVal(rowObj.Team, rowObj.School, rowObj["Current Team"], rowObj.team, ""),
+    pos: firstVal(rowObj["Primary Position"], rowObj.Position, rowObj.Pos, rowObj.pos, ""),
+    year: firstVal(rowObj.Class, rowObj.Year, rowObj.year, ""),
+    marketLow: normalizeNumber(firstVal(rowObj["Open Market Low"], rowObj["Market Low"], rowObj.marketLow, 0)),
+    marketHigh: normalizeNumber(firstVal(rowObj["Open Market High"], rowObj["Market High"], rowObj.marketHigh, 0)),
+    stats: rowObj, // keep entire row
+  };
+
+  const p = Player.from(raw);
+  return {
+    id: p.id,
+    name: p.name,
+    team: p.team,
+    pos: p.pos,
+    year: p.year,
+    marketLow: p.marketLow,
+    marketHigh: p.marketHigh,
+    stats: p.stats,
+  };
+}
+
 function guessNilOffer(rowObj) {
-  const low = rowObj["Open Market Low"];
-  const high = rowObj["Open Market High"];
-  const ln = normalizeNumber(low);
-  const hn = normalizeNumber(high);
-  if (Number.isFinite(ln) && Number.isFinite(hn)) return Math.round((ln + hn) / 2);
+  const low = normalizeNumber(firstVal(rowObj["Open Market Low"], rowObj["Market Low"], 0));
+  const high = normalizeNumber(firstVal(rowObj["Open Market High"], rowObj["Market High"], 0));
+  if (low && high) return Math.round((low + high) / 2);
   return 0;
 }
 
 function addToRoster(rowObj) {
   const state = ensureState();
-  const id = getPlayerId(rowObj);
+  const playerJson = rowToPlayer(rowObj);
 
-  // Make sure the board in the builder knows about this player.
-  // We store a simplified player object compatible with your app.js `byId()`.
-  const raw = {
-    id: getPlayerId(rowObj),
-    name: rowObj.Name || rowObj.Player || rowObj["Player Name"] || "Unknown",
-    team: rowObj.Team || rowObj.School || rowObj["Current Team"] || "",
-    pos: rowObj["Primary Position"] || rowObj.Pos || rowObj.Position || "",
-    year: rowObj.Year || rowObj.Class || "",
-    marketLow: normalizeNumber(rowObj["Open Market Low"]),
-    marketHigh: normalizeNumber(rowObj["Open Market High"]),
-    stats: rowObj,
-    };
+  if (!state.board.some(p => String(p.id) === String(playerJson.id))) state.board.unshift(playerJson);
 
-    const player = Player.from(raw);
-
-    // Store plain JSON in localStorage state (recommended)
-    const playerJson = {
-    id: player.id,
-    name: player.name,
-    team: player.team,
-    pos: player.pos,
-    year: player.year,
-    marketLow: player.marketLow,
-    marketHigh: player.marketHigh,
-    stats: player.stats,
-    };
-
-    if (!Array.isArray(state.board)) state.board = [];
-    if (!state.board.some(p => String(p.id) === playerJson.id)) state.board.unshift(playerJson);
-
-  // Add roster entry if not already
-  if (!Array.isArray(state.roster)) state.roster = [];
-  if (!state.roster.some(r => r.id === id)) {
-    state.roster.unshift({ id, nilOffer: guessNilOffer(rowObj) });
+  if (!state.roster.some(r => String(r.id) === String(playerJson.id))) {
+    state.roster.unshift({ id: playerJson.id, nilOffer: guessNilOffer(rowObj) });
   }
 
-  // If it was shortlisted, remove it
-  if (Array.isArray(state.shortlistIds)) {
-    state.shortlistIds = state.shortlistIds.filter(x => x !== id);
-  }
-
+  state.shortlistIds = (state.shortlistIds || []).filter(x => String(x) !== String(playerJson.id));
   saveState(state);
 
-  els.meta.textContent = `Added ${player.name} to roster. Go back to the builder to see it.`;
+  els.meta.textContent = `Added ${playerJson.name} to roster.`;
 }
 
 function renderTable() {
-  const q = (els.search.value || "").trim().toLowerCase();
-
+  const q = (els.search?.value || "").trim().toLowerCase();
   let view = rows;
 
   if (q) {
-    view = view.filter(r =>
-      columns.some(c => String(r[c] ?? "").toLowerCase().includes(q))
-    );
+    view = view.filter(r => columns.some(c => String(r[c] ?? "").toLowerCase().includes(q)));
   }
 
   if (sortKey) {
@@ -178,7 +134,7 @@ function renderTable() {
     });
   }
 
-  const headerHtml = columns
+  const thead = columns
     .map(c => {
       const active = c === sortKey;
       const arrow = active ? (sortDir === "asc" ? " ▲" : " ▼") : "";
@@ -188,39 +144,26 @@ function renderTable() {
     })
     .join("");
 
-  const bodyHtml = view
+  const tbody = view
     .map(r => {
-      const id = getPlayerId(r);
-      const cells = columns
-        .map(c => `<td style="white-space:nowrap;">${escapeHtml(r[c])}</td>`)
-        .join("");
-
-      return `
-        <tr>
-          <td style="white-space:nowrap;">
-            <button class="btn btn-primary" data-add="${escapeHtml(id)}" type="button">Add</button>
-          </td>
-          ${cells}
-        </tr>
-      `;
+      const id = makeStableId(r);
+      const cells = columns.map(c => `<td style="white-space:nowrap;">${escapeHtml(r[c])}</td>`).join("");
+      return `<tr>
+        <td style="white-space:nowrap;">
+          <button class="btn btn-primary" data-add="${escapeHtml(id)}" type="button">Add</button>
+        </td>
+        ${cells}
+      </tr>`;
     })
     .join("");
 
   els.tableWrap.innerHTML = `
     <table style="width:100%;border-collapse:separate;border-spacing:0 8px;">
-      <thead>
-        <tr>
-          <th style="position:sticky;top:0;background:rgba(0,0,0,.35);backdrop-filter:blur(6px);">Roster</th>
-          ${headerHtml}
-        </tr>
-      </thead>
-      <tbody>
-        ${bodyHtml || `<tr><td colspan="${columns.length + 1}" class="muted" style="padding:12px;">No rows found.</td></tr>`}
-      </tbody>
+      <thead><tr><th style="position:sticky;top:0;background:rgba(0,0,0,.35);backdrop-filter:blur(6px);">Roster</th>${thead}</tr></thead>
+      <tbody>${tbody || `<tr><td colspan="${columns.length + 1}" class="muted" style="padding:12px;">No rows found.</td></tr>`}</tbody>
     </table>
   `;
 
-  // Sort header clicks
   els.tableWrap.querySelectorAll("th[data-sort]").forEach(th => {
     th.addEventListener("click", () => {
       const key = th.getAttribute("data-sort");
@@ -230,58 +173,37 @@ function renderTable() {
     });
   });
 
-  // Add button clicks
   els.tableWrap.querySelectorAll("button[data-add]").forEach(btn => {
     btn.addEventListener("click", () => {
       const targetId = btn.getAttribute("data-add");
-      const rowObj = rows.find(r => getPlayerId(r) === targetId);
+      const rowObj = rows.find(r => makeStableId(r) === targetId);
       if (rowObj) addToRoster(rowObj);
     });
   });
 
-  els.meta.textContent = `${view.length.toLocaleString()} rows shown. Click any header to sort.`;
+  els.meta.textContent = `${view.length.toLocaleString()} rows shown. Click a header to sort.`;
 }
 
-async function loadSheet() {
-  const sheet = (els.sheetName.value || "Import_Board").trim();
+async function loadCSV() {
+  els.meta.textContent = "Loading CSV…";
 
-  els.meta.textContent = "Loading workbook…";
+  const res = await fetch(CSV_URL, { cache: "no-store" });
+  if (!res.ok) throw new Error(`Could not fetch CSV (${res.status}). Check publish settings/link.`);
 
-  const res = await fetch(XLSX_PATH, { cache: "no-store" });
-  if (!res.ok) throw new Error(`Could not fetch workbook at ${XLSX_PATH} (${res.status})`);
+  const text = await res.text();
+  rows = parseCSV(text);
 
-  const buf = await res.arrayBuffer();
-  const wb = XLSX.read(buf, { type: "array" });
-
-  const ws = wb.Sheets[sheet];
-  if (!ws) {
-    const available = wb.SheetNames.join(", ");
-    throw new Error(`Sheet "${sheet}" not found. Available: ${available}`);
-  }
-
-  const json = XLSX.utils.sheet_to_json(ws, { defval: "" }); // array of objects
-    // ✅ Trim header whitespace like "Name " -> "Name"
-    rows = json.map((r) => {
-    const out = {};
-    for (const [k, v] of Object.entries(r)) out[String(k).trim()] = v;
-    return out;
-    });
-
-  // Determine columns from the union of keys, keeping first row order preference
-  const colSet = new Set();
-  for (const r of rows) Object.keys(r).forEach(k => colSet.add(k));
-  columns = Array.from(colSet);
-
-  // reset sort
+  // Columns from headers
+  columns = rows.length ? Object.keys(rows[0]) : [];
   sortKey = null;
   sortDir = "asc";
 
   renderTable();
 }
 
-els.search.addEventListener("input", renderTable);
-els.reloadBtn.addEventListener("click", () => loadSheet().catch(err => (els.meta.textContent = err.message)));
+els.search?.addEventListener("input", renderTable);
+els.reloadBtn?.addEventListener("click", () => loadCSV().catch(err => (els.meta.textContent = err.message)));
 
-loadSheet().catch(err => {
+loadCSV().catch(err => {
   els.meta.textContent = err.message;
 });
