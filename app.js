@@ -50,6 +50,7 @@ function defaultState() {
       // example: { id: "p1", nilOffer: 900000 }
     ],
     board: window.DEMO_BOARD || [],
+    statusById: {},
   };
 }
 
@@ -124,6 +125,48 @@ function updateRosterOffer(id, nilOffer) {
   saveState(state);
   render();
 }
+
+function setStatus(id, statusKey) {
+  if (!byId(id)) return;
+
+  state.statusById[id] = statusKey;
+
+  // Optional automation rules:
+  if (statusKey === "signed") {
+    // if signed, ensure in roster
+    if (!inRoster(id)) addToRoster(id);
+  }
+
+  if (statusKey === "passed") {
+    // if passed, remove from pipeline lists
+    if (inShortlist(id)) removeFromShortlist(id);
+    if (inRoster(id)) removeFromRoster(id);
+  }
+
+  saveState(state);
+  render();
+}
+
+function renderStatusPill(id) {
+  const key = state.statusById[id] || "none";
+  return `<span class="status-pill status-${key}">${escapeHtml(statusLabel(key))}</span>`;
+}
+
+function renderStatusSelect(id) {
+  const current = state.statusById[id] || "none";
+  return `
+    <label class="status-control">
+      <span class="status-label">Status</span>
+      <select data-act="set-status" data-id="${id}">
+        ${STATUSES.map(s => `
+          <option value="${s.key}" ${s.key === current ? "selected" : ""}>${s.label}</option>
+        `).join("")}
+      </select>
+    </label>
+  `;
+}
+
+
 
 function calc() {
   const s = state.settings;
@@ -220,6 +263,7 @@ function renderBoard() {
           <div class="row-title">${escapeHtml(p.name)}</div>
           <div class="row-sub">${escapeHtml(p.team)} • ${escapeHtml(p.pos)} • ${escapeHtml(p.year)}</div>
           <div class="row-sub">Market: ${money(p.marketLow)} – ${money(p.marketHigh)}</div>
+          <div class="row-sub" style="margin-top:10px;"> ${renderStatusSelect(p.id)}</div>
         </div>
         <div class="row-actions">
           <button class="btn btn-ghost" data-act="shortlist" data-id="${p.id}" ${alreadyShort}>Shortlist</button>
@@ -245,6 +289,7 @@ function renderShortlist() {
       <div class="row-main">
         <div class="row-title">${escapeHtml(p.name)}</div>
         <div class="row-sub">${escapeHtml(p.team)} • ${escapeHtml(p.pos)} • ${escapeHtml(p.year)}</div>
+        <div class="row-sub" style="margin-top:10px;">${renderStatusSelect(p.id)}</div>      
       </div>
       <div class="row-actions">
         <button class="btn btn-ghost" data-act="shortlist-remove" data-id="${p.id}">Remove</button>
@@ -268,6 +313,8 @@ function renderRoster() {
         <div class="row-main">
           <div class="row-title">${escapeHtml(p.name)}</div>
           <div class="row-sub">${escapeHtml(p.team)} • ${escapeHtml(p.pos)} • ${escapeHtml(p.year)}</div>
+          <div class="row-sub" style="margin-top:10px;">${renderStatusSelect(p.id)}</div>
+          
           <div class="offer">
             <label>NIL Offer</label>
             <input type="number" min="0" step="1000" value="${Number(entry.nilOffer || 0)}"
@@ -376,6 +423,16 @@ els.importInput?.addEventListener("change", async () => {
     els.importInput.value = "";
   }
 });
+
+function handleStatusChange(e) {
+  const sel = e.target.closest("select[data-act='set-status']");
+  if (!sel) return;
+  const id = sel.getAttribute("data-id");
+  setStatus(id, sel.value);
+}
+
+// Works for selects inside any list/panel
+document.addEventListener("change", handleStatusChange);
 
 els.resetBtn?.addEventListener("click", () => {
   localStorage.removeItem(STORAGE_KEY);

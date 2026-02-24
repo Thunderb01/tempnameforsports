@@ -33,6 +33,16 @@ input,select,button{font:inherit}
   justify-content:space-between;
 }
 .brand{display:inline-flex;gap:10px;align-items:center;font-weight:800}
+
+.brand-logo{
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  object-fit: cover;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,.06);
+}
+
 .brand-mark{
   width:38px;height:38px;border-radius:12px;
   display:grid;place-items:center;
@@ -142,6 +152,51 @@ input,select,button{font:inherit}
   outline:none;
 }
 .actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+
+
+.status-pill{
+  display:inline-flex;
+  align-items:center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  margin-left: 10px;
+  font-size: .8rem;
+  font-weight: 800;
+  border: 1px solid rgba(255,255,255,.14);
+  background: rgba(255,255,255,.06);
+  color: rgba(255,255,255,.85);
+  vertical-align: middle;
+}
+
+.status-control{
+  display:inline-grid;
+  grid-template-columns: 60px 1fr;
+  gap: 10px;
+  align-items:center;
+  max-width: 420px;
+}
+
+.status-label{
+  color: rgba(255,255,255,.65);
+  font-size: .9rem;
+}
+
+.status-control select{
+  width: 100%;
+  border-radius: 14px;
+  padding: 10px 10px;
+  border: 1px solid var(--border);
+  background: rgba(0,0,0,.25);
+  color: var(--text);
+  outline: none;
+}
+
+/* Optional color accents per status (subtle) */
+.status-interested { border-color: rgba(110,210,255,.35); }
+.status-contacted  { border-color: rgba(255,210,110,.35); }
+.status-visit      { border-color: rgba(200,160,255,.35); }
+.status-signed     { border-color: rgba(130,255,160,.35); }
+.status-passed     { border-color: rgba(255,120,120,.35); opacity: .85; }
 
 .summary-grid{
   display:grid;
