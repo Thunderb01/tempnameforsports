@@ -1,3 +1,5 @@
+import { Player } from "./player.js";
+
 const STORAGE_KEY = "bp_roster_builder_v1";
 
 const els = {
@@ -160,7 +162,7 @@ state.statusById = state.statusById || {};
 if (!Array.isArray(state.board) || state.board.length === 0) {
   state.board = window.DEMO_BOARD || [];
 }
-
+state.board = state.board.map(Player.from);
 
 saveState(state); // optional but helps normalize stored data
 
