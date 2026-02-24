@@ -150,12 +150,17 @@ function defaultState() {
 
 let state = loadState() ?? defaultState();
 
-// ✅ migration / hardening for older saved builds
-state.board = state.board || (window.DEMO_BOARD || []);
-state.shortlistIds = state.shortlistIds || [];
-state.roster = state.roster || [];
+// migration / hardening
+state.shortlistIds = Array.isArray(state.shortlistIds) ? state.shortlistIds : [];
+state.roster = Array.isArray(state.roster) ? state.roster : [];
 state.settings = state.settings || defaultState().settings;
-state.statusById = state.statusById || {}; // IMPORTANT
+state.statusById = state.statusById || {};
+
+// ✅ critical: repopulate board if missing/invalid/empty
+if (!Array.isArray(state.board) || state.board.length === 0) {
+  state.board = window.DEMO_BOARD || [];
+}
+
 
 saveState(state); // optional but helps normalize stored data
 
