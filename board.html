@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Full Board — Beyond the Portal</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="./app.html" aria-label="Back to Roster Builder">
+        <span class="brand-mark">BP</span>
+        <span class="brand-name">Beyond the Portal</span>
+      </a>
+      <nav class="nav">
+        <a class="btn btn-ghost" href="./app.html">Back to Builder</a>
+      </nav>
+    </header>
+
+    <main class="section">
+      <h1 style="margin-top:0;">Import Board</h1>
+
+      <div class="settings" style="grid-template-columns: 2fr 1fr 1fr; align-items:end;">
+        <div class="setting">
+          <label>Search</label>
+          <input id="search" type="search" placeholder="Name, team, anything…" />
+        </div>
+
+        <div class="setting">
+          <label>Sheet name</label>
+          <input id="sheetName" type="text" value="Import Board" />
+        </div>
+
+        <div class="setting">
+          <button class="btn btn-primary" id="reloadBtn" type="button">Reload</button>
+        </div>
+
+        <div class="setting setting-wide">
+          <div id="meta" class="muted"></div>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-top:14px;">
+        <div class="list" id="tableWrap" style="overflow:auto;"></div>
+      </div>
+    </main>
+
+    <!-- SheetJS (XLSX parser) -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+    <script src="./board.js"></script>
+  </body>
+</html>
