@@ -17,6 +17,8 @@ const els = {
   warnings: document.getElementById("warnings"),
   boardSearch: document.getElementById("boardSearch"),
   posFilter: document.getElementById("posFilter"),
+  tagGroup: document.getElementById("tagGroup"),
+  tagFilter: document.getElementById("tagFilter"),
   boardList: document.getElementById("boardList"),
   shortlist: document.getElementById("shortlist"),
   roster: document.getElementById("roster"),
@@ -35,6 +37,66 @@ const els = {
   playerModalId: document.getElementById("playerModalId"),
   importCsvBtn: document.getElementById("importCsvBtn"),
 };
+
+function parseTags(v) {
+  if (v === null || v === undefined) return [];
+  const s = String(v).trim();
+  if (!s) return [];
+  // Supports: "Shooter, Stretch Big" or "Shooter|Stretch Big" (and variants)
+  return s
+    .split(/[,|]/)
+    .map(t => t.trim())
+    .filter(Boolean);
+}
+
+function uniq(arr) {
+  const out = [];
+  const seen = new Set();
+  for (const x of (arr || [])) {
+    const s = String(x || "").trim();
+    if (!s) continue;
+    const k = s.toLowerCase();
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push(s);
+  }
+  return out;
+}
+
+function normalizeStoredPlayer(obj) {
+  const o = obj || {};
+  const p = Player.from({
+    id: o.id,
+    name: o.name,
+    team: o.team,
+    pos: o.pos,
+    year: o.year,
+    marketLow: o.marketLow,
+    marketHigh: o.marketHigh,
+    tags: Array.isArray(o.tags) ? o.tags : [],
+    stats: o.stats || {},
+  });
+
+  const playmakerTags = Array.isArray(o.playmakerTags) ? o.playmakerTags : parseTags(o.playmakerTags);
+  const shootingTags = Array.isArray(o.shootingTags) ? o.shootingTags : parseTags(o.shootingTags);
+  const combined = uniq([...(p.tags || []), ...playmakerTags, ...shootingTags]);
+
+  return {
+    id: p.id,
+    name: p.name,
+    team: p.team,
+    pos: p.pos,
+    year: p.year,
+    marketLow: p.marketLow,
+    marketHigh: p.marketHigh,
+    // combined convenience list (kept for backward compatibility)
+    tags: combined,
+    // category-specific tags
+    playmakerTags: uniq(playmakerTags),
+    shootingTags: uniq(shootingTags),
+    stats: p.stats,
+  };
+}
 
 const STATUSES = [
   { key: "none", label: "No status" },
@@ -175,18 +237,7 @@ if (!state.board.length && Array.isArray(window.DEMO_BOARD) && window.DEMO_BOARD
 }
 
 // Normalize board rows into a stable plain-object shape (safe for localStorage)
-state.board = state.board
-  .map(Player.from)
-  .map(p => ({
-    id: p.id,
-    name: p.name,
-    team: p.team,
-    pos: p.pos,
-    year: p.year,
-    marketLow: p.marketLow,
-    marketHigh: p.marketHigh,
-    stats: p.stats,
-  }));
+state.board = state.board.map(normalizeStoredPlayer);
 
 saveState(state); // optional but helps normalize stored data
 
@@ -203,6 +254,30 @@ function makeStableIdFromRow(r) {
 }
 
 function rowToPlayer(r) {
+  const playmakerTags = parseTags(firstVal(
+    r["Play Maker Tags"],
+    r["Playmaker Tags"],
+    r["Playmaker Tag"],
+    r.PlaymakerTags,
+    r.playmakerTags,
+    ""
+  ));
+
+  const shootingTags = parseTags(firstVal(
+    r["Shooting and Scoring Tags"],
+    r["Shooting & Scoring Tags"],
+    r["Shooting/Scoring Tags"],
+    r["Shooting Scoring Tags"],
+    r.ShootingScoringTags,
+    r.shootingTags,
+    ""
+  ));
+
+  // Back-compat / generic tag column (if you have one)
+  const genericTags = parseTags(firstVal(r.Tags, r.Tag, r["Player Tags"], r["Player Tag"], r.tags, ""));
+
+  const combinedTags = uniq([...genericTags, ...playmakerTags, ...shootingTags]);
+
   const raw = {
     id: makeStableIdFromRow(r),
     name: firstVal(r.Name, r["Player Name"], r.Player, r.name, "Unknown"),
@@ -211,6 +286,7 @@ function rowToPlayer(r) {
     year: firstVal(r.Class, r.Year, r.year, ""),
     marketLow: normalizeNumber(firstVal(r["Open Market Low"], r["Market Low"], r.marketLow, 0)),
     marketHigh: normalizeNumber(firstVal(r["Open Market High"], r["Market High"], r.marketHigh, 0)),
+    tags: combinedTags,
     stats: r, // keep full row for modal/stats page
   };
 
@@ -225,6 +301,11 @@ function rowToPlayer(r) {
     year: p.year,
     marketLow: p.marketLow,
     marketHigh: p.marketHigh,
+    // combined convenience list
+    tags: Array.isArray(p.tags) ? p.tags : [],
+    // category-specific tags (what you're referring to)
+    playmakerTags: uniq(playmakerTags),
+    shootingTags: uniq(shootingTags),
     stats: p.stats,
   };
 }
@@ -450,29 +531,80 @@ function renderSummary() {
   }
 }
 
+function tagsForGroup(player, group) {
+  if (group === "playmaker") return Array.isArray(player.playmakerTags) ? player.playmakerTags : [];
+  if (group === "shooting") return Array.isArray(player.shootingTags) ? player.shootingTags : [];
+  // "all": union of both + generic
+  return Array.isArray(player.tags) ? player.tags : [];
+}
+
+function getUniqueTags(board, group = "all") {
+  const set = new Map();
+  (board || []).forEach(p => {
+    (tagsForGroup(p, group) || []).forEach(t => {
+      const key = String(t || "").trim();
+      if (!key) return;
+      // de-dupe case-insensitively, keep first seen display text
+      const low = key.toLowerCase();
+      if (!set.has(low)) set.set(low, key);
+    });
+  });
+  return Array.from(set.values()).sort((a, b) => a.localeCompare(b));
+}
+
+function rebuildTagFilterOptions() {
+  if (!els.tagFilter) return;
+  const prev = els.tagFilter.value || "all";
+  const group = els.tagGroup?.value || "all";
+  const tags = getUniqueTags(state.board, group);
+  const opts = [`<option value="all">All tags</option>`]
+    .concat(tags.map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`));
+  els.tagFilter.innerHTML = opts.join("");
+  // restore selection if possible
+  const canRestore = prev !== "all" && tags.includes(prev);
+  els.tagFilter.value = canRestore ? prev : "all";
+}
+
 function renderBoard() {
   const q = (els.boardSearch.value || "").trim().toLowerCase();
   const pos = els.posFilter.value;
+  const group = els.tagGroup?.value || "all";
+  const tag = els.tagFilter?.value || "all";
 
   const filtered = state.board.filter(p => {
     const matchesQ =
       !q ||
       p.name.toLowerCase().includes(q) ||
-      (p.team || "").toLowerCase().includes(q);
+      (p.team || "").toLowerCase().includes(q) ||
+      (uniq([
+        ...(Array.isArray(p.tags) ? p.tags : []),
+        ...(Array.isArray(p.playmakerTags) ? p.playmakerTags : []),
+        ...(Array.isArray(p.shootingTags) ? p.shootingTags : []),
+      ]).join(" ")).toLowerCase().includes(q);
 
     const matchesPos = pos === "all" ? true : p.pos === pos;
-    return matchesQ && matchesPos;
+    const pool = tagsForGroup(p, group);
+    const matchesTag = tag === "all" ? true : (Array.isArray(pool) && pool.includes(tag));
+    return matchesQ && matchesPos && matchesTag;
   });
 
   els.boardList.innerHTML = filtered.map(p => {
     const disabled = inRoster(p.id) ? "disabled" : "";
     const alreadyShort = inShortlist(p.id) ? "disabled" : "";
+
+    const pm = (Array.isArray(p.playmakerTags) ? p.playmakerTags : []).slice(0, 6)
+      .map(t => `<span class="tag-chip">${escapeHtml(t)}</span>`).join("");
+    const ss = (Array.isArray(p.shootingTags) ? p.shootingTags : []).slice(0, 6)
+      .map(t => `<span class="tag-chip">${escapeHtml(t)}</span>`).join("");
+
     return `
       <div class="row row-click" data-player-id="${p.id}">
         <div class="row-main">
           <div class="row-title">${escapeHtml(p.name)}</div>
           <div class="row-sub">${escapeHtml(p.team)} • ${escapeHtml(p.pos)} • ${escapeHtml(p.year)}</div>
           <div class="row-sub">Market: ${money(p.marketLow)} – ${money(p.marketHigh)}</div>
+          <div class="row-sub tag-row"><span class="muted" style="margin-right:6px;">Play Maker:</span> ${pm || `<span class="muted">—</span>`}</div>
+          <div class="row-sub tag-row"><span class="muted" style="margin-right:6px;">Shooting &amp; Scoring:</span> ${ss || `<span class="muted">—</span>`}</div>
           <div class="row-sub" style="margin-top:10px;"> ${renderStatusSelect(p.id)}</div>
         </div>
         <div class="row-actions">
@@ -548,6 +680,7 @@ function render() {
   els.maxPct.value = state.settings.maxPct;
 
   renderSummary();
+  rebuildTagFilterOptions();
   renderBoard();
   renderShortlist();
   renderRoster();
@@ -588,6 +721,11 @@ document.addEventListener("keydown", (e) => {
 
 els.boardSearch?.addEventListener("input", renderBoard);
 els.posFilter?.addEventListener("change", renderBoard);
+els.tagGroup?.addEventListener("change", () => {
+  rebuildTagFilterOptions();
+  renderBoard();
+});
+els.tagFilter?.addEventListener("change", renderBoard);
 
 // Board click actions
 els.boardList?.addEventListener("click", (e) => {

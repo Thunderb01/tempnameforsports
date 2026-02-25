@@ -6,7 +6,7 @@
     <title>Roster Builder — Beyond the Portal</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
-  <body>
+  <body class="page-builder">
     <header class="site-header">
       <a class="brand" href="./" aria-label="Beyond the Portal home">
         <img class="brand-logo" src="./imgs/beyond_the_portal_logo.jpg" alt="Beyond the Portal" />
@@ -73,6 +73,14 @@
                 <option value="Guard">Guard</option>
                 <option value="Wing">Wing</option>
                 <option value="Big">Big</option>
+              </select>
+              <select id="tagGroup">
+                <option value="all" selected>All tag types</option>
+                <option value="playmaker">Play Maker</option>
+                <option value="shooting">Shooting &amp; Scoring</option>
+              </select>
+              <select id="tagFilter">
+                <option value="all" selected>All tags</option>
               </select>
             </div>
           </div>

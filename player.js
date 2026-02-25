@@ -9,7 +9,7 @@ export class Player {
     marketLow = 0,
     marketHigh = 0,
     stats = {},
-    tags = {}
+    tags = []
   }) {
     this.id = String(id);
     this.name = String(name);
@@ -19,7 +19,18 @@ export class Player {
     this.marketLow = Number(marketLow) || 0;
     this.marketHigh = Number(marketHigh) || 0;
     this.stats = stats || {};
-    this.tags = {}
+
+    // tags: always store as an array of strings
+    if (Array.isArray(tags)) {
+      this.tags = tags.map(t => String(t).trim()).filter(Boolean);
+    } else if (typeof tags === "string") {
+      this.tags = tags
+        .split(/[,|]/)
+        .map(t => t.trim())
+        .filter(Boolean);
+    } else {
+      this.tags = [];
+    }
   }
 
   marketMid() {
