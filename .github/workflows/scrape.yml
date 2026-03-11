@@ -1,0 +1,47 @@
+# .github/workflows/scrape.yml
+# Runs the BBRef scraper nightly and commits updated CSV back to main.
+# GitHub Pages will auto-redeploy with fresh data.
+#
+# Setup:
+#   1. Go to Settings → Actions → General → Workflow permissions
+#   2. Enable "Read and write permissions"
+#   3. That's it — no secrets needed.
+
+name: Nightly Stats Scrape
+
+on:
+  schedule:
+    - cron: "0 7 * * *"   # 7:00 AM UTC = 2 or 3 AM ET (after late games finish)
+  workflow_dispatch:        # also lets you trigger it manually from the Actions tab
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install requests pandas lxml
+
+      - name: Run scraper
+        run: |
+          python scraper.py \
+            --min-mpg 12 \
+            --min-games 8 \
+            --output "data/BeyondThePortal_GM_Tool - Import_Board.csv"
+
+      - name: Commit updated CSV (if changed)
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add "data/BeyondThePortal_GM_Tool - Import_Board.csv"
+          # Only commit if something actually changed
+          git diff --cached --quiet || git commit -m "chore: auto-update player stats $(date -u '+%Y-%m-%d')"
+          git push
