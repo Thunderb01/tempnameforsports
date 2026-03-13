@@ -1,0 +1,497 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Role Prioritization — Beyond the Portal</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <style>
+      .rp-shell {
+        max-width: var(--max);
+        margin: 0 auto;
+        padding: 30px 18px 60px;
+        flex: 1 1 auto;
+      }
+
+      .rp-header {
+        margin-bottom: 28px;
+      }
+      .rp-header h1 { margin: 0 0 6px; }
+      .rp-header p  { margin: 0; color: var(--muted); }
+
+      /* 3-column position grid */
+      .pos-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 16px;
+      }
+      @media (max-width: 860px) { .pos-grid { grid-template-columns: 1fr; } }
+
+      .pos-card {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      /* coloured top accent per position */
+      .pos-card.guard  { border-top: 3px solid rgba(85,130,255,.7); }
+      .pos-card.wing   { border-top: 3px solid rgba(255,90,180,.7); }
+      .pos-card.big    { border-top: 3px solid rgba(90,220,180,.7); }
+
+      .pos-label {
+        font-size: .8rem;
+        font-weight: 800;
+        letter-spacing: .08em;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin-bottom: 2px;
+      }
+      .pos-card.guard  .pos-label { color: rgba(85,130,255,.9); }
+      .pos-card.wing   .pos-label { color: rgba(255,90,180,.9); }
+      .pos-card.big    .pos-label { color: rgba(90,220,180,.9); }
+
+      .pos-title {
+        font-size: 1.3rem;
+        font-weight: 850;
+        margin: 0;
+      }
+
+      .role-field {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .role-field label {
+        font-size: .85rem;
+        color: var(--muted);
+        font-weight: 600;
+      }
+      .role-field select, .role-field input[type="text"] {
+        width: 100%;
+        border-radius: 14px;
+        padding: 10px 12px;
+        border: 1px solid var(--border);
+        background: rgba(0,0,0,.25);
+        color: var(--text);
+        outline: none;
+        font: inherit;
+        cursor: pointer;
+      }
+      .role-field select:focus, .role-field input[type="text"]:focus {
+        border-color: rgba(85,130,255,.5);
+      }
+
+      /* target count row */
+      .target-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        background: rgba(0,0,0,.18);
+        border: 1px solid rgba(255,255,255,.10);
+        border-radius: 14px;
+        padding: 10px 14px;
+      }
+      .target-row label {
+        flex: 1;
+        font-size: .88rem;
+        color: var(--muted);
+      }
+      .target-row input[type="number"] {
+        width: 60px;
+        border-radius: 10px;
+        padding: 6px 10px;
+        border: 1px solid var(--border);
+        background: rgba(0,0,0,.3);
+        color: var(--text);
+        font: inherit;
+        text-align: center;
+        outline: none;
+      }
+
+      /* notes textarea */
+      .role-field textarea {
+        width: 100%;
+        border-radius: 14px;
+        padding: 10px 12px;
+        border: 1px solid var(--border);
+        background: rgba(0,0,0,.25);
+        color: var(--text);
+        outline: none;
+        font: inherit;
+        resize: vertical;
+        min-height: 72px;
+      }
+      .role-field textarea:focus {
+        border-color: rgba(85,130,255,.5);
+      }
+
+      /* save bar */
+      .save-bar {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        margin-top: 28px;
+        flex-wrap: wrap;
+      }
+      .save-confirm {
+        color: rgba(130,255,160,.9);
+        font-size: .9rem;
+        font-weight: 700;
+        opacity: 0;
+        transition: opacity .3s;
+      }
+      .save-confirm.show { opacity: 1; }
+
+      /* summary strip */
+      .summary-strip {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+        margin-bottom: 24px;
+      }
+      @media (max-width: 860px) { .summary-strip { grid-template-columns: 1fr; } }
+
+      .strip-card {
+        background: rgba(0,0,0,.22);
+        border: 1px solid rgba(255,255,255,.10);
+        border-radius: 16px;
+        padding: 14px 16px;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+      }
+      .strip-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        flex-shrink: 0;
+      }
+      .guard-dot  { background: rgba(85,130,255,.9); }
+      .wing-dot   { background: rgba(255,90,180,.9); }
+      .big-dot    { background: rgba(90,220,180,.9); }
+
+      .strip-info { flex: 1; min-width: 0; }
+      .strip-pos  { font-size: .8rem; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
+      .strip-role { font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+      .strip-count { font-size: 1.6rem; font-weight: 900; }
+    </style>
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="./" aria-label="Beyond the Portal home">
+        <img class="brand-logo" src="./imgs/beyond_the_portal_logo.jpg" alt="Beyond the Portal" />
+        <span class="brand-name">Beyond the Portal</span>
+      </a>
+      <nav class="nav">
+        <a href="./">Home</a>
+        <a href="./app.html">Roster Builder</a>
+        <a href="./board.html">Board</a>
+      </nav>
+    </header>
+
+    <main class="rp-shell">
+      <div class="rp-header">
+        <h1>Role Prioritization</h1>
+        <p>Define the primary role and secondary emphasis for each position group. Settings are saved locally and applied to your board.</p>
+      </div>
+
+      <!-- live summary strip -->
+      <div class="summary-strip">
+        <div class="strip-card">
+          <div class="strip-dot guard-dot"></div>
+          <div class="strip-info">
+            <div class="strip-pos">Guards</div>
+            <div class="strip-role" id="sum-guard-role">—</div>
+          </div>
+          <div class="strip-count" id="sum-guard-count">—</div>
+        </div>
+        <div class="strip-card">
+          <div class="strip-dot wing-dot"></div>
+          <div class="strip-info">
+            <div class="strip-pos">Wings</div>
+            <div class="strip-role" id="sum-wing-role">—</div>
+          </div>
+          <div class="strip-count" id="sum-wing-count">—</div>
+        </div>
+        <div class="strip-card">
+          <div class="strip-dot big-dot"></div>
+          <div class="strip-info">
+            <div class="strip-pos">Bigs</div>
+            <div class="strip-role" id="sum-big-role">—</div>
+          </div>
+          <div class="strip-count" id="sum-big-count">—</div>
+        </div>
+      </div>
+
+      <!-- position cards -->
+      <div class="pos-grid">
+
+        <!-- GUARDS -->
+        <div class="pos-card guard">
+          <div>
+            <div class="pos-label">Guards</div>
+            <h2 class="pos-title">Guard Roles</h2>
+          </div>
+
+          <div class="target-row">
+            <label>Target Count</label>
+            <input type="number" id="guard-count" min="0" max="15" value="6" />
+          </div>
+
+          <div class="role-field">
+            <label>Primary Role</label>
+            <select id="guard-primary">
+              <option>Defense-Focused</option>
+              <option>Primary Ball Handler</option>
+              <option>Combo Guard</option>
+              <option>Shooting Guard</option>
+              <option>3-and-D</option>
+              <option>Point-of-Attack Defender</option>
+              <option>Scoring Guard</option>
+              <option>Pass-First PG</option>
+            </select>
+          </div>
+
+          <div class="role-field">
+            <label>Secondary Emphasis</label>
+            <select id="guard-secondary">
+              <option>Shooter</option>
+              <option>Playmaking</option>
+              <option>Defense</option>
+              <option>Scoring</option>
+              <option>Ball Handling</option>
+              <option>Athleticism</option>
+              <option>Size/Length</option>
+              <option>IQ / Decision Making</option>
+            </select>
+          </div>
+
+          <div class="role-field">
+            <label>Notes</label>
+            <textarea id="guard-notes" placeholder="e.g. Need a high-assist, low-turnover lead guard…"></textarea>
+          </div>
+        </div>
+
+        <!-- WINGS -->
+        <div class="pos-card wing">
+          <div>
+            <div class="pos-label">Wings</div>
+            <h2 class="pos-title">Wing Roles</h2>
+          </div>
+
+          <div class="target-row">
+            <label>Target Count</label>
+            <input type="number" id="wing-count" min="0" max="15" value="5" />
+          </div>
+
+          <div class="role-field">
+            <label>Primary Role</label>
+            <select id="wing-primary">
+              <option>Defense / Motor / Glue</option>
+              <option>3-and-D Wing</option>
+              <option>Stretch 4</option>
+              <option>Scoring Wing</option>
+              <option>Versatile Defender</option>
+              <option>Playmaking Wing</option>
+              <option>Athletic Finisher</option>
+              <option>Two-Way Wing</option>
+            </select>
+          </div>
+
+          <div class="role-field">
+            <label>Secondary Emphasis</label>
+            <select id="wing-secondary">
+              <option>Shooting</option>
+              <option>Defense</option>
+              <option>Playmaking</option>
+              <option>Scoring</option>
+              <option>Rebounding</option>
+              <option>Athleticism</option>
+              <option>Versatility</option>
+              <option>Size/Length</option>
+            </select>
+          </div>
+
+          <div class="role-field">
+            <label>Notes</label>
+            <textarea id="wing-notes" placeholder="e.g. Looking for switchable wings who can guard 1-4…"></textarea>
+          </div>
+        </div>
+
+        <!-- BIGS -->
+        <div class="pos-card big">
+          <div>
+            <div class="pos-label">Bigs</div>
+            <h2 class="pos-title">Big Roles</h2>
+          </div>
+
+          <div class="target-row">
+            <label>Target Count</label>
+            <input type="number" id="big-count" min="0" max="15" value="4" />
+          </div>
+
+          <div class="role-field">
+            <label>Primary Role</label>
+            <select id="big-primary">
+              <option>Stretch</option>
+              <option>Rim Protector</option>
+              <option>High-Low Big</option>
+              <option>Rebounding Big</option>
+              <option>Face-Up 4</option>
+              <option>Mobile Screener</option>
+              <option>Passing Big</option>
+              <option>Two-Way Big</option>
+            </select>
+          </div>
+
+          <div class="role-field">
+            <label>Secondary Emphasis</label>
+            <select id="big-secondary">
+              <option>Rim Protection</option>
+              <option>Shooting</option>
+              <option>Rebounding</option>
+              <option>Passing / IQ</option>
+              <option>Post Scoring</option>
+              <option>Pick-and-Roll</option>
+              <option>Mobility</option>
+              <option>Physicality</option>
+            </select>
+          </div>
+
+          <div class="role-field">
+            <label>Notes</label>
+            <textarea id="big-notes" placeholder="e.g. Need at least one true rim protector…"></textarea>
+          </div>
+        </div>
+
+      </div><!-- /pos-grid -->
+
+      <div class="save-bar">
+        <button class="btn btn-primary" id="saveBtn" type="button">Save Settings</button>
+        <button class="btn btn-ghost" id="resetBtn" type="button">Reset to Defaults</button>
+        <span class="save-confirm" id="saveConfirm">✓ Saved</span>
+      </div>
+    </main>
+
+    <script>
+      const STORAGE_KEY = "bp_role_prioritization_v1";
+
+      const DEFAULTS = {
+        guardPrimary:   "Defense-Focused",
+        guardSecondary: "Shooter",
+        guardCount:     6,
+        guardNotes:     "",
+        wingPrimary:    "Defense / Motor / Glue",
+        wingSecondary:  "Shooting",
+        wingCount:      5,
+        wingNotes:      "",
+        bigPrimary:     "Stretch",
+        bigSecondary:   "Rim Protection",
+        bigCount:       4,
+        bigNotes:       "",
+      };
+
+      function load() {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          return raw ? { ...DEFAULTS, ...JSON.parse(raw) } : { ...DEFAULTS };
+        } catch { return { ...DEFAULTS }; }
+      }
+
+      function save() {
+        const data = {
+          guardPrimary:   document.getElementById("guard-primary").value,
+          guardSecondary: document.getElementById("guard-secondary").value,
+          guardCount:     Number(document.getElementById("guard-count").value),
+          guardNotes:     document.getElementById("guard-notes").value,
+          wingPrimary:    document.getElementById("wing-primary").value,
+          wingSecondary:  document.getElementById("wing-secondary").value,
+          wingCount:      Number(document.getElementById("wing-count").value),
+          wingNotes:      document.getElementById("wing-notes").value,
+          bigPrimary:     document.getElementById("big-primary").value,
+          bigSecondary:   document.getElementById("big-secondary").value,
+          bigCount:       Number(document.getElementById("big-count").value),
+          bigNotes:       document.getElementById("big-notes").value,
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+        return data;
+      }
+
+      function setSelectValue(id, val) {
+        const el = document.getElementById(id);
+        // try to match existing option, else add it
+        const existing = [...el.options].find(o => o.value === val || o.text === val);
+        if (existing) {
+          el.value = existing.value;
+        } else if (val) {
+          const opt = new Option(val, val, true, true);
+          el.add(opt);
+        }
+      }
+
+      function populate(data) {
+        setSelectValue("guard-primary",   data.guardPrimary);
+        setSelectValue("guard-secondary", data.guardSecondary);
+        document.getElementById("guard-count").value = data.guardCount;
+        document.getElementById("guard-notes").value = data.guardNotes || "";
+
+        setSelectValue("wing-primary",    data.wingPrimary);
+        setSelectValue("wing-secondary",  data.wingSecondary);
+        document.getElementById("wing-count").value = data.wingCount;
+        document.getElementById("wing-notes").value = data.wingNotes || "";
+
+        setSelectValue("big-primary",     data.bigPrimary);
+        setSelectValue("big-secondary",   data.bigSecondary);
+        document.getElementById("big-count").value = data.bigCount;
+        document.getElementById("big-notes").value = data.bigNotes || "";
+
+        updateStrip(data);
+      }
+
+      function updateStrip(data) {
+        document.getElementById("sum-guard-role").textContent  = data.guardPrimary  || "—";
+        document.getElementById("sum-guard-count").textContent = data.guardCount    ?? "—";
+        document.getElementById("sum-wing-role").textContent   = data.wingPrimary   || "—";
+        document.getElementById("sum-wing-count").textContent  = data.wingCount     ?? "—";
+        document.getElementById("sum-big-role").textContent    = data.bigPrimary    || "—";
+        document.getElementById("sum-big-count").textContent   = data.bigCount      ?? "—";
+      }
+
+      // live strip updates as user changes selects / inputs
+      ["guard-primary","guard-count","wing-primary","wing-count","big-primary","big-count"].forEach(id => {
+        document.getElementById(id).addEventListener("input", () => {
+          updateStrip({
+            guardPrimary: document.getElementById("guard-primary").value,
+            guardCount:   Number(document.getElementById("guard-count").value),
+            wingPrimary:  document.getElementById("wing-primary").value,
+            wingCount:    Number(document.getElementById("wing-count").value),
+            bigPrimary:   document.getElementById("big-primary").value,
+            bigCount:     Number(document.getElementById("big-count").value),
+          });
+        });
+      });
+
+      document.getElementById("saveBtn").addEventListener("click", () => {
+        const data = save();
+        updateStrip(data);
+        const confirm = document.getElementById("saveConfirm");
+        confirm.classList.add("show");
+        setTimeout(() => confirm.classList.remove("show"), 2000);
+      });
+
+      document.getElementById("resetBtn").addEventListener("click", () => {
+        if (confirm("Reset all role settings to defaults?")) {
+          localStorage.removeItem(STORAGE_KEY);
+          populate({ ...DEFAULTS });
+        }
+      });
+
+      // init
+      populate(load());
+    </script>
+  </body>
+</html>

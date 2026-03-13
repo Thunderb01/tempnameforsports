@@ -206,6 +206,18 @@ def parse_bio(soup):
 
     return team, pos, yr
 
+def get_most_recent_row(df, year):
+    """Return the row matching the given season year, e.g. 2026 → '2025-26'."""
+    # Convert 2026 → "2025-26"
+    season_str = f"{year - 1}-{str(year)[-2:]}"
+    
+    match = df[df["Season"].astype(str).str.startswith(season_str)]
+    
+    if match.empty:
+        print(f"    ⚠  No row found for {season_str}, falling back to last row")
+        return df.iloc[-1]
+    
+    return match.iloc[-1]
 
 def parse_table(html, table_id):
     """Return the last (most recent) data row of a stats table as a Series."""
@@ -224,9 +236,13 @@ def parse_table(html, table_id):
     if "Season" in df.columns:
         df = df[df["Season"].notna()].copy()
         df = df[~df["Season"].astype(str).str.contains("Career|Season", na=False)].copy()
-
+        df = df[df["Season"].astype(str).str.startswith("2025-26")].copy()
     if df.empty:
         return None
+    
+    # print(df.iloc[0])
+
+    # print(df.iloc[-1])
 
     return df.iloc[-1]   # most recent season
 
@@ -241,6 +257,7 @@ def scrape_player(url):
     team, pos, yr = parse_bio(soup)
     pg            = parse_table(html, "players_per_game")
     adv           = parse_table(html, "players_advanced")
+    totals        = parse_table(html, "players_totals")
 
     if pg is None:
         print(f"    ⚠  No per-game table found — skipping {name}")
@@ -261,6 +278,23 @@ def scrape_player(url):
     fg_pct = safe_float(pg.get("FG%", 0))
     ft_pct = safe_float(pg.get("FT%", 0))
     tp_pct = safe_float(pg.get("3P%", 0))
+
+    # ── Total stats ────────────────────────────────────────────────
+    if totals is not None:
+        tgp  = safe_float(totals.get("G",   0))
+        tgs  = safe_float(totals.get("GS",  0))
+        tmp  = safe_float(totals.get("MP",  0))
+        tfg  = safe_float(totals.get("FG",  0))
+        tfga = safe_float(totals.get("FGA", 0))
+        tft  = safe_float(totals.get("FT",  0))
+        t3p  = safe_float(totals.get("3P",  0))
+
+        tov  = safe_float(totals.get("TOV", 0))
+        tblk = safe_float(totals.get("BLK", 0))
+        tstl = safe_float(totals.get("STL", 0))
+        trb  = safe_float(totals.get("TRB", 0))
+        tast = safe_float(totals.get("AST", 0))
+        tpts = safe_float(totals.get("PTS", 0))
 
     # ── Derived stats ─────────────────────────────────────────────────
     ast_tov = calc_ast_tov(apg, tpg)
@@ -377,8 +411,11 @@ def parse_args():
     p = argparse.ArgumentParser(description="Scrape BBRef player pages → BeyondThePortal CSV")
     p.add_argument("--players", default="players.txt",
                    help="Text file with one BBRef URL per line (default: players.txt)")
+    p.add_argument("--year", type=int, default=2026,
+               help="Season year to pull, e.g. 2026 for the 2025-26 season")
     p.add_argument("--output",  default="data/BeyondThePortal_GM_Tool - Import_Board.csv",
                    help="Output CSV path")
+    
     return p.parse_args()
 
 
