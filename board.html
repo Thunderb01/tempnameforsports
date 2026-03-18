@@ -6,16 +6,77 @@
     <title>Full Board — Beyond the Portal</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
-  <body>
+  <body class="page-board">
+  <style>
+    /* ── Board page layout ── */
+    .page-board {
+      min-height: 100dvh;
+      height: 100dvh;
+      max-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .page-board .site-header-wrap { flex: 0 0 auto; }
+    .page-board main.section {
+      flex: 1 1 auto;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      padding-top: 18px;
+      padding-bottom: 18px;
+    }
+    .page-board h1 { flex: 0 0 auto; }
+    .page-board .settings { flex: 0 0 auto; }
+    .page-board .board-panel {
+      flex: 1 1 auto;
+      min-height: 0;
+      margin-top: 14px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: auto;
+    }
+    .page-board .board-panel table {
+      min-width: 900px;
+    }
+  </style>
+  <div class="site-header-wrap">
     <header class="site-header">
-      <a class="brand" href="./app.html" aria-label="Back to Roster Builder">
-        <span class="brand-mark">BP</span>
+      <a class="brand" href="./" aria-label="Beyond the Portal home">
+        <img class="brand-logo" src="./imgs/beyond_the_portal_logo.jpg" alt="Beyond the Portal" />
         <span class="brand-name">Beyond the Portal</span>
       </a>
-      <nav class="nav">
-        <a class="btn btn-ghost" href="./app.html">Back to Builder</a>
+
+      <nav class="nav" id="mainNav">
+        <!-- Tools dropdown -->
+        <div class="nav-dropdown" id="toolsDropdown">
+          <button class="nav-dropdown-btn" id="toolsBtn" type="button" aria-haspopup="true" aria-expanded="false">
+            Tools
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="4 6 8 10 12 6"/>
+            </svg>
+          </button>
+          <div class="nav-dropdown-menu" id="toolsMenu" role="menu">
+            <a href="./app.html" role="menuitem" class="">
+              <span class="menu-icon">🏀</span> Roster Builder
+            </a>
+            <a href="./board.html" role="menuitem" class="nav-active">
+              <span class="menu-icon">📋</span> Full Board
+            </a>
+            <a href="./role_prioritization.html" role="menuitem" class="">
+              <span class="menu-icon">🎯</span> Role Prioritization
+            </a>
+          </div>
+        </div>
+
+        <a href="./about.html" class="">About</a>
+        
       </nav>
     </header>
+  </div>
 
     <main class="section">
       <h1 style="margin-top:0;">Import_Board</h1>
@@ -40,13 +101,29 @@
         </div>
       </div>
 
-      <div class="panel" style="margin-top:14px;">
-        <div class="list" id="tableWrap" style="overflow:auto;"></div>
+      <div class="board-panel">
+        <div id="tableWrap"></div>
       </div>
     </main>
 
     <!-- SheetJS (XLSX parser) -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
     <script type="module" src="./board.js"></script>
-  </body>
+  
+  <script>
+    /* ── nav dropdown ── */
+    (function(){
+      var dd = document.getElementById('toolsDropdown');
+      var btn = document.getElementById('toolsBtn');
+      if(!dd||!btn) return;
+      btn.addEventListener('click', function(e){
+        e.stopPropagation();
+        dd.classList.toggle('open');
+        btn.setAttribute('aria-expanded', dd.classList.contains('open'));
+      });
+      document.addEventListener('click', function(){ dd.classList.remove('open'); btn.setAttribute('aria-expanded','false'); });
+      dd.addEventListener('click', function(e){ e.stopPropagation(); });
+    })();
+  </script>
+</body>
 </html>

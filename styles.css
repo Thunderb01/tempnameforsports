@@ -24,21 +24,27 @@ code{background:rgba(255,255,255,.1);padding:.15rem .35rem;border-radius:8px}
 input,select,button{font:inherit}
 .muted{color:var(--muted)}
 
-html, body { height: 100%; }
-
 body {
-  min-height: 100dvh; /* better than 100vh on modern browsers */
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
 }
 
+.site-header-wrap{
+  position:sticky;top:0;z-index:100;
+  background:rgba(11,16,32,.85);
+  backdrop-filter:blur(12px);
+  -webkit-backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--border);
+}
 .site-header{
   max-width:var(--max);
   margin:0 auto;
-  padding:20px 18px;
+  padding:14px 18px;
   display:flex;
   align-items:center;
   justify-content:space-between;
+  position:relative;
 }
 .brand{display:inline-flex;gap:10px;align-items:center;font-weight:800}
 
@@ -60,6 +66,69 @@ body {
 .nav{display:flex;gap:14px;align-items:center}
 .nav a{padding:10px 12px;border-radius:12px;color:var(--muted)}
 .nav a:hover{background:rgba(255,255,255,.06);color:var(--text)}
+.nav a.nav-active{color:var(--text);background:rgba(255,255,255,.06)}
+
+/* ── Dropdown ── */
+.nav-dropdown{position:relative}
+.nav-dropdown-btn{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:10px 12px;border-radius:12px;
+  background:none;border:none;cursor:pointer;
+  color:var(--muted);font-size:inherit;font-family:inherit;
+  transition:background .15s,color .15s;
+}
+.nav-dropdown-btn:hover{background:rgba(255,255,255,.06);color:var(--text)}
+.nav-dropdown-btn svg{width:14px;height:14px;transition:transform .2s}
+.nav-dropdown.open .nav-dropdown-btn{color:var(--text);background:rgba(255,255,255,.06)}
+.nav-dropdown.open .nav-dropdown-btn svg{transform:rotate(180deg)}
+.nav-dropdown-menu{
+  position:absolute;top:calc(100% + 8px);right:0;
+  min-width:200px;
+  background:var(--panel);
+  border:1px solid var(--border);
+  border-radius:14px;
+  padding:6px;
+  box-shadow:0 12px 32px rgba(0,0,0,.4);
+  opacity:0;pointer-events:none;
+  transform:translateY(-6px);
+  transition:opacity .18s,transform .18s;
+  z-index:200;
+}
+.nav-dropdown.open .nav-dropdown-menu{opacity:1;pointer-events:auto;transform:translateY(0)}
+.nav-dropdown-menu a{
+  display:flex;align-items:center;gap:10px;
+  padding:10px 12px;border-radius:10px;
+  color:var(--muted);text-decoration:none;font-size:.9rem;
+  transition:background .12s,color .12s;
+}
+.nav-dropdown-menu a:hover{background:rgba(255,255,255,.07);color:var(--text)}
+.nav-dropdown-menu a.nav-active{color:var(--text);background:rgba(255,255,255,.06)}
+.nav-dropdown-menu .menu-icon{
+  width:28px;height:28px;border-radius:8px;
+  display:grid;place-items:center;flex-shrink:0;
+  font-size:.9rem;
+  background:rgba(255,255,255,.07);
+}
+.nav-dropdown-divider{height:1px;background:var(--border);margin:4px 0}
+
+/* ── Mobile hamburger ── */
+.nav-hamburger{
+  display:none;
+  background:none;border:none;cursor:pointer;
+  padding:8px;border-radius:10px;color:var(--muted);
+}
+.nav-hamburger:hover{background:rgba(255,255,255,.06);color:var(--text)}
+@media(max-width:640px){
+  .nav-hamburger{display:flex;align-items:center;}
+  .nav-links{
+    display:none;flex-direction:column;
+    position:absolute;top:70px;left:0;right:0;
+    background:var(--panel);border-bottom:1px solid var(--border);
+    padding:12px;gap:4px;z-index:100;
+  }
+  .nav-links.open{display:flex}
+  .nav-dropdown-menu{left:0;right:auto}
+}
 
 .btn{
   display:inline-flex;align-items:center;justify-content:center;
@@ -79,10 +148,6 @@ body {
 .btn-ghost{background:transparent}
 
 .section{max-width:var(--max);margin:0 auto;padding:30px 18px}
-
-.app-top{
-  flex: 0 0 auto;
-}
 
 /* Only on the roster builder page */
 
@@ -140,12 +205,6 @@ body {
 
 .footer{max-width:var(--max);margin:0 auto;padding:26px 18px 40px;color:rgba(255,255,255,.6)}
 
-.app-shell{
-  flex: 1 1 auto;
-  min-height: 0;          /* CRITICAL: allows children to scroll */
-  display: flex;
-  flex-direction: column;
-}
 .app-top h1{margin:0 0 12px}
 .settings{
   display:grid;
@@ -243,7 +302,9 @@ body {
 
 
 
-@media (max-width:980px){.app-grid{grid-template-columns:1fr}}
+
+
+
 
 .panel-head h2{margin:0 0 6px}
 .panel-head p{margin:0}
@@ -346,11 +407,14 @@ body {
 
 .modal-card{
   width: min(860px, 100%);
+  max-height: min(90dvh, 800px);
   background: linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,.06));
   border: 1px solid var(--border);
   border-radius: 22px;
   box-shadow: var(--shadow);
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .modal-head{
@@ -360,13 +424,25 @@ body {
   padding: 16px;
   border-bottom: 1px solid rgba(255,255,255,.10);
   align-items: start;
+  /* stays pinned at top — body scrolls below it */
+  flex: 0 0 auto;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: rgba(18,24,44,.95);
+  backdrop-filter: blur(8px);
+  border-radius: 22px 22px 0 0;
 }
 
 .modal-kicker{ color: rgba(255,255,255,.65); font-size: .9rem; }
 .modal-title{ margin: 6px 0 0; }
 .modal-sub{ margin-top: 6px; color: rgba(255,255,255,.7); }
 
-.modal-body{ padding: 16px; }
+.modal-body{
+  padding: 16px;
+  overflow-y: auto;
+  flex: 1 1 auto;
+}
 
 .modal-grid{
   display: grid;
@@ -399,85 +475,91 @@ body {
    Roster Builder: stable layout
    =========================== */
 
-html, body { height: 100%; }
-
-body{
-  min-height: 500dvh;
-  display: flex;
-  flex-direction: column;
+body.page-builder {
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
+  /* flex column already set by global body rule */
 }
 
-/* header stays natural height */
-.site-header{
+/* lock header */
+body.page-builder .site-header-wrap {
   flex: 0 0 auto;
 }
 
-/* main takes remaining space */
-.app-shell{
+/* shell fills everything below header */
+.app-shell {
   flex: 1 1 auto;
-  min-height: 0;              /* IMPORTANT */
+  min-height: 0;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
+  /* horizontal padding only — vertical handled by children */
+  padding: 0 18px;
 }
 
-/* tighten section padding on app page so it fits */
-.app-shell .section{
-  padding-top: 14px;
+/* top controls bar — shrinks to its content */
+.app-top {
+  flex: 0 0 auto;
+  padding: 12px 0 8px;
+}
+
+/* grid fills all remaining height */
+.app-grid {
+  flex: 1 1 auto;
+  min-height: 0;
   padding-bottom: 14px;
-}
-
-/* settings section sizes to content */
-.app-top{
-  flex: 0 0 auto;
-}
-
-/* grid section gets remaining height */
-.app-grid{
-  flex: 1 1 auto;
-  min-height: 0;              /* IMPORTANT */
   display: grid;
   grid-template-columns: 1.1fr 0.9fr 0.9fr;
   gap: 14px;
 }
 
-@media (max-width:980px){
-  .app-grid{ grid-template-columns: 1fr; }
+/* on narrow screens stack vertically and let page scroll */
+@media (max-width: 980px) {
+  body.page-builder {
+    height: auto;
+    max-height: none;
+    overflow: auto;
+  }
+  .app-grid {
+    grid-template-columns: 1fr;
+    padding-bottom: 24px;
+  }
+  .panel {
+    height: auto;
+    min-height: 300px;
+  }
 }
 
-/* panels become vertical flex containers */
-.panel{
-  min-height: 0;              /* IMPORTANT */
+/* panels fill their grid cell */
+.panel {
+  height: 100%;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 14px;
   box-shadow: var(--shadow);
+  box-sizing: border-box;
 }
 
-/* header doesn't scroll */
-.panel-head{
+/* panel header doesn't scroll */
+.panel-head {
   flex: 0 0 auto;
 }
 
-/* list scrolls */
-.list{
+/* list fills remaining panel height and scrolls */
+.list {
   flex: 1 1 auto;
-  min-height: 0;              /* IMPORTANT */
-  overflow: auto;
-
+  min-height: 0;
+  overflow-y: auto;
   margin-top: 12px;
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
-
-/* optional: make only board scroll (uncomment if desired) */
-/*
-#shortlist, #roster { overflow: visible; }
-*/
 
 /* Ensure the HTML `hidden` attribute always wins */
 [hidden] {
