@@ -3,14 +3,292 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Beyond the Portal — Roster Builder</title>
-    <meta name="description" content="Build rosters, manage scholarships and NIL budgets, and organize your board." />
+    <title>About — Beyond the Portal</title>
     <link rel="stylesheet" href="./styles.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet" />
+    <style>
+      body { font-family: 'DM Sans', ui-sans-serif, system-ui, sans-serif; }
+
+      .about-shell {
+        max-width: 1000px;
+        margin: 0 auto;
+        padding: 0 18px 80px;
+        flex: 1 1 auto;
+      }
+
+      /* ── DIVIDER ── */
+      .about-divider {
+        width: 100%;
+        height: 1px;
+        background: linear-gradient(90deg, rgba(85,130,255,.35), rgba(255,90,180,.2), transparent);
+        margin: 56px 0;
+      }
+
+      /* ── HERO ── */
+      .about-hero { padding: 60px 0 52px; }
+
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: .78rem;
+        font-weight: 700;
+        letter-spacing: .12em;
+        text-transform: uppercase;
+        color: rgba(85,130,255,.9);
+        margin-bottom: 20px;
+      }
+      .eyebrow::before {
+        content: '';
+        display: block;
+        width: 28px; height: 2px;
+        background: rgba(85,130,255,.7);
+        border-radius: 2px;
+      }
+
+      .about-hero h1 {
+        font-family: 'DM Serif Display', Georgia, serif;
+        font-size: clamp(2.4rem, 4.5vw, 3.8rem);
+        line-height: 1.1;
+        margin: 0 0 22px;
+        max-width: 20ch;
+      }
+      .about-hero h1 em { font-style: italic; color: rgba(255,90,180,.9); }
+
+      .about-hero .intro {
+        font-size: 1.1rem;
+        line-height: 1.78;
+        color: var(--muted);
+        max-width: 62ch;
+        margin: 0;
+      }
+
+      /* ── SERVICES ── */
+      .services-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+      }
+      @media (max-width: 720px) { .services-grid { grid-template-columns: 1fr; } }
+
+      .service-card {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 28px 26px;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        animation: fadeUp .5s ease both;
+      }
+      .service-card:nth-child(2) { animation-delay: .1s; }
+
+      /* colored top bar per service */
+      .service-card:nth-child(1) { border-top: 3px solid rgba(85,130,255,.7); }
+      .service-card:nth-child(2) { border-top: 3px solid rgba(255,90,180,.7); }
+
+      .service-tag {
+        font-size: .72rem;
+        font-weight: 800;
+        letter-spacing: .12em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+      .service-card:nth-child(1) .service-tag { color: rgba(85,130,255,.8); }
+      .service-card:nth-child(2) .service-tag { color: rgba(255,90,180,.8); }
+
+      .service-title {
+        font-family: 'DM Serif Display', Georgia, serif;
+        font-size: 1.45rem;
+        line-height: 1.2;
+        margin: 0;
+      }
+
+      .service-body {
+        font-size: .95rem;
+        line-height: 1.78;
+        color: var(--muted);
+        margin: 0;
+        flex: 1;
+      }
+
+      .service-bullets {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .service-bullets li {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        font-size: .9rem;
+        line-height: 1.6;
+        color: rgba(255,255,255,.82);
+      }
+      .service-bullets li::before {
+        content: '→';
+        flex-shrink: 0;
+        color: rgba(85,130,255,.8);
+        font-weight: 700;
+        margin-top: 1px;
+      }
+      .service-card:nth-child(2) .service-bullets li::before {
+        color: rgba(255,90,180,.8);
+      }
+
+      /* ── CTA BANNER ── */
+      .cta-banner {
+        background: linear-gradient(135deg, rgba(85,130,255,.14), rgba(255,90,180,.1));
+        border: 1px solid rgba(85,130,255,.3);
+        border-radius: var(--radius);
+        padding: 36px 32px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 24px;
+        flex-wrap: wrap;
+        animation: fadeUp .5s ease .15s both;
+      }
+
+      .cta-text h2 {
+        font-family: 'DM Serif Display', Georgia, serif;
+        font-size: 1.7rem;
+        margin: 0 0 8px;
+      }
+      .cta-text p {
+        color: var(--muted);
+        margin: 0;
+        font-size: .95rem;
+        line-height: 1.65;
+        max-width: 48ch;
+      }
+
+      .cta-action {
+        flex-shrink: 0;
+      }
+      .btn-cta {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 14px 24px;
+        border-radius: 14px;
+        background: rgba(85,130,255,.28);
+        border: 1px solid rgba(85,130,255,.55);
+        color: var(--text);
+        font-weight: 800;
+        font-size: 1rem;
+        cursor: pointer;
+        text-decoration: none;
+        transition: background .2s;
+      }
+      .btn-cta:hover { background: rgba(85,130,255,.4); }
+
+      /* ── CLOSING ── */
+      .closing-block {
+        text-align: center;
+        padding: 12px 0;
+        animation: fadeUp .5s ease .2s both;
+      }
+      .closing-block h2 {
+        font-family: 'DM Serif Display', Georgia, serif;
+        font-size: clamp(1.6rem, 3vw, 2.4rem);
+        margin: 0 0 14px;
+      }
+      .closing-block p {
+        font-size: 1.05rem;
+        line-height: 1.75;
+        color: var(--muted);
+        max-width: 56ch;
+        margin: 0 auto;
+      }
+
+      /* ── TEAM ── */
+      .team-header {
+        display: flex;
+        align-items: baseline;
+        gap: 14px;
+        margin-bottom: 24px;
+      }
+      .team-header h2 {
+        font-family: 'DM Serif Display', Georgia, serif;
+        font-size: clamp(1.6rem, 2.8vw, 2.2rem);
+        margin: 0;
+      }
+      .team-header span {
+        font-size: .78rem;
+        font-weight: 700;
+        letter-spacing: .1em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      .team-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 14px;
+      }
+      @media (max-width: 860px) { .team-grid { grid-template-columns: repeat(2, 1fr); } }
+      @media (max-width: 520px)  { .team-grid { grid-template-columns: 1fr; } }
+
+      .team-card {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 22px 20px;
+        transition: background .2s, transform .2s;
+        animation: fadeUp .5s ease both;
+      }
+      .team-card:hover { background: var(--panel2); transform: translateY(-2px); }
+
+      .team-avatar {
+        width: 50px; height: 50px;
+        border-radius: 14px;
+        border: 1px solid var(--border);
+        display: grid;
+        place-items: center;
+        font-family: 'DM Serif Display', Georgia, serif;
+        font-size: 1.3rem;
+        color: var(--text);
+        margin-bottom: 14px;
+      }
+      .av-0 { background: linear-gradient(135deg, rgba(85,130,255,.35),  rgba(255,90,180,.25)); }
+      .av-1 { background: linear-gradient(135deg, rgba(255,90,180,.3),   rgba(255,160,90,.2)); }
+      .av-2 { background: linear-gradient(135deg, rgba(90,220,180,.25),  rgba(85,130,255,.25)); }
+      .av-3 { background: linear-gradient(135deg, rgba(200,140,255,.28), rgba(85,130,255,.2)); }
+      .av-4 { background: linear-gradient(135deg, rgba(255,210,90,.22),  rgba(255,90,180,.18)); }
+
+      .team-name { font-weight: 800; font-size: 1rem; margin-bottom: 2px; }
+      .team-role { font-size: .82rem; color: rgba(85,130,255,.85); font-weight: 700; margin-bottom: 10px; letter-spacing: .03em; }
+      .team-bio  { font-size: .87rem; line-height: 1.65; color: var(--muted); margin: 0; }
+
+      /* ── SKELETON ── */
+      .sk {
+        background: linear-gradient(90deg, rgba(255,255,255,.06) 25%, rgba(255,255,255,.1) 50%, rgba(255,255,255,.06) 75%);
+        background-size: 200% 100%;
+        animation: shimmer 1.4s infinite;
+        border-radius: 8px;
+        height: 1em;
+        margin-bottom: 10px;
+      }
+      @keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+
+      /* ── ANIMATIONS ── */
+      @keyframes fadeUp {
+        from { opacity: 0; transform: translateY(16px); }
+        to   { opacity: 1; transform: translateY(0); }
+      }
+      .about-hero { animation: fadeUp .5s ease both; }
+    </style>
   </head>
   <body>
   <div class="site-header-wrap">
     <header class="site-header">
-      <a class="brand" href="./" aria-label="Beyond the Portal home">
+      <a class="brand" href="./index.html" aria-label="Beyond the Portal home">
         <img class="brand-logo" src="./imgs/beyond_the_portal_logo.jpg" alt="Beyond the Portal" />
         <span class="brand-name">Beyond the Portal</span>
       </a>
@@ -37,90 +315,142 @@
           </div>
         </div>
 
-        <a href="./about.html" class="">About</a>
+        <a href="./index.html" class="nav-active">About</a>
         
       </nav>
     </header>
   </div>
 
-    <main>
-      <section class="hero">
-        <div class="hero-content">
-          <h1>Roster building that feels like a GM board.</h1>
-          <p class="subhead">
-            Move targets from board → shortlist → roster while tracking scholarships and NIL budget in real time.
+    <main class="about-shell">
+
+      <!-- HERO -->
+      <div class="about-hero">
+        <div class="eyebrow" id="hero-eyebrow">Beyond the Portal</div>
+        <h1 id="hero-headline"><div class="sk" style="width:75%;height:1.15em;margin-bottom:14px"></div></h1>
+        <p class="intro" id="hero-intro"></p>
+          
+        <!-- <div class="sk"> -->
+
+        <!-- </div><div class="sk" style="width:80%"></div> -->
+        <!-- </p> -->
+      </div>
+
+      <!-- SERVICES -->
+      <div class="services-grid" id="services-grid">
+        <div class="service-card"><div class="sk" style="height:1.4em;width:80%;margin-bottom:12px"></div><div class="sk"></div><div class="sk" style="width:90%"></div></div>
+        <div class="service-card"><div class="sk" style="height:1.4em;width:80%;margin-bottom:12px"></div><div class="sk"></div><div class="sk" style="width:90%"></div></div>
+      </div>
+
+      <div class="about-divider"></div>
+
+      <!-- CTA -->
+      <div class="cta-banner" id="cta-banner">
+        <div class="cta-text">
+          <h2 id="cta-title"><div class="sk" style="width:200px;height:1.2em"></div></h2>
+          <p id="cta-body">
+            <!-- <div class="sk"></div><div class="sk" style="width:70%"></div> -->
           </p>
-
-          <div class="cta-row">
-            <a class="btn btn-primary" href="./app.html">Open Roster Builder</a>
-            <a class="btn btn-ghost" href="#features">See features</a>
-          </div>
-
-          <div class="mini-proof">
-            <div class="mini-card">
-              <div class="mini-kicker">Constraints</div>
-              <div class="mini-title">Scholarships + NIL caps</div>
-              <div class="mini-text">See warnings instantly when a move breaks your rules.</div>
-            </div>
-            <div class="mini-card">
-              <div class="mini-kicker">Workflow</div>
-              <div class="mini-title">Board → Shortlist → Roster</div>
-              <div class="mini-text">A simple flow that matches how staff actually builds.</div>
-            </div>
-          </div>
         </div>
-
-        <div class="hero-panel">
-          <div class="mock">
-            <div class="mock-top"><span></span><span></span><span></span></div>
-            <div class="mock-body">
-              <p class="mock-kicker">Live summary</p>
-              <h3 class="mock-title">Rutgers — 15 scholarships</h3>
-              <div class="mock-grid">
-                <div class="mock-stat"><div class="label">Roster</div><div class="value">10</div></div>
-                <div class="mock-stat"><div class="label">Shortlist</div><div class="value">6</div></div>
-                <div class="mock-stat"><div class="label">NIL Remaining</div><div class="value">$2.1M</div></div>
-                <div class="mock-stat"><div class="label">Warnings</div><div class="value">1</div></div>
-              </div>
-              <p class="mock-note">Static demo UI — the tool page is fully interactive.</p>
-            </div>
-          </div>
+        <div class="cta-action">
+          <a href="./app.html" class="btn-cta">Get Started →</a>
         </div>
-      </section>
+      </div>
 
-      <section id="features" class="section">
-        <h2>Features</h2>
-        <div class="cards">
-          <article class="card">
-            <h3>Player board</h3>
-            <p>Search + filter targets and promote them through your pipeline.</p>
-          </article>
-          <article class="card">
-            <h3>Budget-aware roster</h3>
-            <p>Track scholarships and NIL totals, with per-player max rules.</p>
-          </article>
-          <article class="card">
-            <h3>Shareable builds</h3>
-            <p>Export/import a JSON “build” file to collaborate.</p>
-          </article>
-        </div>
-      </section>
+      <div class="about-divider"></div>
 
-      <section id="flow" class="section">
-        <h2>How it works</h2>
-        <ol class="steps">
-          <li><strong>Board:</strong> big pool of candidates.</li>
-          <li><strong>Shortlist:</strong> your serious targets.</li>
-          <li><strong>Roster:</strong> committed/signed + budget impact.</li>
-        </ol>
-      </section>
+      <!-- CLOSING -->
+      <div class="closing-block" id="closing-block">
+        <h2 id="closing-title"><div class="sk" style="width:300px;height:1.2em;margin:0 auto 12px"></div></h2>
+        <p id="closing-body">
+          <!-- <div class="sk"></div><div class="sk" style="width:80%"></div> -->
+           </p>
+      </div>
+
+      <div class="about-divider"></div>
+
+      <!-- TEAM -->
+      <div class="team-header">
+        <h2>Meet the Team</h2>
+        <span id="team-count"></span>
+      </div>
+      <div class="team-grid" id="team-grid"></div>
+
     </main>
 
     <footer class="footer">
-      <p>© <span id="year"></span> Beyond the Portal</p>
+      <p>© 2026 Beyond the Portal. All rights reserved.</p>
     </footer>
 
-    <script src="./landing.js"></script>
+    <script>
+      fetch('./about.json')
+        .then(r => {
+          if (!r.ok) throw new Error(`about.json not found (${r.status})`);
+          return r.json();
+        })
+        .then(d => {
+          renderHero(d.hero);
+          renderServices(d.services);
+          renderCta(d.cta);
+          renderClosing(d.closing);
+          renderTeam(d.team);
+        })
+        .catch(err => {
+          console.error(err);
+          document.querySelector('.about-shell').insertAdjacentHTML('afterbegin',
+            `<div style="background:rgba(255,80,80,.12);border:1px solid rgba(255,80,80,.3);border-radius:16px;padding:16px;margin-bottom:24px;color:rgba(255,120,120,.9)">
+              ⚠ Could not load content.json — make sure it exists in your repo root.
+            </div>`
+          );
+        });
+
+      function renderHero(h) {
+        if (!h) return;
+        document.getElementById('hero-eyebrow').textContent = h.eyebrow || '';
+        document.getElementById('hero-headline').innerHTML  = h.headline || '';
+        document.getElementById('hero-intro').textContent   = h.intro    || '';
+      }
+
+      function renderServices(services) {
+        if (!services?.length) return;
+        document.getElementById('services-grid').innerHTML = services.map((s, i) => `
+          <div class="service-card" style="animation-delay:${i * 0.1}s">
+            <div class="service-tag">${s.tag || ''}</div>
+            <h3 class="service-title">${s.title || ''}</h3>
+            <p class="service-body">${s.body || ''}</p>
+            ${s.bullets?.length ? `
+              <ul class="service-bullets">
+                ${s.bullets.map(b => `<li>${b}</li>`).join('')}
+              </ul>` : ''}
+          </div>
+        `).join('');
+      }
+
+      function renderCta(cta) {
+        if (!cta) return;
+        document.getElementById('cta-title').textContent = cta.title || '';
+        document.getElementById('cta-body').textContent  = cta.body  || '';
+      }
+
+      function renderClosing(c) {
+        if (!c) return;
+        document.getElementById('closing-title').textContent = c.title || '';
+        document.getElementById('closing-body').textContent  = c.body  || '';
+      }
+
+      function renderTeam(team) {
+        if (!team?.length) return;
+        document.getElementById('team-count').textContent = `${team.length} member${team.length !== 1 ? 's' : ''}`;
+        const gradients = ['av-0','av-1','av-2','av-3','av-4'];
+        document.getElementById('team-grid').innerHTML = team.map((p, i) => `
+          <div class="team-card" style="animation-delay:${i * 0.08}s">
+            <div class="team-avatar ${gradients[i % gradients.length]}">${p.initials || ''}</div>
+            <div class="team-name">${p.name || ''}</div>
+            <div class="team-role">${p.role || ''}</div>
+            <p class="team-bio">${p.bio || ''}</p>
+          </div>
+        `).join('');
+      }
+    </script>
   
   <script>
     /* ── nav dropdown ── */

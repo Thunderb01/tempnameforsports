@@ -2,208 +2,440 @@ import { Player } from "./player.js";
 import { parseCSV, normalizeNumber, firstVal } from "./csv.js";
 
 const STORAGE_KEY = "bp_roster_builder_v1";
+const CSV_URL = "./data/BeyondThePortal_GM_Tool - Import_Board.csv";
 
-// ✅ Put your CSV URL here:
-const CSV_URL =
-  "./data/BeyondThePortal_GM_Tool - Import_Board.csv";
+// ✅ Edit to control which columns show in the data table view
+const VISIBLE_COLUMNS = [
+  "Name", 
+  "Team", 
+  "Primary Position", 
+  "Year",
+  // "USG%", 
+  "PPG", 
+  "REB/G",
+  "AST/G", 
+  // "3PA/G", 
+  // "AST/TOV",
+  // "STL/40", 
+  // "BLK/40", 
+  // "FG%", 
+  // "FT%", 
+  // "3P%",
+  "Open Market Low", 
+  "Open Market High",
+  "Playmaker Tags", 
+  "Shooting/Scoring Tags",
+];
 
 const els = {
-  search: document.getElementById("search"),
-  reloadBtn: document.getElementById("reloadBtn"),
-  meta: document.getElementById("meta"),
-  tableWrap: document.getElementById("tableWrap"),
+  search:     document.getElementById("search"),
+  reloadBtn:  document.getElementById("reloadBtn"),
+  meta:       document.getElementById("meta"),
+  tableWrap:  document.getElementById("tableWrap"),
+  posFilter:  document.getElementById("posFilter"),
+  yearFilter: document.getElementById("yearFilter"),
+  tagGroup:   document.getElementById("tagGroup"),
+  tagFilter:  document.getElementById("tagFilter"),
+  viewToggle: document.getElementById("viewToggle"),
+  // modal
+  modalBackdrop:  document.getElementById("playerModalBackdrop"),
+  modal:          document.getElementById("playerModal"),
+  modalClose:     document.getElementById("playerModalCloseBtn"),
+  modalKicker:    document.getElementById("playerModalKicker"),
+  modalTitle:     document.getElementById("playerModalTitle"),
+  modalSub:       document.getElementById("playerModalSub"),
+  modalStats:     document.getElementById("playerModalStats"),
+  modalMarket:    document.getElementById("playerModalMarket"),
+  modalStatus:    document.getElementById("playerModalStatus"),
+  modalId:        document.getElementById("playerModalId"),
 };
 
-let rows = [];
-let columns = [];
-let sortKey = null;
-let sortDir = "asc";
+// ── State ────────────────────────────────────────────────────────────────────
+let allPlayers = [];   // parsed + normalised Player objects
+let rawRows    = [];   // raw CSV rows (for table view)
+let columns    = [];   // visible columns for table view
+let sortKey    = null;
+let sortDir    = "asc";
+let viewMode   = "cards"; // "cards" | "table"
 
+// ── Helpers ──────────────────────────────────────────────────────────────────
 function escapeHtml(str) {
-  return (str ?? "")
-    .toString()
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
+  return (str ?? "").toString()
+    .replaceAll("&", "&amp;").replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;");
 }
 
-function loadState() {
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
-  } catch {
-    return null;
-  }
+function parseTags(v) {
+  if (!v) return [];
+  return String(v).split(/[,|]/).map(t => t.trim()).filter(Boolean);
 }
-function saveState(state) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+
+function uniq(arr) {
+  const seen = new Set();
+  return (arr || []).filter(x => {
+    const k = String(x || "").trim().toLowerCase();
+    if (!k || seen.has(k)) return false;
+    seen.add(k); return true;
+  });
 }
-function ensureState() {
-  const s = loadState();
-  if (s && s.settings && Array.isArray(s.roster)) {
-    s.statusById = s.statusById || {};
+
+function money(n) {
+  const x = Number(n || 0);
+  return x.toLocaleString(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 0 });
+}
+
+function formatStatValue(k, v) {
+  if (v === null || v === undefined || v === "") return "—";
+  return String(v);
+}
+
+function makeStableId(r) {
+  const name = firstVal(r.Name, r["Player Name"], r.Player, r.name, "unknown");
+  const team = firstVal(r.Team, r.School, r["Current Team"], r.team, "unknown");
+  return `imp_${String(name).trim().toLowerCase().replace(/\s+/g, "_")}__${String(team).trim().toLowerCase().replace(/\s+/g, "_")}`;
+}
+
+function compareValues(a, b) {
+  const an = normalizeNumber(a), bn = normalizeNumber(b);
+  if (Number.isFinite(an) && Number.isFinite(bn)) return an - bn;
+  return (a ?? "").toString().toLowerCase() < (b ?? "").toString().toLowerCase() ? -1 : 1;
+}
+
+// ── Roster state helpers ──────────────────────────────────────────────────────
+function loadRosterState() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "null"); } catch { return null; }
+}
+function saveRosterState(s) { localStorage.setItem(STORAGE_KEY, JSON.stringify(s)); }
+function ensureRosterState() {
+  const s = loadRosterState();
+  if (s?.settings && Array.isArray(s.roster)) {
     s.shortlistIds = Array.isArray(s.shortlistIds) ? s.shortlistIds : [];
     s.board = Array.isArray(s.board) ? s.board : [];
+    s.statusById = s.statusById || {};
     return s;
   }
   return { settings: { program: "Program", scholarships: 15, nilTotal: 0, maxPct: 0.3 }, shortlistIds: [], roster: [], board: [], statusById: {} };
 }
 
-function makeStableId(rowObj) {
-  const name = firstVal(rowObj.Name, rowObj["Player Name"], rowObj.Player, rowObj.name);
-  const team = firstVal(rowObj.Team, rowObj.School, rowObj["Current Team"], rowObj.team);
-  return `imp_${String(name).trim().toLowerCase().replace(/\s+/g, "_")}__${String(team)
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, "_")}`;
+function addToRoster(player) {
+  const s = ensureRosterState();
+  const pj = { id: player.id, name: player.name, team: player.team, pos: player.pos, year: player.year,
+    marketLow: player.marketLow, marketHigh: player.marketHigh,
+    tags: player.tags, playmakerTags: player.playmakerTags, shootingTags: player.shootingTags, stats: player.stats };
+  if (!s.board.some(p => p.id === player.id)) s.board.unshift(pj);
+  if (!s.roster.some(r => r.id === player.id)) {
+    const nilOffer = player.marketLow && player.marketHigh ? Math.round((player.marketLow + player.marketHigh) / 2) : 0;
+    s.roster.unshift({ id: player.id, nilOffer });
+  }
+  s.shortlistIds = (s.shortlistIds || []).filter(x => x !== player.id);
+  saveRosterState(s);
+  els.meta.textContent = `Added ${player.name} to roster.`;
 }
 
-function compareValues(a, b) {
-  const an = normalizeNumber(a);
-  const bn = normalizeNumber(b);
-  const bothNum = Number.isFinite(an) && Number.isFinite(bn) && (String(a).trim() !== "" || String(b).trim() !== "");
-  if (bothNum) return an - bn;
-
-  const as = (a ?? "").toString().toLowerCase();
-  const bs = (b ?? "").toString().toLowerCase();
-  return as < bs ? -1 : as > bs ? 1 : 0;
+function addToShortlist(player) {
+  const s = ensureRosterState();
+  const pj = { id: player.id, name: player.name, team: player.team, pos: player.pos, year: player.year,
+    marketLow: player.marketLow, marketHigh: player.marketHigh,
+    tags: player.tags, playmakerTags: player.playmakerTags, shootingTags: player.shootingTags, stats: player.stats };
+  if (!s.board.some(p => p.id === player.id)) s.board.unshift(pj);
+  if (!s.shortlistIds.includes(player.id) && !s.roster.some(r => r.id === player.id))
+    s.shortlistIds.push(player.id);
+  saveRosterState(s);
+  els.meta.textContent = `Added ${player.name} to shortlist.`;
 }
 
-function rowToPlayer(rowObj) {
-  // Adjust these mappings to your CSV headers:
-  const raw = {
-    id: makeStableId(rowObj),
-    name: firstVal(rowObj.Name, rowObj["Player Name"], rowObj.Player, rowObj.name, "Unknown"),
-    team: firstVal(rowObj.Team, rowObj.School, rowObj["Current Team"], rowObj.team, ""),
-    pos: firstVal(rowObj["Primary Position"], rowObj.Position, rowObj.Pos, rowObj.pos, ""),
-    year: firstVal(rowObj.Class, rowObj.Year, rowObj.year, ""),
-    marketLow: normalizeNumber(firstVal(rowObj["Open Market Low"], rowObj["Market Low"], rowObj.marketLow, 0)),
-    marketHigh: normalizeNumber(firstVal(rowObj["Open Market High"], rowObj["Market High"], rowObj.marketHigh, 0)),
-    stats: rowObj, // keep entire row
-  };
-
-  const p = Player.from(raw);
-  return {
-    id: p.id,
-    name: p.name,
-    team: p.team,
-    pos: p.pos,
-    year: p.year,
-    marketLow: p.marketLow,
-    marketHigh: p.marketHigh,
-    stats: p.stats,
-  };
+// ── Filtering helpers ─────────────────────────────────────────────────────────
+function tagsForGroup(p, group) {
+  if (group === "playmaker") return p.playmakerTags || [];
+  if (group === "shooting")  return p.shootingTags  || [];
+  return p.tags || [];
 }
 
-function guessNilOffer(rowObj) {
-  const low = normalizeNumber(firstVal(rowObj["Open Market Low"], rowObj["Market Low"], 0));
-  const high = normalizeNumber(firstVal(rowObj["Open Market High"], rowObj["Market High"], 0));
-  if (low && high) return Math.round((low + high) / 2);
-  return 0;
+function getUniqueTags(players, group) {
+  const map = new Map();
+  players.forEach(p => tagsForGroup(p, group).forEach(t => {
+    const k = t.trim().toLowerCase();
+    if (k && !map.has(k)) map.set(k, t.trim());
+  }));
+  return Array.from(map.values()).sort((a, b) => a.localeCompare(b));
 }
 
-function addToRoster(rowObj) {
-  const state = ensureState();
-  const playerJson = rowToPlayer(rowObj);
+function getUniqueYears(players) {
+  return uniq(players.map(p => p.year).filter(Boolean)).sort();
+}
 
-  if (!state.board.some(p => String(p.id) === String(playerJson.id))) state.board.unshift(playerJson);
+function rebuildTagOptions() {
+  if (!els.tagFilter) return;
+  const prev = els.tagFilter.value;
+  const group = els.tagGroup?.value || "all";
+  const tags = getUniqueTags(allPlayers, group);
+  els.tagFilter.innerHTML = [`<option value="all">All tags</option>`]
+    .concat(tags.map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`)).join("");
+  if (prev !== "all" && tags.includes(prev)) els.tagFilter.value = prev;
+}
 
-  if (!state.roster.some(r => String(r.id) === String(playerJson.id))) {
-    state.roster.unshift({ id: playerJson.id, nilOffer: guessNilOffer(rowObj) });
+function rebuildYearOptions() {
+  if (!els.yearFilter) return;
+  const years = getUniqueYears(allPlayers);
+  els.yearFilter.innerHTML = [`<option value="all">All years</option>`]
+    .concat(years.map(y => `<option value="${escapeHtml(y)}">${escapeHtml(y)}</option>`)).join("");
+}
+
+function getFiltered() {
+  const q   = (els.search?.value || "").trim().toLowerCase();
+  const pos  = els.posFilter?.value  || "all";
+  const yr   = els.yearFilter?.value || "all";
+  const group = els.tagGroup?.value  || "all";
+  const tag  = els.tagFilter?.value  || "all";
+
+  return allPlayers.filter(p => {
+    if (pos !== "all" && p.pos !== pos) return false;
+    if (yr  !== "all" && p.year !== yr)  return false;
+    if (tag !== "all" && !tagsForGroup(p, group).includes(tag)) return false;
+    if (q) {
+      const searchable = [p.name, p.team, p.pos, p.year, ...p.tags].join(" ").toLowerCase();
+      if (!searchable.includes(q)) return false;
+    }
+    return true;
+  });
+}
+
+// ── Player Modal ──────────────────────────────────────────────────────────────
+function openModal(player) {
+  if (!els.modal) return;
+  els.modalKicker.textContent = "Player Card";
+  els.modalTitle.textContent  = player.name;
+  els.modalSub.textContent    = `${player.team} • ${player.pos} • ${player.year}`;
+  if (els.modalId) els.modalId.textContent = `ID: ${player.id}`;
+
+  // Stats from raw row (all fields)
+  const stats = player.stats || {};
+  const skipKeys = new Set(["Name", "Team", "Primary Position", "Year",
+    "Open Market Low", "Open Market High", "Playmaker Tags", "Shooting/Scoring Tags"]);
+  const entries = Object.entries(stats).filter(([k]) => !skipKeys.has(k) && stats[k] !== "" && stats[k] !== undefined);
+
+  els.modalStats.innerHTML = entries.length
+    ? entries.map(([k, v]) => `
+        <div class="statbox">
+          <div class="label">${escapeHtml(k)}</div>
+          <div class="value">${escapeHtml(formatStatValue(k, v))}</div>
+        </div>`).join("")
+    : `<div class="empty">No stats available.</div>`;
+
+  if (els.modalMarket) els.modalMarket.textContent = `${money(player.marketLow)} – ${money(player.marketHigh)}`;
+
+  // Tags
+  const pm = (player.playmakerTags || []).map(t => `<span class="tag-chip">${escapeHtml(t)}</span>`).join("") || `<span class="muted">—</span>`;
+  const ss = (player.shootingTags  || []).map(t => `<span class="tag-chip">${escapeHtml(t)}</span>`).join("") || `<span class="muted">—</span>`;
+  if (els.modalStatus) els.modalStatus.innerHTML = `
+    <div style="margin-bottom:8px;"><span class="muted" style="margin-right:6px;">Play Maker:</span>${pm}</div>
+    <div><span class="muted" style="margin-right:6px;">Shooting &amp; Scoring:</span>${ss}</div>
+  `;
+
+  els.modalBackdrop.hidden = false;
+  els.modal.hidden = false;
+  document.body.classList.add("no-scroll");
+}
+
+function closeModal() {
+  if (!els.modal) return;
+  els.modalBackdrop.hidden = true;
+  els.modal.hidden = true;
+  document.body.classList.remove("no-scroll");
+}
+
+els.modalClose?.addEventListener("click", closeModal);
+els.modalBackdrop?.addEventListener("click", closeModal);
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeModal(); });
+
+// ── Card view render ──────────────────────────────────────────────────────────
+function renderCards(players) {
+  if (!players.length) {
+    els.tableWrap.innerHTML = `<div class="empty" style="padding:24px;">No players match your filters.</div>`;
+    return;
   }
 
-  state.shortlistIds = (state.shortlistIds || []).filter(x => String(x) !== String(playerJson.id));
-  saveState(state);
+  const s = ensureRosterState();
+  els.tableWrap.innerHTML = players.map(p => {
+    const inRoster    = s.roster.some(r => r.id === p.id);
+    const inShortlist = s.shortlistIds.includes(p.id);
+    const pm = (p.playmakerTags || []).slice(0, 5).map(t => `<span class="tag-chip">${escapeHtml(t)}</span>`).join("");
+    const ss = (p.shootingTags  || []).slice(0, 5).map(t => `<span class="tag-chip">${escapeHtml(t)}</span>`).join("");
 
-  els.meta.textContent = `Added ${playerJson.name} to roster.`;
+    return `
+      <div class="row row-click" data-player-id="${escapeHtml(p.id)}" style="cursor:pointer;">
+        <div class="row-main">
+          <div class="row-title">${escapeHtml(p.name)}</div>
+          <div class="row-sub">${escapeHtml(p.team)} • ${escapeHtml(p.pos)} • ${escapeHtml(p.year)}</div>
+          <div class="row-sub">Market: ${money(p.marketLow)} – ${money(p.marketHigh)}</div>
+          <div class="row-sub tag-row"><span class="muted" style="margin-right:6px;">Play Maker:</span>${pm || `<span class="muted">—</span>`}</div>
+          <div class="row-sub tag-row"><span class="muted" style="margin-right:6px;">Shooting &amp; Scoring:</span>${ss || `<span class="muted">—</span>`}</div>
+        </div>
+        <div class="row-actions">
+          <button class="btn btn-ghost"   data-act="shortlist" data-id="${escapeHtml(p.id)}" ${inShortlist || inRoster ? "disabled" : ""}>Shortlist</button>
+          <button class="btn btn-primary" data-act="roster"    data-id="${escapeHtml(p.id)}" ${inRoster ? "disabled" : ""}>Roster</button>
+        </div>
+      </div>`;
+  }).join("");
+
+  // Click row → open modal (but not when clicking buttons)
+  els.tableWrap.querySelectorAll(".row-click").forEach(row => {
+    row.addEventListener("click", e => {
+      if (e.target.closest("button")) return;
+      const id = row.getAttribute("data-player-id");
+      const p  = allPlayers.find(x => x.id === id);
+      if (p) openModal(p);
+    });
+  });
+
+  els.tableWrap.querySelectorAll("button[data-act]").forEach(btn => {
+    btn.addEventListener("click", e => {
+      e.stopPropagation();
+      const id = btn.getAttribute("data-id");
+      const p  = allPlayers.find(x => x.id === id);
+      if (!p) return;
+      if (btn.dataset.act === "roster")    addToRoster(p);
+      if (btn.dataset.act === "shortlist") addToShortlist(p);
+      render(); // re-render to update disabled states
+    });
+  });
 }
 
-function renderTable() {
-  const q = (els.search?.value || "").trim().toLowerCase();
-  let view = rows;
-
-  if (q) {
-    view = view.filter(r => columns.some(c => String(r[c] ?? "").toLowerCase().includes(q)));
+// ── Table view render ─────────────────────────────────────────────────────────
+function renderTable(players) {
+  if (!players.length) {
+    els.tableWrap.innerHTML = `<div class="empty" style="padding:24px;">No players match your filters.</div>`;
+    return;
   }
+
+  // Map player ids back to raw rows for table display
+  const playerIds = new Set(players.map(p => p.id));
+  let view = rawRows.filter(r => playerIds.has(makeStableId(r)));
 
   if (sortKey) {
-    view = [...view].sort((ra, rb) => {
-      const cmp = compareValues(ra[sortKey], rb[sortKey]);
+    view = [...view].sort((a, b) => {
+      const cmp = compareValues(a[sortKey], b[sortKey]);
       return sortDir === "asc" ? cmp : -cmp;
     });
   }
 
-  const thead = columns
-    .map(c => {
-      const active = c === sortKey;
-      const arrow = active ? (sortDir === "asc" ? " ▲" : " ▼") : "";
-      return `<th data-sort="${escapeHtml(c)}" style="position:sticky;top:0;background:rgba(0,0,0,.35);backdrop-filter:blur(6px);cursor:pointer;white-space:nowrap;">
-        ${escapeHtml(c)}${arrow}
-      </th>`;
-    })
-    .join("");
+  const thead = columns.map(c => {
+    const active = c === sortKey;
+    const arrow  = active ? (sortDir === "asc" ? " ▲" : " ▼") : "";
+    return `<th data-sort="${escapeHtml(c)}" style="position:sticky;top:0;background:rgba(0,0,0,.85);backdrop-filter:blur(6px);cursor:pointer;white-space:nowrap;padding:10px 12px;">${escapeHtml(c)}${arrow}</th>`;
+  }).join("");
 
-  const tbody = view
-    .map(r => {
-      const id = makeStableId(r);
-      const cells = columns.map(c => `<td style="white-space:nowrap;">${escapeHtml(r[c])}</td>`).join("");
-      return `<tr>
-        <td style="white-space:nowrap;">
-          <button class="btn btn-primary" data-add="${escapeHtml(id)}" type="button">Add</button>
-        </td>
-        ${cells}
-      </tr>`;
-    })
-    .join("");
+  const tbody = view.map(r => {
+    const id = makeStableId(r);
+    const p  = allPlayers.find(x => x.id === id);
+    const cells = columns.map(c => `<td style="white-space:nowrap;padding:8px 12px;">${escapeHtml(r[c])}</td>`).join("");
+    return `<tr class="row-click" data-player-id="${escapeHtml(id)}" style="cursor:pointer;">
+      <td style="white-space:nowrap;padding:8px 12px;">
+        <button class="btn btn-primary" data-act="roster" data-id="${escapeHtml(id)}" type="button" ${p && ensureRosterState().roster.some(x => x.id === id) ? "disabled" : ""}>Add</button>
+        <button class="btn btn-ghost"   data-act="shortlist" data-id="${escapeHtml(p.id)}" type="button" ${p && ensureRosterState().roster.some(x => x.id === id) ? "disabled" : ""}>Shortlist</button>
+      ${cells}
+    </tr>`;
+  }).join("");
 
   els.tableWrap.innerHTML = `
-    <table style="width:100%;border-collapse:separate;border-spacing:0 8px;">
-      <thead><tr><th style="position:sticky;top:0;background:rgba(0,0,0,.35);backdrop-filter:blur(6px);">Roster</th>${thead}</tr></thead>
-      <tbody>${tbody || `<tr><td colspan="${columns.length + 1}" class="muted" style="padding:12px;">No rows found.</td></tr>`}</tbody>
-    </table>
-  `;
+    <table style="width:100%;border-collapse:collapse;">
+      <thead><tr>
+        <th style="position:sticky;top:0;background:rgba(0,0,0,.85);backdrop-filter:blur(6px);padding:10px 12px;">Action</th>
+        ${thead}
+      </tr></thead>
+      <tbody>${tbody}</tbody>
+    </table>`;
 
   els.tableWrap.querySelectorAll("th[data-sort]").forEach(th => {
     th.addEventListener("click", () => {
       const key = th.getAttribute("data-sort");
-      if (sortKey === key) sortDir = sortDir === "asc" ? "desc" : "asc";
-      else { sortKey = key; sortDir = "asc"; }
-      renderTable();
+      sortDir = sortKey === key && sortDir === "asc" ? "desc" : "asc";
+      sortKey = key;
+      render();
     });
   });
 
-  els.tableWrap.querySelectorAll("button[data-add]").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const targetId = btn.getAttribute("data-add");
-      const rowObj = rows.find(r => makeStableId(r) === targetId);
-      if (rowObj) addToRoster(rowObj);
+  els.tableWrap.querySelectorAll(".row-click").forEach(row => {
+    row.addEventListener("click", e => {
+      if (e.target.closest("button")) return;
+      const id = row.getAttribute("data-player-id");
+      const p  = allPlayers.find(x => x.id === id);
+      if (p) openModal(p);
     });
   });
 
-  els.meta.textContent = `${view.length.toLocaleString()} rows shown. Click a header to sort.`;
+  els.tableWrap.querySelectorAll("button[data-act='roster']").forEach(btn => {
+    btn.addEventListener("click", e => {
+      e.stopPropagation();
+      const id = btn.getAttribute("data-id");
+      const p  = allPlayers.find(x => x.id === id);
+      if (p) { addToRoster(p); render(); }
+    });
+  });
 }
 
-async function loadCSV() {
-  els.meta.textContent = "Loading CSV…";
+// ── Main render ───────────────────────────────────────────────────────────────
+function render() {
+  const filtered = getFiltered();
+  if (viewMode === "cards") renderCards(filtered);
+  else renderTable(filtered);
+  const hiddenCount = allPlayers.length - filtered.length;
+  els.meta.textContent = `${filtered.length.toLocaleString()} of ${allPlayers.length.toLocaleString()} players${hiddenCount ? ` (${hiddenCount} filtered out)` : ""}${viewMode === "table" ? " · click header to sort" : ""}`;
+}
+
+// ── View toggle ───────────────────────────────────────────────────────────────
+els.viewToggle?.addEventListener("click", () => {
+  viewMode = viewMode === "cards" ? "table" : "cards";
+  els.viewToggle.textContent = viewMode === "cards" ? "Table View" : "Card View";
+  render();
+});
+
+// ── Filter wiring ─────────────────────────────────────────────────────────────
+els.search?.addEventListener("input", render);
+els.posFilter?.addEventListener("change", render);
+els.yearFilter?.addEventListener("change", render);
+els.tagGroup?.addEventListener("change", () => { rebuildTagOptions(); render(); });
+els.tagFilter?.addEventListener("change", render);
+els.reloadBtn?.addEventListener("click", () => loadData().catch(err => (els.meta.textContent = err.message)));
+
+// ── Data loading ──────────────────────────────────────────────────────────────
+async function loadData() {
+  els.meta.textContent = "Loading…";
 
   const res = await fetch(CSV_URL, { cache: "no-store" });
-  if (!res.ok) throw new Error(`Could not fetch CSV (${res.status}). Check publish settings/link.`);
-
+  if (!res.ok) throw new Error(`Could not fetch CSV (${res.status}).`);
   const text = await res.text();
-  rows = parseCSV(text);
+  rawRows = parseCSV(text);
 
-  // Columns from headers
-  columns = rows.length ? Object.keys(rows[0]) : [];
+  // Build visible columns list
+  const allCols = rawRows.length ? Object.keys(rawRows[0]) : [];
+  columns = VISIBLE_COLUMNS.filter(c => allCols.includes(c));
+
+  // Parse into player objects
+  allPlayers = rawRows.map(r => {
+    const playmakerTags = parseTags(firstVal(r["Playmaker Tags"], r["Play Maker Tags"], r["Playmaker Tag"], ""));
+    const shootingTags  = parseTags(firstVal(r["Shooting/Scoring Tags"], r["Shooting & Scoring Tags"], r["Shooting and Scoring Tags"], ""));
+    const tags = uniq([...playmakerTags, ...shootingTags]);
+
+    const raw = {
+      id:          makeStableId(r),
+      name:        firstVal(r.Name, r["Player Name"], r.Player, "Unknown"),
+      team:        firstVal(r.Team, r.School, r["Current Team"], ""),
+      pos:         firstVal(r["Primary Position"], r.Position, r.Pos, ""),
+      year:        firstVal(r.Class, r.Year, r.year, ""),
+      marketLow:   normalizeNumber(firstVal(r["Open Market Low"],  r["Market Low"],  0)),
+      marketHigh:  normalizeNumber(firstVal(r["Open Market High"], r["Market High"], 0)),
+      tags, stats: r,
+    };
+    const p = Player.from(raw);
+    return { ...p, playmakerTags, shootingTags, stats: r };
+  });
+
   sortKey = null;
   sortDir = "asc";
-
-  renderTable();
+  rebuildYearOptions();
+  rebuildTagOptions();
+  render();
 }
 
-els.search?.addEventListener("input", renderTable);
-els.reloadBtn?.addEventListener("click", () => loadCSV().catch(err => (els.meta.textContent = err.message)));
-
-loadCSV().catch(err => {
-  els.meta.textContent = err.message;
-});
+loadData().catch(err => { els.meta.textContent = err.message; });

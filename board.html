@@ -28,7 +28,8 @@
       padding-bottom: 18px;
     }
     .page-board h1 { flex: 0 0 auto; }
-    .page-board .settings { flex: 0 0 auto; }
+    .page-board .settings { flex: 0 0 auto; grid-template-columns: repeat(5, 1fr); }
+    @media (max-width: 900px) { .page-board .settings { grid-template-columns: 1fr 1fr; } }
     .page-board .board-panel {
       flex: 1 1 auto;
       min-height: 0;
@@ -45,7 +46,7 @@
   </style>
   <div class="site-header-wrap">
     <header class="site-header">
-      <a class="brand" href="./" aria-label="Beyond the Portal home">
+      <a class="brand" href="./index.html" aria-label="Beyond the Portal home">
         <img class="brand-logo" src="./imgs/beyond_the_portal_logo.jpg" alt="Beyond the Portal" />
         <span class="brand-name">Beyond the Portal</span>
       </a>
@@ -72,39 +73,94 @@
           </div>
         </div>
 
-        <a href="./about.html" class="">About</a>
+        <a href="./index.html" class="">About</a>
         
       </nav>
     </header>
   </div>
 
     <main class="section">
-      <h1 style="margin-top:0;">Import_Board</h1>
+      <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:14px;">
+        <h1 style="margin:0;">Full Board</h1>
+        <button class="btn btn-ghost" id="viewToggle" type="button">Table View</button>
+      </div>
 
-      <div class="settings" style="grid-template-columns: 2fr 1fr 1fr; align-items:end;">
+      <div class="settings" style="grid-template-columns: 2fr 1fr 1fr 1fr 1fr; align-items:end;">
         <div class="setting">
           <label>Search</label>
-          <input id="search" type="search" placeholder="Name, team, anything…" />
+          <input id="search" type="search" placeholder="Name, team, tag…" />
         </div>
 
         <div class="setting">
-          <label>Sheet name</label>
-          <input id="sheetName" type="text" value="Import_Board" />
+          <label>Position</label>
+          <select id="posFilter">
+            <option value="all">All positions</option>
+            <option value="Guard">Guard</option>
+            <option value="Wing">Wing</option>
+            <option value="Big">Big</option>
+          </select>
         </div>
 
         <div class="setting">
-          <button class="btn btn-primary" id="reloadBtn" type="button">Reload</button>
+          <label>Year</label>
+          <select id="yearFilter">
+            <option value="all">All years</option>
+          </select>
         </div>
 
-        <div class="setting setting-wide">
+        <div class="setting">
+          <label>Tag type</label>
+          <select id="tagGroup">
+            <option value="all">All tag types</option>
+            <option value="playmaker">Play Maker</option>
+            <option value="shooting">Shooting &amp; Scoring</option>
+          </select>
+        </div>
+
+        <div class="setting">
+          <label>Tag</label>
+          <select id="tagFilter">
+            <option value="all">All tags</option>
+          </select>
+        </div>
+
+        <div class="setting setting-wide" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
           <div id="meta" class="muted"></div>
+          <button class="btn btn-ghost" id="reloadBtn" type="button">Reload</button>
         </div>
       </div>
 
       <div class="board-panel">
-        <div id="tableWrap"></div>
+        <div id="tableWrap" style="display:flex;flex-direction:column;gap:10px;padding:8px 0;"></div>
       </div>
     </main>
+
+    <!-- Player Modal -->
+    <div class="modal-backdrop" id="playerModalBackdrop" hidden></div>
+    <div class="modal" id="playerModal" role="dialog" aria-modal="true" aria-labelledby="playerModalTitle" hidden>
+      <div class="modal-card">
+        <div class="modal-head">
+          <div>
+            <div class="modal-kicker" id="playerModalKicker">Player</div>
+            <h3 class="modal-title" id="playerModalTitle">Player Name</h3>
+            <div class="modal-sub" id="playerModalSub">Team • Pos • Year</div>
+            <div class="modal-id" id="playerModalId"></div>
+          </div>
+          <button class="btn btn-ghost" id="playerModalCloseBtn" type="button" aria-label="Close">Close</button>
+        </div>
+        <div class="modal-body">
+          <div class="modal-grid" id="playerModalStats"></div>
+          <div class="modal-section">
+            <h4>Market Band</h4>
+            <div class="modal-sub" id="playerModalMarket"></div>
+          </div>
+          <div class="modal-section">
+            <h4>Tags</h4>
+            <div id="playerModalStatus"></div>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <!-- SheetJS (XLSX parser) -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
