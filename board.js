@@ -364,14 +364,18 @@ function renderTable(players) {
     });
   });
 
-  els.tableWrap.querySelectorAll("button[data-act='roster']").forEach(btn => {
+  els.tableWrap.querySelectorAll("button[data-act]").forEach(btn => {
     btn.addEventListener("click", e => {
       e.stopPropagation();
       const id = btn.getAttribute("data-id");
       const p  = allPlayers.find(x => x.id === id);
-      if (p) { addToRoster(p); render(); }
+      if (!p) return;
+      if (btn.dataset.act === "roster")    addToRoster(p);
+      if (btn.dataset.act === "shortlist") addToShortlist(p);
+      render(); // re-render to update disabled states
     });
   });
+
 }
 
 // ── Main render ───────────────────────────────────────────────────────────────
