@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Sign In — Beyond the Portal</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <style>
+      .login-wrap {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+      }
+      .login-card {
+        width: 100%;
+        max-width: 420px;
+        background: var(--card-bg, rgba(255,255,255,0.04));
+        border: 1px solid rgba(255,255,255,0.1);
+        border-radius: 16px;
+        padding: 40px 36px 36px;
+      }
+      .login-logo {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 28px;
+      }
+      .login-logo img {
+        height: 36px;
+        width: 36px;
+        border-radius: 6px;
+        object-fit: cover;
+      }
+      .login-logo span {
+        font-size: 15px;
+        font-weight: 500;
+        opacity: .85;
+      }
+      .login-card h1 {
+        font-size: 22px;
+        font-weight: 500;
+        margin: 0 0 6px;
+      }
+      .login-card p {
+        font-size: 14px;
+        opacity: .55;
+        margin: 0 0 28px;
+        line-height: 1.5;
+      }
+      .login-field {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        margin-bottom: 16px;
+      }
+      .login-field label {
+        font-size: 12px;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: .06em;
+        opacity: .5;
+      }
+      .login-field input {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 10px 12px;
+        font-size: 15px;
+        background: rgba(255,255,255,0.06);
+        border: 1px solid rgba(255,255,255,0.12);
+        border-radius: 8px;
+        color: inherit;
+        outline: none;
+        transition: border-color .15s;
+        font-family: var(--font-mono, monospace);
+        letter-spacing: .05em;
+        text-transform: uppercase;
+      }
+      .login-field input:focus {
+        border-color: rgba(255,255,255,0.35);
+      }
+      .login-field input.error {
+        border-color: rgba(220, 80, 80, 0.7);
+      }
+      .login-error {
+        font-size: 13px;
+        color: #e55;
+        min-height: 18px;
+        margin-bottom: 12px;
+      }
+      .login-btn {
+        width: 100%;
+        padding: 12px;
+        font-size: 15px;
+        font-weight: 500;
+        border-radius: 8px;
+        cursor: pointer;
+        border: none;
+        background: rgba(255,255,255,0.9);
+        color: #111;
+        transition: opacity .15s;
+      }
+      .login-btn:hover  { opacity: .88; }
+      .login-btn:active { opacity: .75; }
+      .login-btn:disabled { opacity: .4; cursor: default; }
+      .login-footer {
+        margin-top: 24px;
+        font-size: 12px;
+        opacity: .35;
+        text-align: center;
+        line-height: 1.6;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="login-wrap">
+      <div class="login-card">
+        <div class="login-logo">
+          <img src="./imgs/beyond_the_portal_logo.jpg" alt="Beyond the Portal" />
+          <span>Beyond the Portal</span>
+        </div>
+
+        <h1>Roster Builder</h1>
+        <p>Enter your program access code to load your team's roster.</p>
+
+        <div class="login-field">
+          <label>Access Code</label>
+          <input id="codeInput" type="text" placeholder="e.g. DUKE-8587"
+                 autocomplete="off" autocorrect="off" spellcheck="false" />
+        </div>
+
+        <div class="login-error" id="loginError"></div>
+
+        <button class="login-btn" id="loginBtn" type="button">Continue</button>
+
+        <div class="login-footer">
+          Don't have a code? Contact Beyond the Portal to get access for your program.
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const input    = document.getElementById("codeInput");
+      const btn      = document.getElementById("loginBtn");
+      const errorEl  = document.getElementById("loginError");
+
+      // ── SHA-256 in the browser ──────────────────────────────────────────────
+      async function sha256(str) {
+        const buf = await crypto.subtle.digest(
+          "SHA-256",
+          new TextEncoder().encode(str)
+        );
+        return "sha256:" + Array.from(new Uint8Array(buf))
+          .map(b => b.toString(16).padStart(2, "0"))
+          .join("");
+      }
+
+      // ── Load the codes file ─────────────────────────────────────────────────
+      async function loadCodes() {
+        const res = await fetch("./data/team_codes.json", { cache: "no-store" });
+        if (!res.ok) throw new Error("Could not load team codes.");
+        return res.json();
+      }
+
+      // ── Attempt login ───────────────────────────────────────────────────────
+      async function attemptLogin() {
+        const raw  = input.value.trim();
+        if (!raw) {
+          errorEl.textContent = "Please enter your access code.";
+          input.classList.add("error");
+          return;
+        }
+
+        btn.disabled       = true;
+        btn.textContent    = "Checking…";
+        errorEl.textContent = "";
+        input.classList.remove("error");
+
+        try {
+          const codes = await loadCodes();
+          const hash  = await sha256(raw.toUpperCase());
+
+          // Find a team whose hash matches
+          const team = Object.entries(codes).find(([, v]) => v.hash === hash)?.[0];
+
+          if (!team) {
+            errorEl.textContent = "Invalid code. Check your access code and try again.";
+            input.classList.add("error");
+            btn.disabled     = false;
+            btn.textContent  = "Continue";
+            return;
+          }
+
+          // Store session (tab-scoped so it clears on browser close)
+          sessionStorage.setItem("btp_team",   team);
+          sessionStorage.setItem("btp_season", codes[team].season || "");
+          sessionStorage.setItem("btp_authed", "1");
+
+          // Redirect to the builder
+          window.location.href = "./app.html";
+
+        } catch (err) {
+          errorEl.textContent = `Error: ${err.message}`;
+          btn.disabled    = false;
+          btn.textContent = "Continue";
+        }
+      }
+
+      btn.addEventListener("click", attemptLogin);
+      input.addEventListener("keydown", e => {
+        if (e.key === "Enter") attemptLogin();
+      });
+
+      // Auto-uppercase as user types
+      input.addEventListener("input", () => {
+        const pos = input.selectionStart;
+        input.value = input.value.toUpperCase();
+        input.setSelectionRange(pos, pos);
+      });
+
+      // If already authed this session, skip straight to app
+      if (sessionStorage.getItem("btp_authed") === "1") {
+        window.location.href = "./app.html";
+      }
+    </script>
+  </body>
+</html>
