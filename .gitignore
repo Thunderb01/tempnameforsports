@@ -1,4 +1,8 @@
-private/
-__pycache__/
+node_modules
+dist
+.env.local
+.env
+data/team_codes_PRIVATE.csv
 *.pyc
+__pycache__
 .DS_Store
