@@ -1,4 +1,5 @@
 {
+<<<<<<< HEAD
   "Alabama": {
     "hash": "sha256:70627a59b0912c94d8ec17686c3ca297771e6edc457fdf6727de3dad5284deae",
     "season": "2025-26"
@@ -37,6 +38,1378 @@
   },
   "Texas": {
     "hash": "sha256:b01ceaeae1ccd19309a2ac8ee495100246908a2dedf7bf08ffa11d353eb71a89",
+=======
+  "Abilene Christian": {
+    "hash": "sha256:22edf5edac0c6090fdae756d677dd1bd1f06c002728010f2fa699b8c744e624b",
+    "season": "2025-26"
+  },
+  "Air Force": {
+    "hash": "sha256:5e19b3a3eab62c2e1ad5e51a52725cb3ecbefcf739cb58c56652a2538805548a",
+    "season": "2025-26"
+  },
+  "Akron": {
+    "hash": "sha256:d71b71601fbfd1fea1f7529045228c633626730bc4ed82d4a539ce801a1d95c3",
+    "season": "2025-26"
+  },
+  "Alabama": {
+    "hash": "sha256:c9436bceb726e8c8909ff8124e41089e69f381dc045bfeb066abad73b8b03e4c",
+    "season": "2025-26"
+  },
+  "Alabama A&M": {
+    "hash": "sha256:45f5d1c1345e3cae9fc9b59770bad754565936ce9179aa8ebfe5d3f9f1be90aa",
+    "season": "2025-26"
+  },
+  "Alabama State": {
+    "hash": "sha256:e6f86c41e36dc52975e3fc562c4223ad1c1e6c09fe83a5749dd376a38032808d",
+    "season": "2025-26"
+  },
+  "Albany": {
+    "hash": "sha256:16a9d2a569ca873eafd0faa9a6bc638446efccdd3cd8d490baf740c99c55d7af",
+    "season": "2025-26"
+  },
+  "Alcorn State": {
+    "hash": "sha256:3762ddcaffb4e16e83a23f956e2f09bffe32c40762030b0432f957a61af3a149",
+    "season": "2025-26"
+  },
+  "American": {
+    "hash": "sha256:1c50edfc3f2a18bc96712d9a12cef84306eba14eada27ed7958630a025b3262c",
+    "season": "2025-26"
+  },
+  "Appalachian State": {
+    "hash": "sha256:39321e2a3a252f4bb54c80a3dc30babf13a02d4cdefef6d9bf9650b3c9290703",
+    "season": "2025-26"
+  },
+  "Arizona": {
+    "hash": "sha256:2bf357e150a2eb0574853c222128aa779290a8692719b4b31dbceb69c0bb28f7",
+    "season": "2025-26"
+  },
+  "Arizona State": {
+    "hash": "sha256:be50d00f89df1c9e1c38d7904322eb99a13e148f59d838e70de00f8927a8a09b",
+    "season": "2025-26"
+  },
+  "Arkansas": {
+    "hash": "sha256:dbcaddb4a2790ca2b024398d78b7dd48a24e27a148a2842566930819ddfc0037",
+    "season": "2025-26"
+  },
+  "Arkansas State": {
+    "hash": "sha256:4d01eb35878330c5e1dc68bdfe981500ebb15b41397043344a92d4f1a492ac90",
+    "season": "2025-26"
+  },
+  "Arkansas-Pine Bluff": {
+    "hash": "sha256:79dec3c5c5bae9e01b4bf6541d6bde0d4e621ffd90480c2bbe415030387f9016",
+    "season": "2025-26"
+  },
+  "Army": {
+    "hash": "sha256:1b5155a120a077c64fca8d79cc6d30246d2aa5dec201059b31dd23f6f447a1d4",
+    "season": "2025-26"
+  },
+  "Auburn": {
+    "hash": "sha256:e52fdd141ef877bba7e935331562b7e93edb207d2ca5138ca90b2abc8ae1502c",
+    "season": "2025-26"
+  },
+  "Austin Peay": {
+    "hash": "sha256:bd8a854f0eaf4511cfecaacb31027618b2e06573388606b9615bb6e6ce626e79",
+    "season": "2025-26"
+  },
+  "BYU": {
+    "hash": "sha256:268c2480e7982e99aba83394b700b8b6fd35ff99144b1350e636455a7f16c306",
+    "season": "2025-26"
+  },
+  "Ball State": {
+    "hash": "sha256:2d1305d5a6d6edecbabfe0064c272432e745b754e9e0d13bc16c4d4c4b4a4502",
+    "season": "2025-26"
+  },
+  "Baylor": {
+    "hash": "sha256:00ebf57ab30ae03edcb18e200cc9b84df89287863dabace1f4f5b3f0eb5de7ce",
+    "season": "2025-26"
+  },
+  "Bellarmine": {
+    "hash": "sha256:de34577e5f881c0c65f46e7b8f503d21c2471f23b409f13367e4f81d8bc2e777",
+    "season": "2025-26"
+  },
+  "Belmont": {
+    "hash": "sha256:5f59ab7e561c5636b22d83be266541fe5b7d18e6b6a66a8442eaccd211a25f05",
+    "season": "2025-26"
+  },
+  "Bethune-Cookman": {
+    "hash": "sha256:fc19f3f158fa2468184782a8798520a78c4d42999e8471cdcff825a1d36f4715",
+    "season": "2025-26"
+  },
+  "Boise State": {
+    "hash": "sha256:c88ef2ab1ff1c88ff93dd2d78687380260931c2aae128dc7fe5b6203f0349013",
+    "season": "2025-26"
+  },
+  "Boston College": {
+    "hash": "sha256:4b7ed54e6a8fbc936cfd65461ecefd7c2140f5725731d3638456d16483734f35",
+    "season": "2025-26"
+  },
+  "Boston University": {
+    "hash": "sha256:5c0236465bde1861e009a198e2bdf15cd5d25e285d1696bd9560dfbc29b0c543",
+    "season": "2025-26"
+  },
+  "Bowling Green": {
+    "hash": "sha256:e6997b4a06a85aace3348bc23a5dbb5e7a2c7d8b5563a5711f4ce14c53aeabf3",
+    "season": "2025-26"
+  },
+  "Bradley": {
+    "hash": "sha256:c966b7e7808bb96dfe17f4661363ac95289aab291e895a032396cfc903f61ee3",
+    "season": "2025-26"
+  },
+  "Brown": {
+    "hash": "sha256:8757f01cd14eed17365a4cf264fb884eba8ecc04d43fc22b92b2ead4d6725682",
+    "season": "2025-26"
+  },
+  "Bryant": {
+    "hash": "sha256:352f6cdb797b6edb216728d8c9559efea05a34554e772a9391aac11c067aa9ac",
+    "season": "2025-26"
+  },
+  "Bucknell": {
+    "hash": "sha256:bfdc3d7103862ea9b45f840357ab836ec3419fd6baa94a9f1f0c9fea57831266",
+    "season": "2025-26"
+  },
+  "Buffalo": {
+    "hash": "sha256:dcf17d25d6c57cfab619409cca25aa12bc8606798a70258fd514a3cc4afb7daa",
+    "season": "2025-26"
+  },
+  "Butler": {
+    "hash": "sha256:9c38ed7a2ae2dbfcb1b29606aae20447aa0d0db54173180aa909ee6dc7785d51",
+    "season": "2025-26"
+  },
+  "Cal Baptist": {
+    "hash": "sha256:a38268c8c225acbade9096caebd323ad14759684d0ad6c40907f38736a9bd00e",
+    "season": "2025-26"
+  },
+  "Cal Poly": {
+    "hash": "sha256:b50ff6bd7ed35637754d8d8809ff936183de2202c457e3bebb74dd8cfad3f151",
+    "season": "2025-26"
+  },
+  "Cal State Bakersfield": {
+    "hash": "sha256:44898bafc7d3017b5d5451f117b11bda23ce1b6a1665adabf8a887ec9a27c854",
+    "season": "2025-26"
+  },
+  "Cal State Fullerton": {
+    "hash": "sha256:43453f430a76b355a844111e4b581d2f0e78df5714a49f2ef37eaa2118b41cee",
+    "season": "2025-26"
+  },
+  "Cal State Northridge": {
+    "hash": "sha256:a0bf55dffcc24b16239b72a85d2dc73fb14f59f92b8ff7e8e0c5611399bdcef4",
+    "season": "2025-26"
+  },
+  "California": {
+    "hash": "sha256:d20491f3a76b6a9ce58692776a6bbf0db329fda17aef2bae1bd0a5547412bda0",
+    "season": "2025-26"
+  },
+  "Campbell": {
+    "hash": "sha256:086c244d001283390da6866dce9309bdfee19818adcd33f283d7ac3d84573f84",
+    "season": "2025-26"
+  },
+  "Canisius": {
+    "hash": "sha256:d8c06b624192567b1621912f4db1ac1da548dddf000d2750b4a02a6ce3019210",
+    "season": "2025-26"
+  },
+  "Central Arkansas": {
+    "hash": "sha256:ecaa0ee352d9d46a774b1f595f964f0554b00700b3488c677dfc8ed7f7f4720f",
+    "season": "2025-26"
+  },
+  "Central Connecticut": {
+    "hash": "sha256:dd9d4f3b5f4b3a1c5dd758e31e40a6453660ad9e2a144fa3092f22486b1dd664",
+    "season": "2025-26"
+  },
+  "Central Michigan": {
+    "hash": "sha256:15f8b046858764cd9b51e97b6fa7b37d511cf4fd9a9b04c62e8ce62e010ba281",
+    "season": "2025-26"
+  },
+  "Charleston": {
+    "hash": "sha256:687f2ff22c456d369ae1e7f6875520250e8a87b2c6073e7c425c62bff5d1a698",
+    "season": "2025-26"
+  },
+  "Charlotte": {
+    "hash": "sha256:070e73b9534882f6e054d893a92071444380d6597831c2837c1ac30dd0cb0dac",
+    "season": "2025-26"
+  },
+  "Chattanooga": {
+    "hash": "sha256:d8a7ac5f3469ad9f8ec3d2430566308abddffcd9bd59ffad3e981d74ff957200",
+    "season": "2025-26"
+  },
+  "Chicago State": {
+    "hash": "sha256:47ec5d11dbcb647a00eede9f469d9995c2159da816ef5d15fe10a765c57c8aa2",
+    "season": "2025-26"
+  },
+  "Cincinnati": {
+    "hash": "sha256:a2a426ba367e21697b8a7df30a43294dd971dd107ce2a6ae6480a744a28d58f1",
+    "season": "2025-26"
+  },
+  "Clemson": {
+    "hash": "sha256:6dd4194c12edadf35cf7f1a3d26ded2ee2620a5807b4471f2bf1354300ffc5c7",
+    "season": "2025-26"
+  },
+  "Cleveland State": {
+    "hash": "sha256:2b74724811c66ec25a887a5a02fa0d55cd7d5db7c93d481a2e8f2e3bb04a1c64",
+    "season": "2025-26"
+  },
+  "Coastal Carolina": {
+    "hash": "sha256:8418e37b54f69925df85d20fb62e333799614ff73025a1b6635dfa99eec456f4",
+    "season": "2025-26"
+  },
+  "Colgate": {
+    "hash": "sha256:9a24d8edb9c739fc11e614cc00105c3c5ac7945edb0a3f4b9fcc8c10eb4a1547",
+    "season": "2025-26"
+  },
+  "Colorado": {
+    "hash": "sha256:eb38d6b24ba43488794a1940e2ba25d222d32f987d4bee8b87dfda824cb8182e",
+    "season": "2025-26"
+  },
+  "Colorado State": {
+    "hash": "sha256:b817c47c14a8e950a1b399d42f9dac6abc6043b604a8c29eeb82d717735d5b2e",
+    "season": "2025-26"
+  },
+  "Columbia": {
+    "hash": "sha256:d9fd13654b6e899b40cb207e626f65b6bb54b381d5fde9c7f201c4b79639b85b",
+    "season": "2025-26"
+  },
+  "Connecticut": {
+    "hash": "sha256:7ea108732fefb04597042f94e81c11fb0d22b24c4b0d599cb586d2341711965a",
+    "season": "2025-26"
+  },
+  "Coppin State": {
+    "hash": "sha256:d88aeed45a8d3fa7b1559fa907538a43800abed19cb1b77e36fe8c68da7e2008",
+    "season": "2025-26"
+  },
+  "Cornell": {
+    "hash": "sha256:dbc4e7d5717abb9688679c035f13af64c0d262baffa4d8b6d3acd5ccf01a3c9e",
+    "season": "2025-26"
+  },
+  "Creighton": {
+    "hash": "sha256:99e154ead7d9f59495e88282cdab3fa38d8c4965e2f328a5fd12f7075082ba7e",
+    "season": "2025-26"
+  },
+  "Dartmouth": {
+    "hash": "sha256:54e504db6277d8bc4cc595b477078ceaab0ac92cb421cba278abb5850c654cd4",
+    "season": "2025-26"
+  },
+  "Davidson": {
+    "hash": "sha256:a57f7af8bef17a44bc207362440339189b624ad566bf7a8ff39ae4dee3581116",
+    "season": "2025-26"
+  },
+  "Dayton": {
+    "hash": "sha256:7607fa74cc3c7c3d98b8ce382cc1cefbde6542f01649524b692b06241c46a153",
+    "season": "2025-26"
+  },
+  "DePaul": {
+    "hash": "sha256:89567cc0629307b5704114092ae2e9bad670eaa4e4da11c7344d2b953f7efc85",
+    "season": "2025-26"
+  },
+  "Delaware": {
+    "hash": "sha256:b8a1fbe758378875ec6c427f44259f0074b486a015572561917a750432605c10",
+    "season": "2025-26"
+  },
+  "Delaware State": {
+    "hash": "sha256:3d9b37ace950a85d06f568735df7f3a48a30482c545e0fd8b605e7ec968b67f6",
+    "season": "2025-26"
+  },
+  "Denver": {
+    "hash": "sha256:5f5e8847d80162325f4e558db260252e30538f7a9e83dbbe19b62bbb8a795695",
+    "season": "2025-26"
+  },
+  "Detroit Mercy": {
+    "hash": "sha256:acb0a7af29162d73d4564b712dcc38bd5c33ffaef04600a57ad67fbb0cdc782f",
+    "season": "2025-26"
+  },
+  "Drake": {
+    "hash": "sha256:5fd9de02e4b8dba9c2a0d1c639ecc72a5997735ac5a62936d689a634fe40c188",
+    "season": "2025-26"
+  },
+  "Drexel": {
+    "hash": "sha256:5ffe605941d6d993ffed50952623aa98d3ca5bdc1a7a30e37cd288ef2f23aeff",
+    "season": "2025-26"
+  },
+  "Duke": {
+    "hash": "sha256:0605725cc27325006da48b967b237db8ef611edbf97e418b2286dd4a5c755f26",
+    "season": "2025-26"
+  },
+  "Duquesne": {
+    "hash": "sha256:4982134fbc889ce0b929eb1c3c2bab60a6210223386008f4eea09bef227fbbc4",
+    "season": "2025-26"
+  },
+  "East Carolina": {
+    "hash": "sha256:c4bc17c3981b1d5991d757f708916d3d8db43ae5206749c39c1406852e936b4d",
+    "season": "2025-26"
+  },
+  "East Tennessee State": {
+    "hash": "sha256:27e51fc93fe8e79aa6d180f5ffd79d4198b2d2cf5145f552db08192a55495c4a",
+    "season": "2025-26"
+  },
+  "Eastern Illinois": {
+    "hash": "sha256:203719775df59e77aa3b1b32fbcf68b7d52b063fa85baab2aaa2a9d4764ab53e",
+    "season": "2025-26"
+  },
+  "Eastern Kentucky": {
+    "hash": "sha256:1df9b972f5c27d55b68bbf7d7b411e0c6c6cdf5dcce37122a43e39767ac8dffc",
+    "season": "2025-26"
+  },
+  "Eastern Michigan": {
+    "hash": "sha256:fb39645493e5947729f9655153e4e0521e8d427edd14e4c078a9e80e6a266bea",
+    "season": "2025-26"
+  },
+  "Eastern Washington": {
+    "hash": "sha256:80c33362bc4fea1f838d1e09bf4ba53a110de6f4e53f468bc741b16a382f1185",
+    "season": "2025-26"
+  },
+  "Elon": {
+    "hash": "sha256:db55096ca11182488477c7a3209e03a3f4cf631e6de9f545d884f0d4ef59ef7b",
+    "season": "2025-26"
+  },
+  "Evansville": {
+    "hash": "sha256:77f31a17b1dfd5c7153c7c0a9f54680deb083c6e21884dbe262a7d632eb50f21",
+    "season": "2025-26"
+  },
+  "FIU": {
+    "hash": "sha256:89dd9d2d74531fe4ef9f1f865734273a6d981a0275f64857467a8b6b553c1c4f",
+    "season": "2025-26"
+  },
+  "Fairfield": {
+    "hash": "sha256:bb3759ed785e2121d32788b1bd1c4610909fe3ca59737d048d6f5729440c0836",
+    "season": "2025-26"
+  },
+  "Fairleigh Dickinson": {
+    "hash": "sha256:e72ba0f4aacbddf070122c5fc9606f35d3d19fd2adecf43ca88f65d562f23d47",
+    "season": "2025-26"
+  },
+  "Florida": {
+    "hash": "sha256:a82be946eb9380a3238cf359b5bf893c121a8b47c02924796e35c4978d07f730",
+    "season": "2025-26"
+  },
+  "Florida A&M": {
+    "hash": "sha256:8bcfd89183c401e915551ee86d421d44c80a457b00fd06b9ad35a0a8a51be6e5",
+    "season": "2025-26"
+  },
+  "Florida Atlantic": {
+    "hash": "sha256:53291247dde8bc399682ec4536d7bc431e62a1ef7b85169a96606d5fada3ca62",
+    "season": "2025-26"
+  },
+  "Florida Gulf Coast": {
+    "hash": "sha256:65fb1364a11b083eee5777ad16f2f8b91bc5ee48de0a3bdba672ce43d374a892",
+    "season": "2025-26"
+  },
+  "Florida State": {
+    "hash": "sha256:6ce3bba52bdbd3899bfd9ff10ac1b7449a433176eb25ab5ccf57764336864339",
+    "season": "2025-26"
+  },
+  "Fordham": {
+    "hash": "sha256:7c3d5939432a0612440087c384768c65167fdc721b98107b768b70b4bf0fd36e",
+    "season": "2025-26"
+  },
+  "Fresno State": {
+    "hash": "sha256:a89b052ca55a89f2b616e7b1d72fcb6685ff0962fff94f7543926d29a5401c70",
+    "season": "2025-26"
+  },
+  "Furman": {
+    "hash": "sha256:beeb0a6549cbef48d7f27f3bce36b6ac44a119c111c6e7cce13e4e3e6f5da036",
+    "season": "2025-26"
+  },
+  "Gardner-Webb": {
+    "hash": "sha256:65c93f5f4efdf15c9565a69216312cc5d0b0688869e8de63c2ab784b4501a3bd",
+    "season": "2025-26"
+  },
+  "George Mason": {
+    "hash": "sha256:27b5ff32db56246c2fb1b3a64a79eaac61d724bb78f827a8d88e1a6f946bc7da",
+    "season": "2025-26"
+  },
+  "George Washington": {
+    "hash": "sha256:91e2c7cd34f5115d141582d52dd319072333b64700d8374e24f7b0db89afa6e0",
+    "season": "2025-26"
+  },
+  "Georgetown": {
+    "hash": "sha256:6b493da13e1654c3d40ae31bd4998baeb07a644cf9d844b140b49e5e490d9452",
+    "season": "2025-26"
+  },
+  "Georgia": {
+    "hash": "sha256:1925aabcea4477611393443eb4e3ce9e63e6d890bf2b52541eccd018b5c66b73",
+    "season": "2025-26"
+  },
+  "Georgia Southern": {
+    "hash": "sha256:08f6374e3f1c487b4b23236f0a39f90b3dee43876eaccfb0d0466111b4a4e672",
+    "season": "2025-26"
+  },
+  "Georgia State": {
+    "hash": "sha256:1742e3b26d25279671c7e3f4735451cacccf0eb35c1cb255c959f5c14b391010",
+    "season": "2025-26"
+  },
+  "Georgia Tech": {
+    "hash": "sha256:dee143e9cd035b4229e1cd474382dd924d7aa51cd2ef4279e39b79fa8b592d30",
+    "season": "2025-26"
+  },
+  "Gonzaga": {
+    "hash": "sha256:de9fade40648e1be4112ddb251998905718f440af590c23d2c9e1041ab976f87",
+    "season": "2025-26"
+  },
+  "Grambling": {
+    "hash": "sha256:31d6734852b43dc38dedb5e22fed8ca9cfc60186798a43635a92f54fe8bed8a7",
+    "season": "2025-26"
+  },
+  "Grand Canyon": {
+    "hash": "sha256:6e6070a4fd12cda09c4a6467cabdacd69c0099a3cff22f4bbaea6dc9f6fbe7e6",
+    "season": "2025-26"
+  },
+  "Green Bay": {
+    "hash": "sha256:2483b478dd100c70b1ba2c8aae6687ac8c705a5a56567347589e5d8f6be366d8",
+    "season": "2025-26"
+  },
+  "Hampton": {
+    "hash": "sha256:cd2e120c178edfbe7dd35f2cb5767912fdf679950374a85260c2f31af95e0863",
+    "season": "2025-26"
+  },
+  "Hartford": {
+    "hash": "sha256:49dbd92a0e5b7ee68c0c0962eee4290978f0899be7cfa2ddbcfd3fccb0b31cc4",
+    "season": "2025-26"
+  },
+  "Harvard": {
+    "hash": "sha256:869b920b024a3ec8ab3822989831db09b0381f02e76d4f8868b469709f8fabd4",
+    "season": "2025-26"
+  },
+  "Hawaii": {
+    "hash": "sha256:abb13debc4aa43fb885b1c4248bc53b50df7ee33252bbc3a4f36ce3de526b281",
+    "season": "2025-26"
+  },
+  "High Point": {
+    "hash": "sha256:8b409d645683c9410643cd25ca868fe9b2b13ca8f81fdde38001ce6bdad0c298",
+    "season": "2025-26"
+  },
+  "Hofstra": {
+    "hash": "sha256:80e8192eb8aebb7cdd9f0a92f126e2c5b7d1bcd670fb81199f8e8b6c4221a499",
+    "season": "2025-26"
+  },
+  "Holy Cross": {
+    "hash": "sha256:460a161fb3dada1a2bc4fd11fa0dcb4569f049f06b63579a9fa7e93a01c571a9",
+    "season": "2025-26"
+  },
+  "Houston": {
+    "hash": "sha256:2698ee62c0babe336aa7058506a51c139bdd30f50df6aa0c448aa51a20bc2e52",
+    "season": "2025-26"
+  },
+  "Houston Christian": {
+    "hash": "sha256:19f52d2fff60a5e1b3933e3ee3bfce9b968f4197c5d70946bc1f1f81c9035400",
+    "season": "2025-26"
+  },
+  "Howard": {
+    "hash": "sha256:0f8e0699f27ce7faf81441ecc850df2022ba9971054b68f06f3fc5b9bf59b5ed",
+    "season": "2025-26"
+  },
+  "Idaho": {
+    "hash": "sha256:3bdc83573becb95b853e7d34c1a8b46be602064fde019e054d4676f8c77b36bc",
+    "season": "2025-26"
+  },
+  "Idaho State": {
+    "hash": "sha256:f2133b88259debab54f06865d9b15fbc1c10798e0d25d15ac59921b640b84ff9",
+    "season": "2025-26"
+  },
+  "Illinois": {
+    "hash": "sha256:5b7c67c67fcf1731f0e055fa81fa85ace14fda7d1e9b7cabcdf0df207f58e05d",
+    "season": "2025-26"
+  },
+  "Illinois State": {
+    "hash": "sha256:849135d74ea907ed760ca7801fa225931281010fa5d900ffedbb531bf4fac713",
+    "season": "2025-26"
+  },
+  "Incarnate Word": {
+    "hash": "sha256:0978bf7fdf2407450d378ddd8d871e7d13b8ff5d2ccc18ae5dcbe6e99351e877",
+    "season": "2025-26"
+  },
+  "Indiana": {
+    "hash": "sha256:b246e0d54bc83e502ec777acee9a23f8e2f933c35e7d636e396766c1ebcdd463",
+    "season": "2025-26"
+  },
+  "Indiana State": {
+    "hash": "sha256:cf5c60bceb29fdf99db9ae5abf9ff1c1f5c233b7c1d41cebac89c22c0e77f693",
+    "season": "2025-26"
+  },
+  "Iona": {
+    "hash": "sha256:76072e55508bec50bab1427f3e72cf525fb701791054d8fea192a4166af34515",
+    "season": "2025-26"
+  },
+  "Iowa": {
+    "hash": "sha256:b955543d645584cef8a82a939a7421fa817e673e611a7e83a895ad5e535bc9bd",
+    "season": "2025-26"
+  },
+  "Iowa State": {
+    "hash": "sha256:6723f7a051f66ee7c4f79879a82f2dbdb701e5272fd8fb47f9aec2873d139501",
+    "season": "2025-26"
+  },
+  "Jackson State": {
+    "hash": "sha256:0f365639b54817dc868811ace888c894df4723812f8626932227ada75b895bb8",
+    "season": "2025-26"
+  },
+  "Jacksonville": {
+    "hash": "sha256:b53f91424ede2a2f7c172b6f7d355def50676916bac8e30d5a4d0f732131950e",
+    "season": "2025-26"
+  },
+  "Jacksonville State": {
+    "hash": "sha256:0cf3b7b8c90290bd9a82c6c6a51cb7a83705ba2429b429e4d6bda56eb90d4d40",
+    "season": "2025-26"
+  },
+  "James Madison": {
+    "hash": "sha256:4f74d3b402497be4b00a9ddb5d130767cf5a28bff89f39ba016d84f926d943c1",
+    "season": "2025-26"
+  },
+  "Kansas": {
+    "hash": "sha256:294b98502b7b17cb1c01e211e99aeb485941cd39d4abe039d96e5ee423c0ce33",
+    "season": "2025-26"
+  },
+  "Kansas State": {
+    "hash": "sha256:d9d1f21b0f5be66a9cfc40e00e33d4871cf96d69d0043d03b52322208075e12b",
+    "season": "2025-26"
+  },
+  "Kennesaw State": {
+    "hash": "sha256:920b648a48a298f5905015b17adc956215c04b724277450b568aae104c37b280",
+    "season": "2025-26"
+  },
+  "Kent State": {
+    "hash": "sha256:ece59b3e921b9377e7d9f9453c1eb34eb1aa40b74ca098c8fca1beb2e2a33e0f",
+    "season": "2025-26"
+  },
+  "Kentucky": {
+    "hash": "sha256:5faaaf1c675dce734e5166155945d2bd9da1639d61003a8c939212ce7d3d17e2",
+    "season": "2025-26"
+  },
+  "LSU": {
+    "hash": "sha256:aaa368a8a7a0d176aa15656f4e707f78b3f3ca442964a5391dee782a7e62a908",
+    "season": "2025-26"
+  },
+  "La Salle": {
+    "hash": "sha256:5b50b0031afbf9c0cd821306dc57468e22e19c0e3ba03b06ecf197df0baf70b9",
+    "season": "2025-26"
+  },
+  "Lafayette": {
+    "hash": "sha256:d76747a0d11fe71aa36b9363dfcc46d4072fddbf6958423c6903e618f01d91d5",
+    "season": "2025-26"
+  },
+  "Lamar": {
+    "hash": "sha256:53e3722705004234e17ceacfef9b8a8a0ee517ae6a885cf90fff5a306490aaae",
+    "season": "2025-26"
+  },
+  "Lehigh": {
+    "hash": "sha256:408e206f2a3827bde9a9b37b3409343e86749a6eaa9bc59f64f0f758e41d8b8d",
+    "season": "2025-26"
+  },
+  "Liberty": {
+    "hash": "sha256:d6a323a2a3159298cabf8ab2d1b9cae24b4bb54a4f3aa44155e13243bf124a20",
+    "season": "2025-26"
+  },
+  "Lindenwood": {
+    "hash": "sha256:9ca161908f3c853a11eed1f8568567c74f9af0380b29e956232a69d61fad62e1",
+    "season": "2025-26"
+  },
+  "Lipscomb": {
+    "hash": "sha256:f3a0d8ccc3bed847b31ccb9ef77db03f0f11a32ddbddef2ac771ece238fef9ac",
+    "season": "2025-26"
+  },
+  "Little Rock": {
+    "hash": "sha256:92253a25d4d1e2fc7415976d0958eb7bf9652f70871b2ba817accfef4fa5e679",
+    "season": "2025-26"
+  },
+  "Long Beach State": {
+    "hash": "sha256:c3a49522d10ed34aa434513d798f8e54aa1f4a76481f7144d0c773bf8b2cced9",
+    "season": "2025-26"
+  },
+  "Long Island": {
+    "hash": "sha256:c874b4bc2cdf126a1c67fba0826e85993abb78d0adf9b3c87cb87c3a61e7db70",
+    "season": "2025-26"
+  },
+  "Longwood": {
+    "hash": "sha256:717e8ba719da503a6bd3ce8a72a2be8af5416a7adab3b6b1e90c84ac8f48ab09",
+    "season": "2025-26"
+  },
+  "Louisiana": {
+    "hash": "sha256:2506f3ee85cdddc1511b817af45faf6bb75ebe127892f3be9616171da529922f",
+    "season": "2025-26"
+  },
+  "Louisiana Tech": {
+    "hash": "sha256:748a52c13f4adb3601890f61968e0fa0632b1174be97636ce5d23fb735c745ac",
+    "season": "2025-26"
+  },
+  "Louisville": {
+    "hash": "sha256:51a21c0886b6d17dbb865eaef02fea9e17877daa15ce5a1187c0f9031f208e61",
+    "season": "2025-26"
+  },
+  "Loyola Chicago": {
+    "hash": "sha256:bd6e00aece423e7f56f29106afdd869b6bb15bf8d8ae2f8befe7aacc7876f306",
+    "season": "2025-26"
+  },
+  "Loyola Maryland": {
+    "hash": "sha256:3792741440513cbf959b04a67d65bb3f3e6e51e6df186e235db9a4d1940773db",
+    "season": "2025-26"
+  },
+  "Loyola Marymount": {
+    "hash": "sha256:62906104471a6faf78871dd8efe4aba3f8e11936de179d6e3eab324e526e11c5",
+    "season": "2025-26"
+  },
+  "Maine": {
+    "hash": "sha256:093e2482c770a0c1cf40f5ae82531e5e13989719ef7db9ffe8a6bcb5499ae8da",
+    "season": "2025-26"
+  },
+  "Manhattan": {
+    "hash": "sha256:a5bdfaec7249a5933cf63848221ee7516d066776ac35519697b3292153785415",
+    "season": "2025-26"
+  },
+  "Marist": {
+    "hash": "sha256:f0387c80a83a16c0917cd3d16ef179d489d7cb0bc244466aeec6247fdf260038",
+    "season": "2025-26"
+  },
+  "Marquette": {
+    "hash": "sha256:2212e99ec7403b3789e3bd3c7aedae344f2fec389ea4992726c89538fa944888",
+    "season": "2025-26"
+  },
+  "Marshall": {
+    "hash": "sha256:0bd85b6630f983d3e44bbcdb258495884356ffd1c01460b0b5d747026697ed9a",
+    "season": "2025-26"
+  },
+  "Maryland": {
+    "hash": "sha256:44e054c9fc153c2dcae36152699f08a2ea870e12d250e8d3c861d20c0f9864b4",
+    "season": "2025-26"
+  },
+  "Maryland-Eastern Shore": {
+    "hash": "sha256:4057539f807286d1b986ec5e6e2f00cfad05f4a3a7acd6001644b3aba127dbc3",
+    "season": "2025-26"
+  },
+  "Massachusetts": {
+    "hash": "sha256:3be6e3033b623eba228be8063911bb2bc79ea59f22c548908f98e386c7d4ac5e",
+    "season": "2025-26"
+  },
+  "McNeese": {
+    "hash": "sha256:774919df88fe691f80c4981e32a024c3f7ba8eef9e7ff516aa6364e5d514eec7",
+    "season": "2025-26"
+  },
+  "Memphis": {
+    "hash": "sha256:9cc1b2216aa311a2ecd84338c9e4995339d223c55dfba11ca346818786071bf3",
+    "season": "2025-26"
+  },
+  "Mercer": {
+    "hash": "sha256:74edf9e181356f4c65fa64a7db802e3c1bb4f90f3142e20f493bcd1caddb43ca",
+    "season": "2025-26"
+  },
+  "Miami": {
+    "hash": "sha256:2fe2c7ee08018026c73e49921e67db7c7d2f83803fc2a9f40b9c0692e94c1221",
+    "season": "2025-26"
+  },
+  "Miami (OH)": {
+    "hash": "sha256:b627f828bb79eec1dd86cbab08fbb5037a7390ff3771730abaceb92f0dca0c05",
+    "season": "2025-26"
+  },
+  "Michigan": {
+    "hash": "sha256:f40cec1deade8c8eb74cd3dbab848ab9793f94a46860a6e09204bf85b21217e8",
+    "season": "2025-26"
+  },
+  "Michigan State": {
+    "hash": "sha256:f5a0f412c9d841d73320f3996fba49c58e4da64ac8841a189c15c72acb7dcf4a",
+    "season": "2025-26"
+  },
+  "Middle Tennessee": {
+    "hash": "sha256:8ee1c36aab0a1ee1ea01e34ce868a3d9d1dea1a5799f39c7356bc658bd974e06",
+    "season": "2025-26"
+  },
+  "Milwaukee": {
+    "hash": "sha256:3b0be8f46984da2b6ccaca501dbba8c64877ae54e9226d62d36b42fbd997b212",
+    "season": "2025-26"
+  },
+  "Minnesota": {
+    "hash": "sha256:87cfe06b44cdc2e58f16994ff9d3f70d7ed86253d606799b2c434aa0e1a16832",
+    "season": "2025-26"
+  },
+  "Mississippi State": {
+    "hash": "sha256:b1d0077df7a02fecfdaa12ce8d4d71741f0383b03b0b59a8bfdc2bb3b0283b4c",
+    "season": "2025-26"
+  },
+  "Mississippi Valley": {
+    "hash": "sha256:7177bd3ab4e31d3a5144550461030097d73e8fe42f62585222188b619b807a13",
+    "season": "2025-26"
+  },
+  "Missouri": {
+    "hash": "sha256:bd01827acec98ba10d85e11d42668f4d43d351d71fe42146f556b0383ea92c1c",
+    "season": "2025-26"
+  },
+  "Missouri State": {
+    "hash": "sha256:c3993db3e9294ca0f174b5241b30ff5e8833bc776d489d1adc0ebae3869570c9",
+    "season": "2025-26"
+  },
+  "Monmouth": {
+    "hash": "sha256:b297097507fe3e00c673cd100230af0481e033d43dd0177337be89deb97341ec",
+    "season": "2025-26"
+  },
+  "Montana": {
+    "hash": "sha256:0b9c1b43e29dc1ed45da6de980c0118e7536d43cc81ab28742a4eaf349d07ecf",
+    "season": "2025-26"
+  },
+  "Montana State": {
+    "hash": "sha256:cbf5d8c1d35ef35f7d37847bc641428c1f965dca286e4ed215558978196832ab",
+    "season": "2025-26"
+  },
+  "Morehead State": {
+    "hash": "sha256:61848e477c62fd4e39620d9e0ae033dde26b28b89f0499e8b1eb9ca743a5b4ad",
+    "season": "2025-26"
+  },
+  "Morgan State": {
+    "hash": "sha256:ed177db45948ceb550767e7665eeaf105f1fd454d04fbe07f105992861c86bc9",
+    "season": "2025-26"
+  },
+  "Mount St. Mary's": {
+    "hash": "sha256:39af60a5d0ef8f85181f9d2738b83a7250eb2ef5b446c365bf6c9d570ec98f6b",
+    "season": "2025-26"
+  },
+  "Murray State": {
+    "hash": "sha256:accaba67aceff4f3d80ce49d07a89ff8f216f54fdfb716c26b17a798e5cd3701",
+    "season": "2025-26"
+  },
+  "NC State": {
+    "hash": "sha256:0b31108bff2b175ce6396506cdc7dc0aa0788f4f94f4b1dbeecff3b0a1fd499d",
+    "season": "2025-26"
+  },
+  "NJIT": {
+    "hash": "sha256:44693bd71eca9f19206c5e8ae9fbd3c3324c30255da0df415bab9c01609010bd",
+    "season": "2025-26"
+  },
+  "Navy": {
+    "hash": "sha256:5e3b00a9a29aef736b6fdbfd8c1894bbc74e2b9e2fe18e726847ab3f27dd426e",
+    "season": "2025-26"
+  },
+  "Nebraska": {
+    "hash": "sha256:6c3e9702fe26a18e94b6601200778f87752745ab4e7f7d02a78dfd6bdd1e3c88",
+    "season": "2025-26"
+  },
+  "Nevada": {
+    "hash": "sha256:fcf6075c71e0ca27fc8148b7d50ffd4093ca4fff680fae15f6a09d4b7b3a90f9",
+    "season": "2025-26"
+  },
+  "New Hampshire": {
+    "hash": "sha256:3a06816f7ceba033969c9ed850a6daf967d6baacfd8ce739d27e171772bfe0bb",
+    "season": "2025-26"
+  },
+  "New Mexico": {
+    "hash": "sha256:dd2cddb03a5ea68f0fcd82a149aba85679c92f22f693f35122e96b3bbd975149",
+    "season": "2025-26"
+  },
+  "New Mexico State": {
+    "hash": "sha256:abf423181da59f6130104d64776c6ebb83eaf999fca488d5529a5ef00513f289",
+    "season": "2025-26"
+  },
+  "New Orleans": {
+    "hash": "sha256:0b26f4cefd81567629d49b67d3a759b37f8e7178d4430d9afacfbe49ffa4327b",
+    "season": "2025-26"
+  },
+  "Niagara": {
+    "hash": "sha256:22429d152f8b0187318cb3b95be88b8f39f58044510c6e06478d664becbfefc2",
+    "season": "2025-26"
+  },
+  "Nicholls": {
+    "hash": "sha256:aea8904e86c425652708c0493262f364f61e4a89d3a59a62c849b8f527f38b14",
+    "season": "2025-26"
+  },
+  "Norfolk State": {
+    "hash": "sha256:f2d12e136e7e2f870d86a8945af9ee9bc4c26499df4d27a6b2448ec5d4373e23",
+    "season": "2025-26"
+  },
+  "North Alabama": {
+    "hash": "sha256:b5f0df917c5c605ede7a884d383910bf5aecbea3d760d82b587ca2c68b003139",
+    "season": "2025-26"
+  },
+  "North Carolina": {
+    "hash": "sha256:5ccff8bc548b6c22f76d949e5c6442b1e63c9f2cca92f926653c6254f5aa6cca",
+    "season": "2025-26"
+  },
+  "North Carolina A&T": {
+    "hash": "sha256:dff623c1a74674c195bcb244b01d551d80aae5434c91b6343a0f72854dfb323a",
+    "season": "2025-26"
+  },
+  "North Carolina Central": {
+    "hash": "sha256:aa972a0dbae0d7e1f565dccf42804e1c16eb909c75928df7db6271f87d892247",
+    "season": "2025-26"
+  },
+  "North Dakota": {
+    "hash": "sha256:00b281dd04f79d32b7a1117638285d107dabc6f14b0953d5fbf1289a9d6bafef",
+    "season": "2025-26"
+  },
+  "North Dakota State": {
+    "hash": "sha256:5e402eb50a93a15a8dbc4286cc2b1aafa67b3bf583475724f02e9ad62c774959",
+    "season": "2025-26"
+  },
+  "North Florida": {
+    "hash": "sha256:f24ac0c6bd1be794ab86db78ffa41e738dcfb8a5364df800079344d2f25337d5",
+    "season": "2025-26"
+  },
+  "North Texas": {
+    "hash": "sha256:e20f88b65709bc8f0f0e035683f3fc99d92c154a2ca3b11511f78a51acbbcfda",
+    "season": "2025-26"
+  },
+  "Northeastern": {
+    "hash": "sha256:3cde161216c6ddfb6febfd2b8fa869c6a24f29d3662ece60f2cade2334bccfb5",
+    "season": "2025-26"
+  },
+  "Northern Arizona": {
+    "hash": "sha256:d7963c23dc2e5f1873a1e6d02b042c6fb49d8a8ff221f4c23cb83c80884c9794",
+    "season": "2025-26"
+  },
+  "Northern Colorado": {
+    "hash": "sha256:bb016119c464ffc61d3139ad6e7e883de2b0523b834285390558ea4a53cde411",
+    "season": "2025-26"
+  },
+  "Northern Illinois": {
+    "hash": "sha256:4c2067775fae4090b09814ee2aab647dbf144e91bd8f9827f25ec1ab64561705",
+    "season": "2025-26"
+  },
+  "Northern Iowa": {
+    "hash": "sha256:ce294a1724f5fb697318ff88d81711cb0f5f9b9f3f68990eb72ae6b76f108bb1",
+    "season": "2025-26"
+  },
+  "Northern Kentucky": {
+    "hash": "sha256:e6ebec3db2042dec2f75aaa54b884e44fbd6363acf68b6390104804cdad54d58",
+    "season": "2025-26"
+  },
+  "Northwestern": {
+    "hash": "sha256:d3725dffdbbce73907a74751f5100f0d73b314b6802bacf75556b63eb4895394",
+    "season": "2025-26"
+  },
+  "Northwestern State": {
+    "hash": "sha256:d6d01edc215cea3cfdb6f5d59d57959d1cb7a33ce28c69c7c079fbcabfdb59c1",
+    "season": "2025-26"
+  },
+  "Notre Dame": {
+    "hash": "sha256:ff43e89c9096fb4a77f6dc8e7f206e96797a0334368053cabb102d6c47fa67c7",
+    "season": "2025-26"
+  },
+  "Oakland": {
+    "hash": "sha256:4693b7b9b1ce6d75b5bfb28ffebf88d0ad161df76bbcc0dd1301974d27659cea",
+    "season": "2025-26"
+  },
+  "Ohio": {
+    "hash": "sha256:cbcd93ee81258418004205fde424581ae6a04b13979ba5413f43d6a105f65fae",
+    "season": "2025-26"
+  },
+  "Ohio State": {
+    "hash": "sha256:7b17e93f32fce808513dc2e5942934766b388b1a51b00feecc90c45130447a67",
+    "season": "2025-26"
+  },
+  "Oklahoma": {
+    "hash": "sha256:066ada9e9168be51cbaa8a91ee59838e080a09b26e5da69de2e9d51fee9f6bfb",
+    "season": "2025-26"
+  },
+  "Oklahoma State": {
+    "hash": "sha256:895fd28749389b2083bad0ddfae1783ba8e4c28d6a51e0c5d4f25a8e179ac012",
+    "season": "2025-26"
+  },
+  "Old Dominion": {
+    "hash": "sha256:536fe7ca0d1015c1333b5510488e7a4007a797b2cf9412ad2c555f9ad6beac51",
+    "season": "2025-26"
+  },
+  "Ole Miss": {
+    "hash": "sha256:adf59eb191b910cbc12471fb8f28013caff956a511a9b44229043bfff26c315b",
+    "season": "2025-26"
+  },
+  "Omaha": {
+    "hash": "sha256:721690983e0b701f4464f0a5b6e9a4a3f564b96157d8a523260e16260dd80978",
+    "season": "2025-26"
+  },
+  "Oregon": {
+    "hash": "sha256:d582217672879801cd282fd7c68ecf4a7f718da2c71c4c4123adcb3a5d2a4c62",
+    "season": "2025-26"
+  },
+  "Oregon State": {
+    "hash": "sha256:4c123aaa25da2be8de087537f9097e1c2607b86218228b177bed128cdd1ef62d",
+    "season": "2025-26"
+  },
+  "Pacific": {
+    "hash": "sha256:cfd78d69b16826904f4c5ee9aef22f0c3da9bd7dcae84985e55913e032ff5190",
+    "season": "2025-26"
+  },
+  "Penn": {
+    "hash": "sha256:8e3d7e7f19caba992ad9ee30485c1bc9adccfab14a9c7a6e4cb9134caa0b7050",
+    "season": "2025-26"
+  },
+  "Penn State": {
+    "hash": "sha256:a787e28975745857ad7da4272136d0d427350e368f9b27d567c3d18e80b8e522",
+    "season": "2025-26"
+  },
+  "Pepperdine": {
+    "hash": "sha256:06830269a7c6aaf4d6de734fbc14f4132bcc3c53693b0ec4d0cbee4856bb2763",
+    "season": "2025-26"
+  },
+  "Pittsburgh": {
+    "hash": "sha256:9cc38eb434c30fd979fb694e6bc1b5c4fbc32b54b3c85a567d9c9a4a2163e477",
+    "season": "2025-26"
+  },
+  "Portland": {
+    "hash": "sha256:50f17e830a5f1159c3811b48407a73409813296579ea5d53d793d13cc54a2e0f",
+    "season": "2025-26"
+  },
+  "Portland State": {
+    "hash": "sha256:c78cd94ab1909f05e939b1b11f6ee0a88853463139d5a4fb92dd3c11df4bf359",
+    "season": "2025-26"
+  },
+  "Prairie View A&M": {
+    "hash": "sha256:d75981e26e791393852805df5b1fdc0aa29c9df3c7deec033b3c7c74ad618fed",
+    "season": "2025-26"
+  },
+  "Presbyterian": {
+    "hash": "sha256:383763c2b01bea8166834e4cba27c0045c3f4d722555f64e1be2134d618170c3",
+    "season": "2025-26"
+  },
+  "Princeton": {
+    "hash": "sha256:4b91527a18260cb508fdac71cf060dfcec94f57514a382baba962d5d137a39de",
+    "season": "2025-26"
+  },
+  "Providence": {
+    "hash": "sha256:4266072f3f110ceaca921387fb1aef306e2154033853f50e340a064328a82993",
+    "season": "2025-26"
+  },
+  "Purdue": {
+    "hash": "sha256:81055987b833b46bff2ca1c3f267bc758145e90e14f772abbdab0c4ab89199d2",
+    "season": "2025-26"
+  },
+  "Purdue Fort Wayne": {
+    "hash": "sha256:43791c82f477e8b6c2e6dc1b324ebedbcf147dfc43baa45be44a2ec933567536",
+    "season": "2025-26"
+  },
+  "Quinnipiac": {
+    "hash": "sha256:7d3cbff5a49789da03deaa0c5387e4f929f1354a673f93919a2e197057d060d7",
+    "season": "2025-26"
+  },
+  "Radford": {
+    "hash": "sha256:5257c6ce400242e16c58818b380b2fea3c6760061fabf7119296052079f160bd",
+    "season": "2025-26"
+  },
+  "Rhode Island": {
+    "hash": "sha256:4013de07d74cd3dccdf345efacbd57af597999fc460f92327d7eb98f773ebd83",
+    "season": "2025-26"
+  },
+  "Rice": {
+    "hash": "sha256:aea85c09e22c4da524dba88292f3c44652b11a585ac7c1d8bf44d76731a439cc",
+    "season": "2025-26"
+  },
+  "Richmond": {
+    "hash": "sha256:01bb353a5e5033369def5e290f6ddfc1314064840e7d0e74670424650c2323e3",
+    "season": "2025-26"
+  },
+  "Rider": {
+    "hash": "sha256:79793a9e1cf68b8b65df385c16a6d7f6930efb72c8115431c9faa01b0cd58f01",
+    "season": "2025-26"
+  },
+  "Robert Morris": {
+    "hash": "sha256:c4c730392c12f4b4821e9f08f589f07bf3f0c30916612a1b97e32d771f4a8924",
+    "season": "2025-26"
+  },
+  "Rutgers": {
+    "hash": "sha256:0406c7e8debdaa23369e2e53c0ff02f7cc243ff2400d6c1efa4c68f4edcc3eb2",
+    "season": "2025-26"
+  },
+  "SMU": {
+    "hash": "sha256:70df108c112d7a6ae140d8819c75a19b8d38a2125e6ce2ee173893ac122b88c5",
+    "season": "2025-26"
+  },
+  "Sacramento State": {
+    "hash": "sha256:49cc880396e2f3e424f03da8121319c5b161fa0ce52ff1f7dc491fc750f12b43",
+    "season": "2025-26"
+  },
+  "Saint Francis": {
+    "hash": "sha256:e2a6086cbb97243370d87a57f7a0e7ab3a643d84576672833fba3fab15d78ce8",
+    "season": "2025-26"
+  },
+  "Saint Joseph's": {
+    "hash": "sha256:f37a7a0922d09057da49cc03ae6ad108baab4b4841ba73ea61271d591a69a32a",
+    "season": "2025-26"
+  },
+  "Saint Louis": {
+    "hash": "sha256:eafe3206eccd5a18ea1f36f74ea3e7f0cc3d1b27dc7780974d4592ef643557b6",
+    "season": "2025-26"
+  },
+  "Saint Mary's": {
+    "hash": "sha256:7b00d5e5d5f7d19bf1afc792d0a1ccd0cc7e4eacc6409a90b9f564b240b84e92",
+    "season": "2025-26"
+  },
+  "Saint Peter's": {
+    "hash": "sha256:4782dc81ae06480355345d606c15b63be150f78d3e6d84984366628234ba4c0d",
+    "season": "2025-26"
+  },
+  "Sam Houston": {
+    "hash": "sha256:0302013e758a995eb4cca1065bcd62162664a11982132898ff70ff386dd383f5",
+    "season": "2025-26"
+  },
+  "Samford": {
+    "hash": "sha256:f275aef09c6a72c3e5eeaee8f57d4efebff9872d6134993167dc3af7d3229d19",
+    "season": "2025-26"
+  },
+  "San Diego": {
+    "hash": "sha256:b97cf1c9e945f3d71ff566aacaf3f9dbbc4965ff6a44e1612a466ccc03d1893b",
+    "season": "2025-26"
+  },
+  "San Diego State": {
+    "hash": "sha256:a0e1d7c5992632c766683b715ccf91171494a28ebb0f3c82e17c00ab57c74fa2",
+    "season": "2025-26"
+  },
+  "San Francisco": {
+    "hash": "sha256:5e66b492ede5579f2bdfd81a520075e1de273f725a60e35e1f9712829021525e",
+    "season": "2025-26"
+  },
+  "San Jose State": {
+    "hash": "sha256:51b25f8a646211eff839b72d638d00a14aaa0e8d77edc2c84a88e976f25e5e53",
+    "season": "2025-26"
+  },
+  "Seton Hall": {
+    "hash": "sha256:3d4c9831b118da0c5b29f5a80985e234f7f65df1be17fce5ab77d6f95920e9e1",
+    "season": "2025-26"
+  },
+  "Siena": {
+    "hash": "sha256:fdfafa8710deac30360bf617116bb369ec7ff316516b0d4278ffcd0f4b5bb27b",
+    "season": "2025-26"
+  },
+  "South Alabama": {
+    "hash": "sha256:4ae1dc971d1206657ce7bc9ced0171036bd0a5e42d69d26019c01c2702b81a7f",
+    "season": "2025-26"
+  },
+  "South Carolina": {
+    "hash": "sha256:46217280db8f4cf3893efbbc918043d13dace02e82e0dd1cd10087e66fd04e05",
+    "season": "2025-26"
+  },
+  "South Carolina State": {
+    "hash": "sha256:8d56beefd4f5a58de835f2bc27df4a4fd5ea495ba2af7a047f28d921e43f1186",
+    "season": "2025-26"
+  },
+  "South Dakota": {
+    "hash": "sha256:f9c571b01ea6918cddc90d134ae7691d40e45094951b81d1511a52d3734bb34b",
+    "season": "2025-26"
+  },
+  "South Dakota State": {
+    "hash": "sha256:2c8bc04b3d6370440a18d16385e63f969f21e1cd548ef443e94d18f7570aad16",
+    "season": "2025-26"
+  },
+  "South Florida": {
+    "hash": "sha256:e359da7aec192caf1b4ed1029dc53a78f8d5439d2e0c9dc1f1d8002b743f4cb1",
+    "season": "2025-26"
+  },
+  "Southeast Missouri": {
+    "hash": "sha256:a2a993d1e462d538a5cd87b0429bc7fefa56ffbea373c00fc3023916ccae4f28",
+    "season": "2025-26"
+  },
+  "Southeastern Louisiana": {
+    "hash": "sha256:74c8dd3de872bf1ded9105ccfbdb44dee888b220013eabf3b7c0e65c53266cbe",
+    "season": "2025-26"
+  },
+  "Southern": {
+    "hash": "sha256:76c7f231617a6fdd82b54c7e12951aa18cf6c08485e944f9d5f8e3ea02ff9b66",
+    "season": "2025-26"
+  },
+  "Southern Illinois": {
+    "hash": "sha256:e988b87f3387304c77460957f2a2b5e8fc0993ea78625598bad80e5991341980",
+    "season": "2025-26"
+  },
+  "Southern Miss": {
+    "hash": "sha256:9bef1c75a79b67b678d7bd1288b367365a51226d0bd0abcafd272e40dc27d66a",
+    "season": "2025-26"
+  },
+  "Southern Utah": {
+    "hash": "sha256:33b450337dc5d37ec5771d1f156d9b9ad938629c58239f69a034b18719993dc8",
+    "season": "2025-26"
+  },
+  "St. Bonaventure": {
+    "hash": "sha256:03e80e70a3d11e82672f92aa5b5d8573ab1e9f053ff778db40b00dc7d815a8fa",
+    "season": "2025-26"
+  },
+  "St. John's": {
+    "hash": "sha256:206943b6153c90c6bc03fdd448314e1fbe7426e0c44f5338456fcd449ff2818a",
+    "season": "2025-26"
+  },
+  "Stanford": {
+    "hash": "sha256:bfc5a3f8dc36ec99443514a3200fec4e4c31f7c96dba734afb2f8e7c795c28e8",
+    "season": "2025-26"
+  },
+  "Stephen F. Austin": {
+    "hash": "sha256:152d2d145b34e52d9b8faf42cc633e154cf4ca85bd7aa4fbc100eba88eb9a2ea",
+    "season": "2025-26"
+  },
+  "Stetson": {
+    "hash": "sha256:b36c11ed527d768018a993b0f0a3c1f017da8b5bae65bff68faa7007e52835b2",
+    "season": "2025-26"
+  },
+  "Stony Brook": {
+    "hash": "sha256:9d671ef397ffcf4d1d63530765b81ee6da8097660371f9a877522ca6f612ad52",
+    "season": "2025-26"
+  },
+  "Syracuse": {
+    "hash": "sha256:72585a3e661e58a8ee628865c21f477108705c6381a87d5cdc4e3a6b85c76f09",
+    "season": "2025-26"
+  },
+  "TCU": {
+    "hash": "sha256:dcfc459a8751c25df6bff165e4f3405f28f5ba4e87015107c2f783067d4ed605",
+    "season": "2025-26"
+  },
+  "Temple": {
+    "hash": "sha256:0198b3070ea8c236962efa0e67e7d81435b2d4bdee8f0ec2d666ca088b24f8e8",
+    "season": "2025-26"
+  },
+  "Tennessee": {
+    "hash": "sha256:acef42d1d5578f0eb59fb5adee900ab4a18aaca3685fbbf0a8765ff1edf428a4",
+    "season": "2025-26"
+  },
+  "Tennessee State": {
+    "hash": "sha256:45cb74f3535aa48de18b856e6fc6664d0ee249b455f806de129dd0e5336730a0",
+    "season": "2025-26"
+  },
+  "Tennessee Tech": {
+    "hash": "sha256:40faeefee9b7ebff2c4c534ede810da1fc025d0ee7e4e0aba925e715c429f993",
+    "season": "2025-26"
+  },
+  "Texas": {
+    "hash": "sha256:3dbc46d256558e180dd8abce30e49a49caa83c1b5c7452f8315a3bf6f1ffa344",
+    "season": "2025-26"
+  },
+  "Texas A&M": {
+    "hash": "sha256:a1131ad4a13500f9acfa8450ce97c7966d33042053bdf4bfb7eb291f1f3991bd",
+    "season": "2025-26"
+  },
+  "Texas A&M-Corpus Christi": {
+    "hash": "sha256:fab77958208e8acd81c267933370b1ce748998156ec1245a82746584921814c9",
+    "season": "2025-26"
+  },
+  "Texas Southern": {
+    "hash": "sha256:1869c347c9142b7d7cbda858cf8afa0cccb28d7f37bcfde32ef35e124ff7fa77",
+    "season": "2025-26"
+  },
+  "Texas State": {
+    "hash": "sha256:a834ae934a4c48dc07ad14da6e10dd1d56bc0bddc1f84f17366daccc56d4278e",
+    "season": "2025-26"
+  },
+  "Texas Tech": {
+    "hash": "sha256:04844d444d7f4b37195e35a134dc3d0887d487ec09a3a85805f738dc5bfddcdb",
+    "season": "2025-26"
+  },
+  "The Citadel": {
+    "hash": "sha256:3872385e14d77b7880125e83cc69e185000cced4b746e72887086b6b26357923",
+    "season": "2025-26"
+  },
+  "Toledo": {
+    "hash": "sha256:bb3eb5617939dee4163207907192d143d915db31087e416bbad3d8677bd09ae2",
+    "season": "2025-26"
+  },
+  "Towson": {
+    "hash": "sha256:eae4cac0a419be9fa2cb4e0cb6b52d37f900c48edcc3d432f426ab729d03242b",
+    "season": "2025-26"
+  },
+  "Troy": {
+    "hash": "sha256:9c19fdddad08bea7e7692f078047c504f6c3861c467030a52c25b38ff8900319",
+    "season": "2025-26"
+  },
+  "Tulane": {
+    "hash": "sha256:2812ab2feee2df82d012d853f5effa0fb1feccec9a9478d516a3df1304ca54be",
+    "season": "2025-26"
+  },
+  "Tulsa": {
+    "hash": "sha256:18347f189890d8bdc0355147677e0d8c4d76d9d9af40bc89d14025c4d13d7128",
+    "season": "2025-26"
+  },
+  "UAB": {
+    "hash": "sha256:4477b83635b1165119229d2fdea734889b56b68b8cbaf2b2f252b3dfc5405b46",
+    "season": "2025-26"
+  },
+  "UC Davis": {
+    "hash": "sha256:2988ae1098f24519a3612c4bb889ca857b99f246b47f0b215850344232abbd83",
+    "season": "2025-26"
+  },
+  "UC Irvine": {
+    "hash": "sha256:93c53215e1e583d5d88d5ecde2c1f3b4fec7d2379355185a70b3c64bcba916bd",
+    "season": "2025-26"
+  },
+  "UC Riverside": {
+    "hash": "sha256:70cf66dc292ba420e51b03de4ed5aad4e610250cab3a75d553896197c14b34f4",
+    "season": "2025-26"
+  },
+  "UC San Diego": {
+    "hash": "sha256:59d739f25faa9d643f8c81a0832f2b76b33fc3d79a50b2271dfe16bac483746b",
+    "season": "2025-26"
+  },
+  "UCF": {
+    "hash": "sha256:08a1e291817180e590a7143133e7c278de3bd5e43d759eae250b208d96b27cf1",
+    "season": "2025-26"
+  },
+  "UCLA": {
+    "hash": "sha256:5c45567614ec09cfc1a3cb6d0e403a403e5e9b87b89d908bf63a88bd10c1c42a",
+    "season": "2025-26"
+  },
+  "UIC": {
+    "hash": "sha256:540152b12e00fde71d00e8955aebf112dc96a53bf714800213b619abf9d336c7",
+    "season": "2025-26"
+  },
+  "UL Monroe": {
+    "hash": "sha256:51106696ce907adea3a3988d5b116c462c9ba94dafd1399199aa3db5d9afeb8f",
+    "season": "2025-26"
+  },
+  "UMBC": {
+    "hash": "sha256:1d9b970edf026f62c20d2514f50ab6097120a1d27ecdc77246d6d17f5c43ef3a",
+    "season": "2025-26"
+  },
+  "UMass Lowell": {
+    "hash": "sha256:012eeb21aac88f3a34ab5c00fd5f32f6b7ce4dd436ae2c7eb20364c9df360324",
+    "season": "2025-26"
+  },
+  "UNC Asheville": {
+    "hash": "sha256:0ef0ee253515db1cebf3a1e8a8257573c5396294d34230711ed2f7ab77fd218e",
+    "season": "2025-26"
+  },
+  "UNC Greensboro": {
+    "hash": "sha256:4d9a944f5f914413cbbd27fc953e3b686915f105f49c06bd4050b9a1a864790d",
+    "season": "2025-26"
+  },
+  "UNC Wilmington": {
+    "hash": "sha256:ba8eafb95e72af807a794a4e65fc500529806168e76b549e4e18bd71752543a3",
+    "season": "2025-26"
+  },
+  "UNLV": {
+    "hash": "sha256:fecfe021a245bbc9dc859d9ed5541d4d0a9e6b14d893383bce0f6101b8a5a81b",
+    "season": "2025-26"
+  },
+  "USC": {
+    "hash": "sha256:b8b81333a85c34352b2bbd525269675049c0da4edb2c998aa5e393e8587f5212",
+    "season": "2025-26"
+  },
+  "USC Upstate": {
+    "hash": "sha256:496b97eb57aedf3b822ac150fd7ff8f4c0d2211b2baa5b14df50850de3664456",
+    "season": "2025-26"
+  },
+  "UT Arlington": {
+    "hash": "sha256:df70cf012880c2f33003691700f9c286a6ee00ed9d334193881f652bbb908437",
+    "season": "2025-26"
+  },
+  "UT Martin": {
+    "hash": "sha256:36fa0aa70689828160f466529cd8b1b1dc7f023f67d7ae4a902b5ce177afa298",
+    "season": "2025-26"
+  },
+  "UTEP": {
+    "hash": "sha256:ac2fefaa55fcbbf9248e4ec2959e52ffe4da08c11db0c97226028c0b3b1088dd",
+    "season": "2025-26"
+  },
+  "UTSA": {
+    "hash": "sha256:0e86c0b524dda9599db07dd600d63a6b6163c7aec47500ddabbde5c986730fdb",
+    "season": "2025-26"
+  },
+  "Utah": {
+    "hash": "sha256:86380e488866982733b959c22ea791411fd40c50f366996f0c0f19e485649619",
+    "season": "2025-26"
+  },
+  "Utah State": {
+    "hash": "sha256:5a4ed284a47477d61fdefbfcb48a13d47421e72c35a32a5a056ebfd96b5fb3bf",
+    "season": "2025-26"
+  },
+  "Utah Tech": {
+    "hash": "sha256:c9b107d0c380b64608548e5edaae579e8d35cc5546d03a9b77adacc340e9cb97",
+    "season": "2025-26"
+  },
+  "Utah Valley": {
+    "hash": "sha256:46ea26eac94f01e3f3090105840e8d67a359f00e03e4f56b93f274cde939b7ab",
+    "season": "2025-26"
+  },
+  "VCU": {
+    "hash": "sha256:fbac28d61d42cb6284d48f03deecac3833f46335df5ad4175cc1f49f7b906774",
+    "season": "2025-26"
+  },
+  "VMI": {
+    "hash": "sha256:98ac2cceecd5c71fd5b765c2b7a4869596673887d99b5e239220390c48563e9e",
+    "season": "2025-26"
+  },
+  "Valparaiso": {
+    "hash": "sha256:9919c6af1c05eeba8084c01539bb40906eeb4f33a4d107c8499e3c4df8ff1537",
+    "season": "2025-26"
+  },
+  "Vermont": {
+    "hash": "sha256:0f177e41c47373958563489e63b0e8f32abaed837bb6395d991801650a37e953",
+    "season": "2025-26"
+  },
+  "Villanova": {
+    "hash": "sha256:57d5165c0599d85972694d59edf75608663131641c12e5237bc7450ae616e357",
+    "season": "2025-26"
+  },
+  "Virginia": {
+    "hash": "sha256:184afd00a0cc3c7eab714a93136a9a9dc2ca9e7f94bd9454f93ca2d8acb4d1e2",
+    "season": "2025-26"
+  },
+  "Virginia Tech": {
+    "hash": "sha256:d10744f062d637777930c9393181c09bb070f3ab0b85dcd7374a05e1a2df6bcd",
+    "season": "2025-26"
+  },
+  "Wagner": {
+    "hash": "sha256:9b226e3fc1a307989b2c6008051e04ffadc9e700e1aba998ce3a43de57203294",
+    "season": "2025-26"
+  },
+  "Wake Forest": {
+    "hash": "sha256:a49922adec5448d6fed35f75db5c19a7b13e1e3d74ce955a70d9c0edbc74dda4",
+    "season": "2025-26"
+  },
+  "Washington": {
+    "hash": "sha256:b4023db0013f85022b719045cb5a68de64c0def4d8a14dc2a39b3f780814ad13",
+    "season": "2025-26"
+  },
+  "Washington State": {
+    "hash": "sha256:a26d4d49dba3708010d6b0f4fc0d44ebeed11bfc249d9be244d5becc2e8e4698",
+    "season": "2025-26"
+  },
+  "Weber State": {
+    "hash": "sha256:d00a3c62d51ef7152d0b25af71ccbd3ccb50bddf3a89fb5d9902d0414aa36ce4",
+    "season": "2025-26"
+  },
+  "West Virginia": {
+    "hash": "sha256:fb38b97a715c22aa69e093203c2379e8af107c670f5e3cf07b8e6154ba24250f",
+    "season": "2025-26"
+  },
+  "Western Carolina": {
+    "hash": "sha256:66b8aa6ad1f59c9de33fcca57066cd03cd2612c7e5dfea8b788d526306414379",
+    "season": "2025-26"
+  },
+  "Western Illinois": {
+    "hash": "sha256:5675887f8fcd88982b34b44f618fbac796bf35288916c5d812e3e5b36f4a62e9",
+    "season": "2025-26"
+  },
+  "Western Kentucky": {
+    "hash": "sha256:b13f954f4e1cf687b4c37c09ef4970b540db85ad9ceb6cc792dec2633abf39de",
+    "season": "2025-26"
+  },
+  "Western Michigan": {
+    "hash": "sha256:77420ac836f2d84c9831bb86f7c2b1c3d422bff062d57e9014923ea97c2e6db6",
+    "season": "2025-26"
+  },
+  "Wichita State": {
+    "hash": "sha256:b62e12a928aeef6742350717eab019f0612937f3dc4d76fbe072fb9804e49750",
+    "season": "2025-26"
+  },
+  "William & Mary": {
+    "hash": "sha256:b77856349d0f022d3fdf1cdb9ab34db6ec98e24ff056dcd7d4d1d1e49ff0fa77",
+    "season": "2025-26"
+  },
+  "Winthrop": {
+    "hash": "sha256:322c120074f7f624c49e9ab9b135732d64797c9922c2ac758c85e3e74020e373",
+    "season": "2025-26"
+  },
+  "Wisconsin": {
+    "hash": "sha256:af6d2b21a0ec2daecd1f208b1830e3674b5e4d9a1a7a25ab41e8cb6c56bda0cc",
+    "season": "2025-26"
+  },
+  "Wofford": {
+    "hash": "sha256:96f60d5f0b798a5f7d9af833716f3c07b3f1a15a3e31165b0b26a239967007b1",
+    "season": "2025-26"
+  },
+  "Wright State": {
+    "hash": "sha256:875d603db2cbc24212e250aa93369c5090bba039f92453044c70c535a19ae148",
+    "season": "2025-26"
+  },
+  "Wyoming": {
+    "hash": "sha256:dd3979b684665e7824fe6ac92a9a700d7c2e1a3515fc1b20741d5f8d693d9bdb",
+    "season": "2025-26"
+  },
+  "Xavier": {
+    "hash": "sha256:4e48e3a2725200e212706cbaba8881b381cd0e3561fb4d375a5500ea242ea829",
+    "season": "2025-26"
+  },
+  "Yale": {
+    "hash": "sha256:772a25bd5c5fd24a2e3ffa4cdfa2deb9ef5366f9cc35e103c6ee9b9088a79ce5",
+    "season": "2025-26"
+  },
+  "Youngstown State": {
+    "hash": "sha256:bcfddb640a4b150b5959b80b670e31b1ef0ace412320833a2cb3e3986343840a",
+>>>>>>> d9bdb99fbc834d0fa7262b02c96d239766023a51
     "season": "2025-26"
   }
 }

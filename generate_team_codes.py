@@ -3,7 +3,11 @@ generate_team_codes.py — Generate per-team access codes for the app
 ====================================================================
 Creates two files:
   data/team_codes.json   — shipped with the app (hashed codes only, safe to publish)
+<<<<<<< HEAD
   data/team_codes_PRIVATE.csv — YOUR copy with plaintext codes (never commit this)
+=======
+  private/team_codes_PRIVATE.csv — YOUR copy with plaintext codes (never commit this)
+>>>>>>> d9bdb99fbc834d0fa7262b02c96d239766023a51
 
 Usage:
     python generate_team_codes.py
@@ -23,7 +27,11 @@ The JSON shipped with the app looks like:
     }
 
 The app hashes whatever the coach types and compares to the stored hash.
+<<<<<<< HEAD
 Codes are never stored in plaintext in the app — keep team_codes_PRIVATE.csv secure.
+=======
+Codes are never stored in plaintext in the app — keep private/team_codes_PRIVATE.csv secure.
+>>>>>>> d9bdb99fbc834d0fa7262b02c96d239766023a51
 """
 
 import argparse
@@ -161,13 +169,21 @@ def parse_args():
                    help="Code style (default: SLUG-1234, word: SLUG-WORD-12)")
     p.add_argument("--json-out",    default="data/team_codes.json",
                    help="Output path for hashed codes (safe to publish)")
+<<<<<<< HEAD
     p.add_argument("--private-out", default="data/team_codes_PRIVATE.csv",
+=======
+    p.add_argument("--private-out", default="private/team_codes_PRIVATE.csv",
+>>>>>>> d9bdb99fbc834d0fa7262b02c96d239766023a51
                    help="Output path for plaintext codes (KEEP PRIVATE)")
     return p.parse_args()
 
 def main():
     args = parse_args()
     os.makedirs("data", exist_ok=True)
+<<<<<<< HEAD
+=======
+    os.makedirs("private", exist_ok=True)
+>>>>>>> d9bdb99fbc834d0fa7262b02c96d239766023a51
 
     # Load what already exists so we don't rotate codes unnecessarily
     existing_json    = load_existing_json(args.json_out)

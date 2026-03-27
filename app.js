@@ -25,6 +25,16 @@ try {
   console.warn("Could not load coach profile:", err.message);
 }
 
+// ── Auth guard ────────────────────────────────────────────────────────────────
+(function checkAuth() {
+  if (sessionStorage.getItem("btp_authed") !== "1") {
+    window.location.replace("./login.html");
+  }
+})();
+
+const SESSION_TEAM   = sessionStorage.getItem("btp_team")   || "";
+const SESSION_SEASON = sessionStorage.getItem("btp_season") || "";
+
 // Local CSV in /data (recommended). If you later publish a Google Sheet as CSV,
 // replace this with that published CSV URL.
 const CSV_URL         = "./data/BeyondThePortal_GM_Tool - Import_Board.csv";
@@ -849,9 +859,15 @@ render();
   signOut.textContent = "Sign out";
   signOut.href = "#";
   signOut.style.cssText = "opacity:.7;text-decoration:underline;cursor:pointer;";
+<<<<<<< HEAD
   signOut.addEventListener("click", async e => {
     e.preventDefault();
     try { await signOut(); } catch (_) {}
+=======
+  signOut.addEventListener("click", e => {
+    e.preventDefault();
+    sessionStorage.clear();
+>>>>>>> d9bdb99fbc834d0fa7262b02c96d239766023a51
     window.location.href = "./login.html";
   });
   banner.appendChild(signOut);
