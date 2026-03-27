@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Sign In — Beyond the Portal</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <style>
+      .login-wrap {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+      }
+      .login-card {
+        width: 100%;
+        max-width: 420px;
+        background: rgba(255,255,255,0.04);
+        border: 1px solid rgba(255,255,255,0.1);
+        border-radius: 16px;
+        padding: 40px 36px 36px;
+      }
+      .login-logo {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 32px;
+      }
+      .login-logo img {
+        height: 36px;
+        width: 36px;
+        border-radius: 6px;
+        object-fit: cover;
+      }
+      .login-logo span { font-size: 15px; font-weight: 500; opacity: .85; }
+      .login-card h1   { font-size: 22px; font-weight: 500; margin: 0 0 6px; }
+      .subtitle        { font-size: 14px; opacity: .5; margin: 0 0 28px; line-height: 1.5; }
+      .login-field     { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+      .login-field label {
+        font-size: 12px; font-weight: 500;
+        text-transform: uppercase; letter-spacing: .06em; opacity: .45;
+      }
+      .login-field input {
+        width: 100%; box-sizing: border-box;
+        padding: 10px 12px; font-size: 15px;
+        background: rgba(255,255,255,0.06);
+        border: 1px solid rgba(255,255,255,0.12);
+        border-radius: 8px; color: inherit; outline: none;
+        transition: border-color .15s;
+      }
+      .login-field input:focus    { border-color: rgba(255,255,255,0.4); }
+      .login-field input.field-error { border-color: rgba(220,70,70,0.7); }
+      .login-error {
+        font-size: 13px; color: #e55;
+        min-height: 18px; margin-bottom: 14px; line-height: 1.4;
+      }
+      .login-btn {
+        width: 100%; padding: 12px; font-size: 15px; font-weight: 500;
+        border-radius: 8px; cursor: pointer; border: none;
+        background: rgba(255,255,255,0.92); color: #111;
+        transition: opacity .15s; margin-bottom: 14px;
+      }
+      .login-btn:hover    { opacity: .88; }
+      .login-btn:active   { opacity: .75; }
+      .login-btn:disabled { opacity: .38; cursor: default; }
+      .login-forgot       { text-align: center; font-size: 13px; opacity: .45; }
+      .login-forgot a     { opacity: 1; text-decoration: underline; cursor: pointer; }
+      .login-forgot a:hover { opacity: .7; }
+      .reset-success {
+        font-size: 13px; color: rgba(80,200,120,0.9);
+        text-align: center; min-height: 18px;
+        margin-top: 10px; line-height: 1.5;
+      }
+      .login-footer {
+        margin-top: 28px; padding-top: 20px;
+        border-top: 1px solid rgba(255,255,255,0.07);
+        font-size: 12px; opacity: .3; text-align: center; line-height: 1.6;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="login-wrap">
+      <div class="login-card">
+        <div class="login-logo">
+          <img src="./imgs/beyond_the_portal_logo.jpg" alt="Beyond the Portal" />
+          <span>Beyond the Portal</span>
+        </div>
+
+        <!-- Sign-in form -->
+        <div id="signinView">
+          <h1>Sign in</h1>
+          <p class="subtitle">Access your program's roster builder.</p>
+
+          <div class="login-field">
+            <label for="emailInput">Email</label>
+            <input id="emailInput" type="email" placeholder="you@program.edu"
+                   autocomplete="email" />
+          </div>
+          <div class="login-field">
+            <label for="passwordInput">Password</label>
+            <input id="passwordInput" type="password" placeholder="••••••••"
+                   autocomplete="current-password" />
+          </div>
+
+          <div class="login-error" id="loginError"></div>
+          <button class="login-btn" id="loginBtn" type="button">Sign in</button>
+          <div class="login-forgot"><a id="forgotLink">Forgot password?</a></div>
+        </div>
+
+        <!-- Password reset form -->
+        <div id="resetView" hidden>
+          <h1>Reset password</h1>
+          <p class="subtitle">Enter your email and we'll send a reset link.</p>
+
+          <div class="login-field">
+            <label for="resetEmailInput">Email</label>
+            <input id="resetEmailInput" type="email" placeholder="you@program.edu"
+                   autocomplete="email" />
+          </div>
+
+          <div class="login-error" id="resetError"></div>
+          <button class="login-btn" id="resetBtn" type="button">Send reset link</button>
+          <div class="reset-success" id="resetSuccess"></div>
+          <div class="login-forgot" style="margin-top:12px;">
+            <a id="backToSignin">Back to sign in</a>
+          </div>
+        </div>
+
+        <div class="login-footer">
+          Don't have an account? Contact Beyond the Portal to get set up.
+        </div>
+      </div>
+    </div>
+
+    <script type="module">
+      import { signIn, getSession, requestPasswordReset } from "./auth.js";
+
+      const signinView      = document.getElementById("signinView");
+      const resetView       = document.getElementById("resetView");
+      const emailInput      = document.getElementById("emailInput");
+      const passwordInput   = document.getElementById("passwordInput");
+      const loginBtn        = document.getElementById("loginBtn");
+      const loginError      = document.getElementById("loginError");
+      const forgotLink      = document.getElementById("forgotLink");
+      const resetEmailInput = document.getElementById("resetEmailInput");
+      const resetBtn        = document.getElementById("resetBtn");
+      const resetError      = document.getElementById("resetError");
+      const resetSuccess    = document.getElementById("resetSuccess");
+      const backToSignin    = document.getElementById("backToSignin");
+
+      // Already signed in → skip to app
+      getSession().then(session => {
+        if (session) window.location.replace("./app.html");
+      });
+
+      // ── Sign in ────────────────────────────────────────────────────────────
+      async function attemptSignIn() {
+        const email    = emailInput.value.trim();
+        const password = passwordInput.value;
+
+        loginError.textContent = "";
+        emailInput.classList.remove("field-error");
+        passwordInput.classList.remove("field-error");
+
+        if (!email) {
+          loginError.textContent = "Please enter your email.";
+          emailInput.classList.add("field-error");
+          emailInput.focus();
+          return;
+        }
+        if (!password) {
+          loginError.textContent = "Please enter your password.";
+          passwordInput.classList.add("field-error");
+          passwordInput.focus();
+          return;
+        }
+
+        loginBtn.disabled    = true;
+        loginBtn.textContent = "Signing in…";
+
+        try {
+          await signIn(email, password);
+          window.location.href = "./app.html";
+        } catch (err) {
+          loginError.textContent   = friendlyError(err.message);
+          passwordInput.classList.add("field-error");
+          loginBtn.disabled    = false;
+          loginBtn.textContent = "Sign in";
+          passwordInput.focus();
+        }
+      }
+
+      loginBtn.addEventListener("click", attemptSignIn);
+      passwordInput.addEventListener("keydown", e => { if (e.key === "Enter") attemptSignIn(); });
+      emailInput.addEventListener("keydown",    e => { if (e.key === "Enter") passwordInput.focus(); });
+
+      // ── Forgot password ────────────────────────────────────────────────────
+      forgotLink.addEventListener("click", () => {
+        signinView.hidden = true;
+        resetView.hidden  = false;
+        resetEmailInput.value = emailInput.value;
+        resetEmailInput.focus();
+      });
+
+      backToSignin.addEventListener("click", () => {
+        resetView.hidden  = true;
+        signinView.hidden = false;
+        emailInput.focus();
+      });
+
+      async function attemptReset() {
+        const email = resetEmailInput.value.trim();
+        resetError.textContent   = "";
+        resetSuccess.textContent = "";
+        resetEmailInput.classList.remove("field-error");
+
+        if (!email) {
+          resetError.textContent = "Please enter your email.";
+          resetEmailInput.classList.add("field-error");
+          return;
+        }
+
+        resetBtn.disabled    = true;
+        resetBtn.textContent = "Sending…";
+
+        try {
+          await requestPasswordReset(email);
+          resetSuccess.textContent = "Check your email for a reset link.";
+          resetBtn.textContent     = "Sent";
+        } catch (err) {
+          resetError.textContent = friendlyError(err.message);
+          resetBtn.disabled    = false;
+          resetBtn.textContent = "Send reset link";
+        }
+      }
+
+      resetBtn.addEventListener("click", attemptReset);
+      resetEmailInput.addEventListener("keydown", e => { if (e.key === "Enter") attemptReset(); });
+
+      // ── Error messages ─────────────────────────────────────────────────────
+      function friendlyError(msg) {
+        if (!msg) return "Something went wrong. Try again.";
+        const m = msg.toLowerCase();
+        if (m.includes("invalid login") || m.includes("invalid credentials"))
+          return "Incorrect email or password.";
+        if (m.includes("email not confirmed"))
+          return "Please confirm your email before signing in.";
+        if (m.includes("too many requests"))
+          return "Too many attempts. Wait a few minutes and try again.";
+        if (m.includes("network") || m.includes("fetch"))
+          return "Network error. Check your connection.";
+        return msg;
+      }
+    </script>
+  </body>
+</html>

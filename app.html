@@ -133,8 +133,35 @@
         <div class="panel">
           <div class="panel-head">
             <h2>Roster</h2>
-            <p class="muted">Players on scholarship with NIL impact.</p>
+            <p class="muted">Returning players + portal adds with NIL impact.</p>
+
+            <!-- Team roster import -->
+            <div class="panel-tools" style="margin-top:10px;">
+              <select id="rosterTeamSelect" style="flex:1;min-width:0;">
+                <option value="">— Import returning roster —</option>
+              </select>
+              <button class="btn btn-ghost" id="rosterImportBtn" type="button">Import</button>
+            </div>
+            <div id="rosterImportStatus" class="muted" style="font-size:12px;margin-top:6px;min-height:16px;"></div>
+
+            <!-- CSV fallback -->
+            <div style="margin-top:8px;">
+              <label class="btn btn-ghost" style="cursor:pointer;font-size:12px;">
+                Or upload roster CSV
+                <input id="rosterCsvInput" type="file" accept=".csv" hidden />
+              </label>
+            </div>
           </div>
+
+          <!-- Returning players section (populated by import) -->
+          <div id="returningSection" hidden>
+            <div style="padding:8px 12px 4px;font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.06em;opacity:.5;">Returning</div>
+            <div class="list" id="returningList"></div>
+          </div>
+
+          <!-- Divider shown when both sections have content -->
+          <div id="rosterDivider" hidden style="padding:8px 12px 4px;font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.06em;opacity:.5;">Portal Adds</div>
+
           <div class="list" id="roster"></div>
         </div>
       </section>
@@ -176,6 +203,7 @@
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
     <script src="./data.js"></script>
     <script type="module" src="./app.js"></script>
+    <script type="module" src="./roster-ui.js"></script>
   
   <script>
     /* ── nav dropdown ── */

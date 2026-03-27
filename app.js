@@ -1,9 +1,34 @@
 import { Player } from "./player.js";
 import { parseCSV, normalizeNumber, firstVal } from "./csv.js";
+import { requireAuth, getCoachProfile, signOut } from "./auth.js";
+
+// ── Auth guard ────────────────────────────────────────────────────────────────
+// requireAuth() checks for a valid Supabase session and redirects to
+// login.html if none exists. It returns the session so we can get the user id.
+const _session = await requireAuth();
+if (!_session) throw new Error("Not authenticated"); // unreachable but satisfies linters
+
+// Fetch the coach's profile row from the `coaches` table to get their team
+let SESSION_TEAM   = "";
+let SESSION_SEASON = "";
+let SESSION_NAME   = "";
+
+try {
+  const profile  = await getCoachProfile(_session.user.id);
+  SESSION_TEAM   = profile.team   || "";
+  SESSION_NAME   = profile.display_name || "";
+  // Season label: derive from current date
+  const now = new Date();
+  const yr  = now.getMonth() >= 9 ? now.getFullYear() : now.getFullYear() - 1;
+  SESSION_SEASON = `${yr}-${String(yr + 1).slice(-2)}`;
+} catch (err) {
+  console.warn("Could not load coach profile:", err.message);
+}
 
 // Local CSV in /data (recommended). If you later publish a Google Sheet as CSV,
 // replace this with that published CSV URL.
-const CSV_URL = "./data/BeyondThePortal_GM_Tool - Import_Board.csv";
+const CSV_URL         = "./data/BeyondThePortal_GM_Tool - Import_Board.csv";
+const ALL_ROSTERS_URL = "./data/all_rosters.csv";
 
 const STORAGE_KEY = "bp_roster_builder_v1";
 
@@ -204,21 +229,16 @@ function saveState(state) {
 function defaultState() {
   return {
     settings: {
-      program: "Rutgers",
+      program: SESSION_TEAM || "Rutgers",
       scholarships: 15,
       nilTotal: 4500000,
       maxPct: 0.3,
     },
-    // master list shown in the Board panel
     board: [],
-    // store IDs in pipeline lists
     shortlistIds: [],
-    roster: [
-      // roster entries: { id, nilOffer }
-      // example: { id: "p1", nilOffer: 900000 }
-    ],
-    // board: window.DEMO_BOARD || [],
+    roster: [],
     statusById: {},
+    returningLoaded: false,
   };
 }
 
@@ -816,3 +836,212 @@ window.addEventListener("pageshow", () => {
 });
 
 render();
+// ── Team identity banner ──────────────────────────────────────────────────────
+// Show which program is logged in at the top of the page.
+(function injectTeamBanner() {
+  if (!SESSION_TEAM) return;
+  const appTop = document.querySelector(".app-top h1");
+  if (!appTop) return;
+  const banner = document.createElement("div");
+  banner.style.cssText = "font-size:13px;opacity:.45;margin-bottom:4px;font-weight:400;";
+  banner.textContent   = `${SESSION_TEAM}  ·  ${SESSION_SEASON}  ·  `;
+  const signOut = document.createElement("a");
+  signOut.textContent = "Sign out";
+  signOut.href = "#";
+  signOut.style.cssText = "opacity:.7;text-decoration:underline;cursor:pointer;";
+  signOut.addEventListener("click", async e => {
+    e.preventDefault();
+    try { await signOut(); } catch (_) {}
+    window.location.href = "./login.html";
+  });
+  banner.appendChild(signOut);
+  appTop.insertAdjacentElement("beforebegin", banner);
+})();
+
+// ── Returning roster: load team players from all_rosters.csv ─────────────────
+
+const RETURNING_KEY = "bp_returning_v1";
+
+function loadReturningState() {
+  try {
+    const raw = localStorage.getItem(RETURNING_KEY);
+    return raw ? JSON.parse(raw) : { team: "", players: [] };
+  } catch { return { team: "", players: [] }; }
+}
+
+function saveReturningState(obj) {
+  localStorage.setItem(RETURNING_KEY, JSON.stringify(obj));
+}
+
+let returningState = loadReturningState();
+
+// If the session team changed (different coach logging in on same browser), clear old cache
+if (returningState.team !== SESSION_TEAM) {
+  returningState = { team: SESSION_TEAM, players: [] };
+  saveReturningState(returningState);
+}
+
+async function loadTeamRoster() {
+  if (!SESSION_TEAM) return;
+
+  // Use cached version if we already have it for this team
+  if (returningState.players.length > 0) {
+    renderReturningRoster();
+    return;
+  }
+
+  const statusEl = document.getElementById("returningStatus");
+  if (statusEl) statusEl.textContent = `Loading ${SESSION_TEAM} roster…`;
+
+  try {
+    const res = await fetch(ALL_ROSTERS_URL, { cache: "no-store" });
+    if (!res.ok) throw new Error(`Could not fetch all_rosters.csv (${res.status})`);
+    const text = await res.text();
+    const rows  = parseCSV(text);
+
+    // Filter to this team only
+    const teamRows = rows.filter(r => {
+      const t = (r.Team || r.team || "").trim();
+      return t.toLowerCase() === SESSION_TEAM.toLowerCase();
+    });
+
+    if (!teamRows.length) {
+      if (statusEl) statusEl.textContent = `No roster data found for ${SESSION_TEAM} yet.`;
+      return;
+    }
+
+    // Shape into the same plain-object format the app uses
+    returningState.players = teamRows.map((r, i) => {
+      const name = firstVal(r.Name, r["Player Name"], r.name, "Unknown").trim();
+      const pos  = firstVal(r["Primary Position"], r.Position, r.Pos, r.pos, "");
+      const yr   = firstVal(r.Year, r.Class, r.year, "");
+      return {
+        id:            `ret_${name.toLowerCase().replace(/\s+/g, "_")}_${i}`,
+        name,
+        team:          SESSION_TEAM,
+        pos,
+        year:          yr,
+        marketLow:     0,
+        marketHigh:    0,
+        tags:          [],
+        playmakerTags: [],
+        shootingTags:  [],
+        stats:         r,
+        source:        "returning",
+      };
+    });
+
+    saveReturningState(returningState);
+    if (statusEl) statusEl.textContent = "";
+    renderReturningRoster();
+    updateRosterDivider();
+
+  } catch (err) {
+    console.warn("Could not load team roster:", err.message);
+    if (statusEl) statusEl.textContent = `Could not load roster: ${err.message}`;
+  }
+}
+
+function renderReturningRoster() {
+  const listEl = document.getElementById("returningList");
+  const sectionEl = document.getElementById("returningSection");
+  if (!listEl || !sectionEl) return;
+
+  const players = returningState.players;
+  if (!players.length) {
+    sectionEl.hidden = true;
+    return;
+  }
+
+  sectionEl.hidden = false;
+
+  // Group by position
+  const groups = { Guard: [], Wing: [], Big: [], "": [] };
+  players.forEach(p => {
+    const bucket = groups[p.pos] !== undefined ? p.pos : "";
+    groups[bucket].push(p);
+  });
+
+  listEl.innerHTML = Object.entries(groups).flatMap(([pos, group]) => {
+    if (!group.length) return [];
+    const label = pos || "Other";
+    return [
+      `<div style="padding:6px 12px 2px;font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.08em;opacity:.35;">${escapeHtml(label)}s (${group.length})</div>`,
+      ...group.map(p => `
+        <div class="row" style="opacity:.8;">
+          <div class="row-main">
+            <div class="row-title" style="font-size:13px;">${escapeHtml(p.name)}</div>
+            <div class="row-sub" style="font-size:11px;">${escapeHtml(p.pos)} · ${escapeHtml(p.year)}</div>
+          </div>
+          <div class="row-actions">
+            <span style="font-size:11px;opacity:.4;padding:4px 6px;">Returning</span>
+          </div>
+        </div>
+      `),
+    ];
+  }).join("");
+
+  updateRosterDivider();
+}
+
+function updateRosterDivider() {
+  const divider = document.getElementById("rosterDivider");
+  if (!divider) return;
+  const hasReturning = returningState.players.length > 0;
+  const hasPortal    = state.roster.length > 0;
+  divider.hidden = !(hasReturning && hasPortal);
+}
+
+// Patch the existing renderRoster to also update the divider
+const _origRenderRoster = renderRoster;
+// eslint-disable-next-line no-global-assign
+window._renderRosterPatched = function() {
+  _origRenderRoster();
+  updateRosterDivider();
+};
+
+// ── Inject returning roster UI into the Roster panel ─────────────────────────
+(function injectReturningUI() {
+  const rosterPanel = document.querySelector("#roster")?.closest(".panel");
+  if (!rosterPanel) return;
+
+  const head = rosterPanel.querySelector(".panel-head");
+  if (!head) return;
+
+  // Status line
+  const statusEl = document.createElement("div");
+  statusEl.id = "returningStatus";
+  statusEl.style.cssText = "font-size:12px;opacity:.45;margin-top:6px;min-height:14px;";
+  head.appendChild(statusEl);
+
+  // Returning section (inserted before the portal roster list)
+  const rosterList = document.getElementById("roster");
+  if (rosterList) {
+    const section = document.createElement("div");
+    section.id = "returningSection";
+    section.hidden = true;
+
+    const sectionLabel = document.createElement("div");
+    sectionLabel.style.cssText = "padding:8px 12px 4px;font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.06em;opacity:.4;";
+    sectionLabel.textContent = "Returning";
+
+    const list = document.createElement("div");
+    list.id = "returningList";
+    list.className = "list";
+
+    section.appendChild(sectionLabel);
+    section.appendChild(list);
+    rosterList.insertAdjacentElement("beforebegin", section);
+
+    // Divider
+    const divider = document.createElement("div");
+    divider.id = "rosterDivider";
+    divider.hidden = true;
+    divider.style.cssText = "padding:8px 12px 4px;font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.06em;opacity:.4;border-top:1px solid rgba(255,255,255,0.07);margin-top:4px;";
+    divider.textContent = "Portal Adds";
+    rosterList.insertAdjacentElement("beforebegin", divider);
+  }
+})();
+
+// Kick off the auto-load
+loadTeamRoster();
