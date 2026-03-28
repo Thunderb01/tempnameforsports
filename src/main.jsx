@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import "@/styles/global.css";
 
+import { LandingPage }      from "@/pages/LandingPage";
 import { LoginPage }        from "@/pages/LoginPage";
 import { ResetPasswordPage }from "@/pages/ResetPasswordPage";
 import { AppPage }          from "@/pages/AppPage";
@@ -14,6 +15,7 @@ createRoot(document.getElementById("root")).render(
     <BrowserRouter>
       <Routes>
         {/* Public */}
+        <Route path="/"               element={<LandingPage />} />
         <Route path="/login"          element={<LoginPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
 
@@ -23,8 +25,8 @@ createRoot(document.getElementById("root")).render(
           <Route path="/board" element={<BoardPage />} />
         </Route>
 
-        {/* Default redirect */}
-        <Route path="*" element={<Navigate to="/app" replace />} />
+        {/* Fallback */}
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
   </StrictMode>

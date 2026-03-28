@@ -296,3 +296,143 @@ select.input { cursor: pointer; }
 .nav-link { font-size: 14px; opacity: .7; padding: 6px 10px; border-radius: 6px; transition: opacity .15s; }
 .nav-link:hover { opacity: 1; background: var(--panel); }
 .nav-link.active { opacity: 1; }
+
+/* ── Landing page ───────────────────────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@400;500;700&display=swap');
+
+.about-shell {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 0 18px 80px;
+  flex: 1 1 auto;
+}
+
+.about-divider {
+  width: 100%; height: 1px;
+  background: linear-gradient(90deg, rgba(85,130,255,.35), rgba(255,90,180,.2), transparent);
+  margin: 56px 0;
+}
+
+/* Hero */
+.about-hero        { padding: 60px 0 52px; animation: fadeUp .5s ease both; }
+.eyebrow {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: .78rem; font-weight: 700; letter-spacing: .12em;
+  text-transform: uppercase; color: rgba(85,130,255,.9); margin-bottom: 20px;
+}
+.eyebrow::before {
+  content: ''; display: block; width: 28px; height: 2px;
+  background: rgba(85,130,255,.7); border-radius: 2px;
+}
+.about-hero h1 {
+  font-family: 'DM Serif Display', Georgia, serif;
+  font-size: clamp(2.4rem, 4.5vw, 3.8rem);
+  line-height: 1.1; margin: 0 0 22px; max-width: 20ch;
+}
+.about-hero h1 em { font-style: italic; color: rgba(255,90,180,.9); }
+.about-hero .intro {
+  font-size: 1.1rem; line-height: 1.78;
+  color: var(--muted); max-width: 62ch; margin: 0;
+}
+
+/* Services */
+.services-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 720px) { .services-grid { grid-template-columns: 1fr; } }
+
+.service-card {
+  background: var(--panel); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 28px 26px;
+  display: flex; flex-direction: column; gap: 14px;
+  animation: fadeUp .5s ease both;
+}
+.service-card:nth-child(1) { border-top: 3px solid rgba(85,130,255,.7); }
+.service-card:nth-child(2) { border-top: 3px solid rgba(255,90,180,.7); animation-delay: .1s; }
+
+.service-tag {
+  font-size: .72rem; font-weight: 800; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--muted);
+}
+.service-card:nth-child(1) .service-tag { color: rgba(85,130,255,.8); }
+.service-card:nth-child(2) .service-tag { color: rgba(255,90,180,.8); }
+
+.service-title {
+  font-family: 'DM Serif Display', Georgia, serif;
+  font-size: 1.45rem; line-height: 1.2; margin: 0;
+}
+.service-body  { font-size: .95rem; line-height: 1.78; color: var(--muted); margin: 0; flex: 1; }
+
+.service-bullets { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.service-bullets li {
+  display: flex; align-items: flex-start; gap: 10px;
+  font-size: .9rem; line-height: 1.6; color: rgba(255,255,255,.82);
+}
+.service-bullets li::before { content: '→'; flex-shrink: 0; color: rgba(85,130,255,.8); font-weight: 700; margin-top: 1px; }
+.service-card:nth-child(2) .service-bullets li::before { color: rgba(255,90,180,.8); }
+
+/* CTA */
+.cta-banner {
+  background: linear-gradient(135deg, rgba(85,130,255,.14), rgba(255,90,180,.1));
+  border: 1px solid rgba(85,130,255,.3); border-radius: var(--radius);
+  padding: 36px 32px; display: flex; align-items: center;
+  justify-content: space-between; gap: 24px; flex-wrap: wrap;
+  animation: fadeUp .5s ease .15s both;
+}
+.cta-text h2 { font-family: 'DM Serif Display', Georgia, serif; font-size: 1.7rem; margin: 0 0 8px; }
+.cta-text p  { color: var(--muted); margin: 0; font-size: .95rem; line-height: 1.65; max-width: 48ch; }
+.btn-cta {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 14px 24px; border-radius: 14px;
+  background: rgba(85,130,255,.28); border: 1px solid rgba(85,130,255,.55);
+  color: var(--text); font-weight: 800; font-size: 1rem;
+  cursor: pointer; text-decoration: none; transition: background .2s;
+}
+.btn-cta:hover { background: rgba(85,130,255,.4); }
+
+/* Closing */
+.closing-block { text-align: center; padding: 12px 0; animation: fadeUp .5s ease .2s both; }
+.closing-block h2 { font-family: 'DM Serif Display', Georgia, serif; font-size: clamp(1.6rem, 3vw, 2.4rem); margin: 0 0 14px; }
+.closing-block p  { font-size: 1.05rem; line-height: 1.75; color: var(--muted); max-width: 56ch; margin: 0 auto; }
+
+/* Team */
+.team-header { display: flex; align-items: baseline; gap: 14px; margin-bottom: 24px; }
+.team-header h2   { font-family: 'DM Serif Display', Georgia, serif; font-size: clamp(1.6rem, 2.8vw, 2.2rem); margin: 0; }
+.team-header span { font-size: .78rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+
+.team-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+@media (max-width: 860px) { .team-grid { grid-template-columns: repeat(2,1fr); } }
+@media (max-width: 520px)  { .team-grid { grid-template-columns: 1fr; } }
+
+.team-card {
+  background: var(--panel); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 22px 20px;
+  transition: background .2s, transform .2s; animation: fadeUp .5s ease both;
+}
+.team-card:hover { background: var(--panel2); transform: translateY(-2px); }
+
+.team-avatar {
+  width: 50px; height: 50px; border-radius: 14px; border: 1px solid var(--border);
+  display: grid; place-items: center;
+  font-family: 'DM Serif Display', Georgia, serif; font-size: 1.3rem;
+  color: var(--text); margin-bottom: 14px;
+}
+.av-0 { background: linear-gradient(135deg, rgba(85,130,255,.35),  rgba(255,90,180,.25)); }
+.av-1 { background: linear-gradient(135deg, rgba(255,90,180,.3),   rgba(255,160,90,.2)); }
+.av-2 { background: linear-gradient(135deg, rgba(90,220,180,.25),  rgba(85,130,255,.25)); }
+.av-3 { background: linear-gradient(135deg, rgba(200,140,255,.28), rgba(85,130,255,.2)); }
+.av-4 { background: linear-gradient(135deg, rgba(255,210,90,.22),  rgba(255,90,180,.18)); }
+
+.team-name { font-weight: 800; font-size: 1rem; margin-bottom: 2px; }
+.team-role { font-size: .82rem; color: rgba(85,130,255,.85); font-weight: 700; margin-bottom: 10px; letter-spacing: .03em; }
+.team-bio  { font-size: .87rem; line-height: 1.65; color: var(--muted); margin: 0; }
+
+/* Skeleton loader */
+.sk {
+  background: linear-gradient(90deg, rgba(255,255,255,.06) 25%, rgba(255,255,255,.1) 50%, rgba(255,255,255,.06) 75%);
+  background-size: 200% 100%; animation: shimmer 1.4s infinite;
+  border-radius: 8px; height: 1em; margin-bottom: 10px;
+}
+@keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+@keyframes fadeUp  { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+
+/* Footer */
+.footer { text-align: center; padding: 24px; font-size: 13px; opacity: .3; border-top: 1px solid var(--border); }

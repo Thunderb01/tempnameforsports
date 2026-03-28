@@ -121,3 +121,20 @@ create trigger portal_board_updated_at
 -- 5. Import your portal board CSV via the Supabase Table Editor
 --    (Table Editor → portal_board → Insert → Import CSV)
 -- ============================================================
+
+-- ── Access requests (from the "Request access" form on login page) ────
+create table if not exists public.access_requests (
+  id         uuid primary key default gen_random_uuid(),
+  created_at timestamp with time zone default now(),
+  name       text not null,
+  school     text not null,
+  position   text not null,
+  email      text not null
+);
+
+alter table public.access_requests enable row level security;
+
+-- Anyone (even unauthenticated) can submit — only you can read them in the dashboard
+create policy "Anyone can submit an access request"
+  on public.access_requests for insert
+  with check (true);
