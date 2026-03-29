@@ -21,10 +21,27 @@ const STATUSES = [
 ];
 
 export function AppPage() {
+  
   const { profile } = useAuth();
   const team        = profile?.team || "";
 
   const board = useRosterBoard(team);
+  //some debug logs to help track down state loading issues
+  console.log("DEBUG profile:", profile);
+  console.log("DEBUG team:", team);
+  console.log("DEBUG board object:", board);
+  console.log("DEBUG board.state:", board?.state);
+  console.log("DEBUG board.state.board:", board?.state?.board);
+  console.log("DEBUG board.returningPlayers:", board?.returningPlayers);
+  console.log("DEBUG board.state.settings:", board?.state?.settings);
+  console.log("DEBUG shortlistIds:", board?.state?.shortlistIds);
+  console.log("DEBUG roster:", board?.state?.roster);
+
+  //safe guards
+  if (!board) return <div>board missing</div>;
+  if (!board.state) return <div>board.state missing</div>;
+  if (!Array.isArray(board.state.board)) return <div>board.state.board not array</div>;
+  if (!Array.isArray(board.returningPlayers)) return <div>returningPlayers not array</div>;
 
   const [search,   setSearch]   = useState("");
   const [posFilter,setPosFilter]= useState("all");
@@ -83,9 +100,8 @@ export function AppPage() {
     setSettings(next);
   }
 
-  if (!settings) return null;
-
   // ── Returning roster grouped by position ───────────────────────────────────
+  // Must be before any conditional return to satisfy Rules of Hooks
   const returningByPos = useMemo(() => {
     const groups = {};
     board.returningPlayers.forEach(p => {
@@ -95,6 +111,35 @@ export function AppPage() {
     });
     return groups;
   }, [board.returningPlayers]);
+
+  if (!settings) {
+    return (
+      <>
+        <SiteHeader />
+        <div className="app-shell">
+          <div className="empty">Loading roster builder settings...</div>
+        </div>
+      </>
+    );
+  }
+
+  // more debug logs to verify data is present before rendering
+  const debug = {
+    hasProfile: !!profile,
+    team,
+    hasState: !!board?.state,
+    boardIsArray: Array.isArray(board?.state?.board),
+    boardLength: Array.isArray(board?.state?.board) ? board.state.board.length : "not array",
+    returningIsArray: Array.isArray(board?.returningPlayers),
+    returningLength: Array.isArray(board?.returningPlayers) ? board.returningPlayers.length : "not array",
+    hasSettings: !!board?.state?.settings,
+    shortlistIsArray: Array.isArray(board?.state?.shortlistIds),
+    rosterIsArray: Array.isArray(board?.state?.roster),
+  };
+
+  <pre style={{ padding: 12, background: "#111", color: "#0f0", fontSize: 12 }}>
+    {JSON.stringify(debug, null, 2)}
+  </pre>
 
   return (
     <>

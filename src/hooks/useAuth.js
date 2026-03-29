@@ -1,53 +1,112 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 
-/**
- * Returns { session, user, profile, loading }
- * - session:  raw Supabase session (null if not signed in)
- * - user:     Supabase auth user
- * - profile:  row from the `coaches` table { team, display_name, role }
- * - loading:  true while we're waiting for the initial auth check
- */
 export function useAuth() {
-  const [session, setSession]   = useState(undefined); // undefined = not yet checked
-  const [profile, setProfile]   = useState(null);
-  const [loading, setLoading]   = useState(true);
+  const [session, setSession] = useState(undefined); // undefined = not yet checked
+  const [profile, setProfile] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const fetchingFor = useRef(null); // tracks which user_id we last fetched for
 
   useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session ?? null);
-    });
+    let mounted = true;
+    console.log("useAuth: checking session on mount...");
 
-    // Listen for sign-in / sign-out events
+    async function init() {
+      // 1. Get the current session first
+      const { data } = await supabase.auth.getSession();
+      const initialSession = data.session ?? null;
+
+      if (!mounted) return;
+      setSession(initialSession);
+
+      // 2. If there's a session, fetch the profile before marking loading=false
+      if (initialSession) {
+      
+        await fetchProfile(initialSession.user.id, mounted);
+      } else {
+        setLoading(false);
+      }
+    }
+
+    init();
+    
+
+    // 3. Listen for future auth changes (sign in, sign out, token refresh)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, newSession) => {
+      async (_event, newSession) => {
+        if (!mounted) return;
         setSession(newSession ?? null);
+
+        if (newSession) {
+          await fetchProfile(newSession.user.id, mounted);
+        } else {
+          setProfile(null);
+          setLoading(false);
+        }
       }
     );
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      fetchingFor.current = null;
+      subscription.unsubscribe();
+    };
   }, []);
 
-  // Fetch coach profile whenever session changes
-  useEffect(() => {
-    if (!session) {
-      setProfile(null);
-      setLoading(false);
+  async function fetchProfile(userId, mounted = true) {
+  console.log("fetchProfile start", { userId, fetchingFor: fetchingFor.current });
+
+  if (fetchingFor.current === userId) {
+    console.log("skipping duplicate fetch for", userId);
+    return;
+  }
+
+  fetchingFor.current = userId;
+
+  try {
+    //debug to see if coaches table exists
+    
+     
+    console.log("about to query coaches for", userId);
+
+    // temp: test if supabase client can reach the DB at all
+    const { data: testData, error: testError } = await supabase.from("coaches").select("count").limit(1);
+    console.log("test query result", { testData, testError });
+
+    let { data: coaches, error } = await supabase
+      .from("coaches")
+      .select("team, display_name, role")
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    console.log("query finished", { coaches, error });
+
+    if (!mounted) {
+      console.log("component unmounted before profile set");
       return;
     }
 
-    supabase
-      .from("coaches")
-      .select("team, display_name, role")
-      .eq("user_id", session.user.id)
-      .single()
-      .then(({ data, error }) => {
-        if (error) console.warn("Could not load coach profile:", error.message);
-        setProfile(data ?? null);
-        setLoading(false);
-      });
-  }, [session]);
+    if (error) {
+      console.warn("Could not load coach profile:", error.message);
+    }
+
+    setProfile(coaches ?? null);
+    setLoading(false);
+    console.log("setProfile/setLoading done");
+  } catch (err) {
+    console.error("fetchProfile crashed", err);
+    setLoading(false);
+  }
+}
+  //debug log to help track down loading issues
+  console.log("useAuth return", {
+    session,
+    profile,
+    loadingState: loading,
+    finalLoading: session === undefined || loading,
+  });
+
+
 
   return {
     session,
