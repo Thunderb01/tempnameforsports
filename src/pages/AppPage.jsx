@@ -176,7 +176,7 @@ export function AppPage() {
                 </div>
                 <div className="sum">
                   <div className="label">Roster</div>
-                  <div className="value">{board.state.roster.length} / {settings.scholarships}</div>
+                  <div className="value">{calc.totalRoster} / {settings.scholarships}</div>
                 </div>
                 <div className="sum">
                   <div className="label">Scholarships Left</div>
@@ -325,12 +325,22 @@ export function AppPage() {
                     <div key={pos}>
                       <div className="sub-label" style={{ opacity: .25, fontSize: 9 }}>{pos}s ({players.length})</div>
                       {players.map((p, i) => (
-                        <div key={i} className="row" style={{ opacity: .75 }}>
+                        <div key={i} className="row row-click" style={{ opacity: .75 }}
+                          onClick={e => { if (!e.target.closest("select")) setModal(p); }}>
                           <div className="row-main">
                             <div className="row-title" style={{ fontSize: 13 }}>{p.name}</div>
                             <div className="row-sub" style={{ fontSize: 11 }}>{p.primary_position || p.pos} · {p.year}</div>
                           </div>
-                          <span style={{ fontSize: 11, opacity: .35, padding: "4px 6px" }}>Returning</span>
+                          <select
+                            className="input"
+                            style={{ fontSize: 11, padding: "3px 6px", width: "auto" }}
+                            value={board.state.retentionById?.[p.id] || "returning"}
+                            onChange={e => { e.stopPropagation(); board.setRetention(p.id, e.target.value); }}
+                            onClick={e => e.stopPropagation()}>
+                            <option value="returning">Returning</option>
+                            <option value="undecided">Undecided</option>
+                            <option value="entering_portal">Entering Portal</option>
+                          </select>
                         </div>
                       ))}
                     </div>

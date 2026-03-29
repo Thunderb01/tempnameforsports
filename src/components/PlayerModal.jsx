@@ -39,11 +39,14 @@ const STAT_ROWS = [
   { key: "drb_40", label: "DRB/40" },
   { key: "orb_40", label: "ORB/40" },
   { key: "trb_40", label: "TRB/40" },
-  { key: "cdi",    label: "CDI" },
-  { key: "dds",    label: "DDS" },
-  { key: "sei",    label: "SEI" },
-  { key: "smi",    label: "SMI" },
-  { key: "ris",    label: "RIS" },
+];
+
+const ADV_ROWS = [
+  { key: "cdi", label: "CDI" },
+  { key: "dds", label: "DDS" },
+  { key: "sei", label: "SEI" },
+  { key: "smi", label: "SMI" },
+  { key: "ris", label: "RIS" },
 ];
 
 export function PlayerModal({ player, status, onStatus, onClose }) {
@@ -82,7 +85,10 @@ export function PlayerModal({ player, status, onStatus, onClose }) {
             <div>
               <div className="modal-kicker">Player Card</div>
               <h3 className="modal-title" id="modal-title">{player.name}</h3>
-              <div className="modal-sub">{player.team} · {player.pos} · {player.year}</div>
+              <div className="modal-sub">
+                {[player.team, player.pos, player.year, player.height, player.hometown]
+                  .filter(Boolean).join(" · ")}
+              </div>
             </div>
             <button className="btn btn-ghost" onClick={onClose}>Close</button>
           </div>
@@ -99,18 +105,56 @@ export function PlayerModal({ player, status, onStatus, onClose }) {
             ) : !stats ? (
               <div style={{ opacity: .4, fontSize: 13 }}>No stats on file.</div>
             ) : (
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-                <tbody>
-                  {STAT_ROWS.map(({ key, label }) => (
-                    <tr key={key} style={{ borderBottom: "1px solid rgba(255,255,255,.06)" }}>
-                      <td style={{ padding: "5px 8px", opacity: .5, width: "50%" }}>{label}</td>
-                      <td style={{ padding: "5px 8px", fontVariantNumeric: "tabular-nums" }}>
-                        {fmt(stats[key], key)}
-                      </td>
+              <>
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ borderCollapse: "collapse", fontSize: 12, whiteSpace: "nowrap" }}>
+                  <thead>
+                    <tr>
+                      {STAT_ROWS.map(({ key, label }) => (
+                        <th key={key} style={{ padding: "4px 10px", opacity: .5, fontWeight: 600, textAlign: "center", borderBottom: "1px solid rgba(255,255,255,.1)" }}>
+                          {label}
+                        </th>
+                      ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      {STAT_ROWS.map(({ key }) => (
+                        <td key={key} style={{ padding: "6px 10px", textAlign: "center", fontVariantNumeric: "tabular-nums", fontWeight: 600 }}>
+                          {fmt(stats[key], key)}
+                        </td>
+                      ))}
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div style={{ marginTop: 16 }}>
+                <div style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: ".06em", opacity: .4, marginBottom: 8, fontWeight: 500 }}>Beyond the Portal Metrics (BtPM)</div>
+                <div style={{ overflowX: "auto" }}>
+                  <table style={{ borderCollapse: "collapse", fontSize: 12, whiteSpace: "nowrap" }}>
+                    <thead>
+                      <tr>
+                        {ADV_ROWS.map(({ key, label }) => (
+                          <th key={key} style={{ padding: "4px 10px", opacity: .5, fontWeight: 600, textAlign: "center", borderBottom: "1px solid rgba(255,255,255,.1)" }}>
+                            {label}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        {ADV_ROWS.map(({ key }) => (
+                          <td key={key} style={{ padding: "6px 10px", textAlign: "center", fontVariantNumeric: "tabular-nums", fontWeight: 600 }}>
+                            {fmt(stats[key], key)}
+                          </td>
+                        ))}
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              </>
             )}
           </div>
 

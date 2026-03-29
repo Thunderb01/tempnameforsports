@@ -21,6 +21,7 @@ function defaultState(team = "") {
     shortlistIds:  [],
     roster:        [],   // [{ id, nilOffer }]
     statusById:    {},
+    retentionById: {},
   };
 }
 
@@ -72,8 +73,10 @@ export function useRosterBoard(team) {
       team:          row.current_team,
       pos:           row.primary_position,
       year:          row.year,
-      marketLow:     row.market_low  ?? 0,
-      marketHigh:    row.market_high ?? 0,
+      height:        row.height   ?? null,
+      hometown:      row.hometown ?? null,
+      marketLow:     row.open_market_low  ?? 0,
+      marketHigh:    row.open_market_high ?? 0,
       playmakerTags: row.playmaker_tags ? row.playmaker_tags.split(",").map(t => t.trim()).filter(Boolean) : [],
       shootingTags:  row.shooting_tags  ? row.shooting_tags.split(",").map(t => t.trim()).filter(Boolean)  : [],
       tags:          [],
@@ -91,7 +94,7 @@ export function useRosterBoard(team) {
     if (!teamName) return;
     const { data, error } = await supabase
       .from("team_players")
-      .select("*, players(*)")
+      .select("*, players(*, player_stats(*))")
       .eq("team", teamName);
 
     if (error) { console.error("team_players fetch:", error); return; }
@@ -99,11 +102,15 @@ export function useRosterBoard(team) {
     const returning = (data || [])
       .map(row => ({
         ...row.players,
-        name:             row.players.name,
-        team:             row.players.current_team,
-        primary_position: row.players.primary_position,
-        pos:              row.players.primary_position,
-        year:             row.players.year,
+        name:        row.players.name,
+        team:        row.players.current_team,
+        pos:         row.players.primary_position,
+        year:        row.players.year,
+        height:      row.players.height   ?? null,
+        hometown:    row.players.hometown ?? null,
+        marketLow:   row.players.open_market_low  ?? 0,
+        marketHigh:  row.players.open_market_high ?? 0,
+        stats:       { ...(row.players.player_stats?.[0] || {}) },
       }))
       .sort((a, b) => a.name.localeCompare(b.name));
 
@@ -159,6 +166,10 @@ export function useRosterBoard(team) {
     });
   }
 
+  function setRetention(id, value) {
+    setState(s => ({ ...s, retentionById: { ...s.retentionById, [id]: value } }));
+  }
+
   function commitSettings(settings) {
     setState(s => ({ ...s, settings }));
   }
@@ -171,12 +182,16 @@ export function useRosterBoard(team) {
   // ── Calc ────────────────────────────────────────────────────────────────────
 
   function calc() {
-    const { settings, roster } = state;
-    const nilCommitted         = roster.reduce((sum, r) => sum + (r.nilOffer || 0), 0);
-    const nilRemaining         = settings.nilTotal - nilCommitted;
-    const scholarshipsRemaining = settings.scholarships - roster.length;
-    const maxPerPlayer         = settings.nilTotal * settings.maxPct;
-    const warnings             = [];
+    const { settings, roster, retentionById } = state;
+    const committedReturning = returningPlayers.filter(
+      p => (retentionById[p.id] || "returning") === "returning"
+    ).length;
+    const totalRoster        = roster.length + committedReturning;
+    const nilCommitted       = roster.reduce((sum, r) => sum + (r.nilOffer || 0), 0);
+    const nilRemaining       = settings.nilTotal - nilCommitted;
+    const scholarshipsRemaining = settings.scholarships - totalRoster;
+    const maxPerPlayer       = settings.nilTotal * settings.maxPct;
+    const warnings           = [];
 
     if (scholarshipsRemaining < 0)
       warnings.push(`Over scholarships by ${Math.abs(scholarshipsRemaining)}.`);
@@ -189,7 +204,7 @@ export function useRosterBoard(team) {
       }
     });
 
-    return { nilCommitted, nilRemaining, scholarshipsRemaining, maxPerPlayer, warnings };
+    return { totalRoster, nilCommitted, nilRemaining, scholarshipsRemaining, maxPerPlayer, warnings };
   }
 
   return {
@@ -200,7 +215,7 @@ export function useRosterBoard(team) {
     byId, inRoster, inShort,
     addToShortlist, removeFromShortlist,
     addToRoster, removeFromRoster,
-    updateOffer, setStatus, commitSettings, reset,
+    updateOffer, setStatus, setRetention, commitSettings, reset,
     calc,
   };
 }

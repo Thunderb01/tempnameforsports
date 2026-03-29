@@ -23,10 +23,19 @@ function saveRosterState(s) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
 }
 
-const VISIBLE_COLS = [
-  "Name", "Team", "Primary Position", "Year",
-  "PPG", "REB/G", "AST/G", "Open Market Low", "Open Market High",
-  "Playmaker Tags", "Shooting/Scoring Tags",
+// label → getter(player)
+const COLS = [
+  { label: "Player",    get: p => p.name },
+  { label: "Team",      get: p => p.team },
+  { label: "Pos",       get: p => p.pos },
+  { label: "Yr",        get: p => p.year },
+  { label: "Ht",        get: p => p.height   || "—" },
+  { label: "Hometown",  get: p => p.hometown || "—" },
+  { label: "PPG",       get: p => p.stats?.ppg    ?? "—" },
+  { label: "RPG",       get: p => p.stats?.rpg    ?? "—" },
+  { label: "APG",       get: p => p.stats?.apg    ?? "—" },
+  { label: "Mkt Low",   get: p => money(p.marketLow) },
+  { label: "Mkt High",  get: p => money(p.marketHigh) },
 ];
 
 const STATUSES = [
@@ -59,7 +68,7 @@ export function BoardPage() {
     setLoading(true);
     supabase
       .from("players")
-      .select("*")
+      .select("*, player_stats(*)")
       .eq("source", "portal")
       .order("name")
       .then(({ data, error: err }) => {
@@ -70,11 +79,13 @@ export function BoardPage() {
           team:          row.current_team,
           pos:           row.primary_position,
           year:          row.year,
-          marketLow:     row.market_low  ?? 0,
-          marketHigh:    row.market_high ?? 0,
+          height:        row.height   ?? null,
+          hometown:      row.hometown ?? null,
+          marketLow:     row.open_market_low  ?? 0,
+          marketHigh:    row.open_market_high ?? 0,
           playmakerTags: row.playmaker_tags ? row.playmaker_tags.split(",").map(t => t.trim()).filter(Boolean) : [],
           shootingTags:  row.shooting_tags  ? row.shooting_tags.split(",").map(t => t.trim()).filter(Boolean)  : [],
-          stats:         { name: row.name, team: row.current_team, primary_position: row.primary_position, year: row.year, market_low: row.market_low, market_high: row.market_high, open_market_low: row.open_market_low, open_market_high: row.open_market_high, playmaker_tags: row.playmaker_tags, shooting_tags: row.shooting_tags, ...(row.stats || {}) },
+          stats:         { ...(row.player_stats?.[0] || {}) },
         })));
         setLoading(false);
       });
@@ -112,16 +123,19 @@ export function BoardPage() {
     });
 
     if (sortKey) {
-      out = [...out].sort((a, b) => {
-        const av = a.stats?.[sortKey] ?? "";
-        const bv = b.stats?.[sortKey] ?? "";
-        const an = parseFloat(String(av).replace(/[%,$]/g, ""));
-        const bn = parseFloat(String(bv).replace(/[%,$]/g, ""));
-        const cmp = !isNaN(an) && !isNaN(bn)
-          ? an - bn
-          : String(av).localeCompare(String(bv));
-        return sortDir === "asc" ? cmp : -cmp;
-      });
+      const col = COLS.find(c => c.label === sortKey);
+      if (col) {
+        out = [...out].sort((a, b) => {
+          const av = col.get(a);
+          const bv = col.get(b);
+          const an = parseFloat(String(av).replace(/[%,$,—]/g, ""));
+          const bn = parseFloat(String(bv).replace(/[%,$,—]/g, ""));
+          const cmp = !isNaN(an) && !isNaN(bn)
+            ? an - bn
+            : String(av).localeCompare(String(bv));
+          return sortDir === "asc" ? cmp : -cmp;
+        });
+      }
     }
 
     return out;
@@ -174,9 +188,9 @@ export function BoardPage() {
   }
 
   // ── Sort handler ─────────────────────────────────────────────────────────────
-  function handleSort(col) {
-    setSortDir(prev => sortKey === col && prev === "asc" ? "desc" : "asc");
-    setSortKey(col);
+  function handleSort(label) {
+    setSortDir(prev => sortKey === label && prev === "asc" ? "desc" : "asc");
+    setSortKey(label);
   }
 
   // ── Render ─────────────────────────────────────────────────────────────────
@@ -234,7 +248,9 @@ export function BoardPage() {
                       onClick={e => { if (!e.target.closest("button,select")) setModal(p); }}>
                       <div className="row-main">
                         <div className="row-title">{p.name}</div>
-                        <div className="row-sub">{p.team} · {p.pos} · {p.year}</div>
+                        <div className="row-sub">
+                          {[p.team, p.pos, p.year, p.height, p.hometown].filter(Boolean).join(" · ")}
+                        </div>
                         <div className="row-sub">Market: {money(p.marketLow)} – {money(p.marketHigh)}</div>
                         {pm.length > 0 && (
                           <div className="row-sub tag-row">
@@ -288,10 +304,10 @@ export function BoardPage() {
                   <thead>
                     <tr>
                       <th style={thStyle}>Action</th>
-                      {VISIBLE_COLS.map(col => (
-                        <th key={col} style={{ ...thStyle, cursor: "pointer", userSelect: "none" }}
-                          onClick={() => handleSort(col)}>
-                          {col}{sortKey === col ? (sortDir === "asc" ? " ▲" : " ▼") : ""}
+                      {COLS.map(col => (
+                        <th key={col.label} style={{ ...thStyle, cursor: "pointer", userSelect: "none" }}
+                          onClick={() => handleSort(col.label)}>
+                          {col.label}{sortKey === col.label ? (sortDir === "asc" ? " ▲" : " ▼") : ""}
                         </th>
                       ))}
                     </tr>
@@ -313,10 +329,9 @@ export function BoardPage() {
                             Shortlist
                           </button>
                         </td>
-                        {VISIBLE_COLS.map(col => {
-                          const raw = p.stats?.[col] ?? p.stats?.[col.toLowerCase()] ?? "";
-                          return <td key={col} style={tdStyle}>{String(raw)}</td>;
-                        })}
+                        {COLS.map(col => (
+                          <td key={col.label} style={tdStyle}>{col.get(p)}</td>
+                        ))}
                       </tr>
                     ))}
                   </tbody>

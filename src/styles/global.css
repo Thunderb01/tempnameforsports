@@ -224,7 +224,7 @@ select.input { cursor: pointer; }
   position: fixed; top: 50%; left: 50%;
   transform: translate(-50%, -50%);
   z-index: 201;
-  width: min(560px, calc(100vw - 32px));
+  width: min(860px, calc(100vw - 32px));
   max-height: 85vh; overflow-y: auto;
 }
 .modal-card {
