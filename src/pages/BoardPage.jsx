@@ -58,22 +58,23 @@ export function BoardPage() {
   useEffect(() => {
     setLoading(true);
     supabase
-      .from("portal_board")
+      .from("players")
       .select("*")
+      .eq("source", "portal")
       .order("name")
       .then(({ data, error: err }) => {
         if (err) { setError(err.message); setLoading(false); return; }
         setPlayers((data || []).map(row => ({
           id:            row.id,
           name:          row.name,
-          team:          row.team,
+          team:          row.current_team,
           pos:           row.primary_position,
           year:          row.year,
           marketLow:     row.market_low  ?? 0,
           marketHigh:    row.market_high ?? 0,
           playmakerTags: row.playmaker_tags ? row.playmaker_tags.split(",").map(t => t.trim()).filter(Boolean) : [],
           shootingTags:  row.shooting_tags  ? row.shooting_tags.split(",").map(t => t.trim()).filter(Boolean)  : [],
-          stats:         row,
+          stats:         { name: row.name, team: row.current_team, primary_position: row.primary_position, year: row.year, market_low: row.market_low, market_high: row.market_high, open_market_low: row.open_market_low, open_market_high: row.open_market_high, playmaker_tags: row.playmaker_tags, shooting_tags: row.shooting_tags, ...(row.stats || {}) },
         })));
         setLoading(false);
       });

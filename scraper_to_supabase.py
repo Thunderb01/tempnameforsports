@@ -1,61 +1,25 @@
 """
-scraper_to_supabase.py — Scrape D1 rosters → Supabase `rosters` table
-======================================================================
-Replaces the old all_rosters.csv workflow. Run this once per season
-(or whenever you onboard a new program). Data is immediately live in
-the app — no file commit or redeploy needed.
+scraper_to_supabase.py — Scrape D1 rosters → players + player_stats + team_players
+====================================================================================
+Targets the new 3-table schema. Every player gets a row in `players` and
+a row in `player_stats`. Returning-roster players also get a row in `team_players`.
 
 Usage:
-    # Scrape specific teams (recommended for first run / testing)
     python scraper_to_supabase.py --teams "Duke" "Kentucky" "Rutgers"
-
-    # Scrape all teams (slow — budget ~5s per player)
-    python scraper_to_supabase.py
-
-    # Dry run: scrape but print rows instead of upserting
     python scraper_to_supabase.py --teams "Duke" --dry-run
-
-    # Replace a team's roster entirely (vs. upsert/merge)
     python scraper_to_supabase.py --teams "Rutgers" --replace
 
-Environment variables (set before running):
+Environment variables:
     export SUPABASE_URL="https://xxxxxxxxxxxx.supabase.co"
     export SUPABASE_SERVICE_KEY="your-service-role-key"
 
-Supabase table schema (run in SQL Editor before first use):
-------------------------------------------------------------
-create table public.rosters (
-  id              uuid primary key default gen_random_uuid(),
-  team            text not null,
-  name            text not null,
-  primary_position text,
-  year            text,
-  ppg             numeric,
-  reb_g           numeric,
-  ast_g           numeric,
-  usg_pct         numeric,
-  fg_pct          text,
-  three_p_pct     text,
-  ft_pct          text,
-  three_pa_g      numeric,
-  ast_tov         numeric,
-  stl_40          numeric,
-  blk_40          numeric,
-  playmaker_tags  text,
-  shooting_tags   text,
-  updated_at      timestamp with time zone default now(),
-  unique (team, name)
-);
-alter table public.rosters enable row level security;
-create policy "Coaches read own team"
-  on public.rosters for select
-  using (
-    team = (select team from public.coaches where user_id = auth.uid() limit 1)
-  );
-------------------------------------------------------------
+Prerequisite SQL (run once in SQL Editor):
+    ALTER TABLE public.players
+      ADD CONSTRAINT players_name_team_source_key UNIQUE (name, current_team, source);
 """
 
 import argparse
+import datetime
 import json
 import math
 import os
@@ -81,7 +45,6 @@ except ImportError:
 SUPABASE_URL         = os.environ.get("SUPABASE_URL", "")
 SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")
 
-import datetime
 _now = datetime.date.today()
 DEFAULT_YEAR = _now.year + 1 if _now.month >= 10 else _now.year
 
@@ -97,7 +60,15 @@ HEADERS = {
     "Accept-Language": "en-US,en;q=0.9",
 }
 
-# Full D1 team → BBRef slug map (same as roster_scraper.py)
+POS_MAP = {
+    "G": "Guard", "G-F": "Wing", "F-G": "Wing",
+    "F": "Wing",  "F-C": "Big", "C-F": "Big", "C": "Big",
+}
+CLASS_MAP = {
+    "FR": "Freshman", "SO": "Sophomore", "JR": "Junior",
+    "SR": "Senior",   "GR": "Graduate",
+}
+
 TEAMS = {
     "Abilene Christian": "abilene-christian", "Air Force": "air-force",
     "Akron": "akron", "Alabama": "alabama", "Alabama A&M": "alabama-am",
@@ -222,28 +193,38 @@ TEAMS = {
     "Wyoming": "wyoming", "Xavier": "xavier", "Yale": "yale",
 }
 
-POS_MAP   = {"G":"Guard","G-F":"Wing","F-G":"Wing","F":"Wing","F-C":"Big","C-F":"Big","C":"Big"}
-CLASS_MAP = {"FR":"Freshman","SO":"Sophomore","JR":"Junior","SR":"Senior","GR":"Graduate"}
-
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
 def safe_float(val, default=0.0):
-    try: return float(str(val).strip().replace("%","").replace(",",""))
-    except: return default
+    try:
+        return float(str(val).strip().replace("%", "").replace(",", ""))
+    except (ValueError, TypeError):
+        return default
 
-def pct_str(val):
-    if val is None or (isinstance(val, float) and math.isnan(val)): return "0.00%"
-    return f"{val:.2f}%" if val > 1.5 else f"{val*100:.2f}%"
+def pct(val):
+    """Return percentage as a plain float (e.g. 0.452 → 45.2). Handles both forms."""
+    if val is None or (isinstance(val, float) and math.isnan(val)):
+        return None
+    v = safe_float(val)
+    return round(v * 100, 2) if v <= 1.5 else round(v, 2)
 
-def per40(stat, mp): return round((stat/mp)*40, 1) if mp else 0.0
-def calc_ast_tov(ast, tov): return round(ast/tov, 1) if tov else round(ast, 1)
-def normalise_pos(raw): return POS_MAP.get(str(raw).strip(), "Guard")
-def normalise_class(raw): return CLASS_MAP.get(str(raw).strip().upper(), str(raw).strip())
+def per40(stat, mp):
+    return round((stat / mp) * 40, 1) if mp else None
+
+def calc_ast_tov(ast, tov):
+    return round(ast / tov, 1) if tov else round(ast, 1)
+
+def normalise_pos(raw):
+    return POS_MAP.get(str(raw).strip(), "Guard")
+
+def normalise_class(raw):
+    return CLASS_MAP.get(str(raw).strip().upper(), str(raw).strip())
 
 def fetch(url):
     resp = requests.get(url, headers=HEADERS, timeout=30)
     if resp.status_code == 429:
-        print("    Rate-limited. Waiting 90s..."); time.sleep(90)
+        print("    Rate-limited. Waiting 90s...")
+        time.sleep(90)
         resp = requests.get(url, headers=HEADERS, timeout=30)
     resp.raise_for_status()
     return resp.text
@@ -252,102 +233,130 @@ def strip_comments(html):
     return re.sub(r"<!--(.*?)-->", r"\1", html, flags=re.DOTALL)
 
 def parse_table(html, table_id, year):
-    try: dfs = pd.read_html(StringIO(html), attrs={"id": table_id})
-    except: return None
-    if not dfs: return None
-    df = dfs[0]; df.columns = [str(c).strip() for c in df.columns]
-    if "Season" not in df.columns: return df.iloc[-1] if not df.empty else None
+    try:
+        dfs = pd.read_html(StringIO(html), attrs={"id": table_id})
+    except Exception:
+        return None
+    if not dfs:
+        return None
+    df = dfs[0]
+    df.columns = [str(c).strip() for c in df.columns]
+    if "Season" not in df.columns:
+        return df.iloc[-1] if not df.empty else None
     df = df[df["Season"].notna()]
     df = df[~df["Season"].astype(str).str.contains("Career|Season", na=False)]
-    season = f"{year-1}-{str(year)[-2:]}"
-    match = df[df["Season"].astype(str).str.startswith(season)]
+    season_str = f"{year-1}-{str(year)[-2:]}"
+    match = df[df["Season"].astype(str).str.startswith(season_str)]
     return match.iloc[-1] if not match.empty else (df.iloc[-1] if not df.empty else None)
 
-def auto_playmaker_tag(apg, ast_tov, usg):
+def auto_playmaker_tags(apg, ast_tov, usg):
     tags = []
-    if apg >= 6.0: tags.append("Primary Playmaker")
-    elif apg >= 4.0: tags.append("Secondary Playmaker")
-    if usg >= 25: tags.append("Ball Dominant")
-    if ast_tov >= 2.5: tags.extend(["High-IQ Passer","Low-Mistake Handler"])
-    if not tags: tags.append("Non-Passer")
+    if apg >= 6.0:      tags.append("Primary Playmaker")
+    elif apg >= 4.0:    tags.append("Secondary Playmaker")
+    if usg >= 25:       tags.append("Ball Dominant")
+    if ast_tov >= 2.5:  tags.extend(["High-IQ Passer", "Low-Mistake Handler"])
+    if not tags:        tags.append("Non-Passer")
     return ", ".join(tags)
 
-def auto_shooting_tag(tp_pct, ppg, fg_pct, usg):
-    if tp_pct > 1.5: tp_pct /= 100
-    if fg_pct > 1.5: fg_pct /= 100
+def auto_shooting_tags(tp_pct, ppg, fg_pct, usg):
+    # expects raw fractions or already-percent — normalise to fraction
+    tp = tp_pct / 100 if tp_pct and tp_pct > 1.5 else (tp_pct or 0)
+    fg = fg_pct / 100 if fg_pct and fg_pct > 1.5 else (fg_pct or 0)
     tags = []
-    if tp_pct >= 0.38 and usg < 22: tags.extend(["Elite Shooter","Low-USG Finisher"])
-    elif tp_pct >= 0.35: tags.append("Shooter")
-    if ppg >= 18 or usg >= 28: tags.append("Volume Scorer")
-    if fg_pct >= 0.56: tags.append("Efficient Scorer")
-    if not tags: tags.append("Non-Shooter")
+    if tp >= 0.38 and usg < 22: tags.extend(["Elite Shooter", "Low-USG Finisher"])
+    elif tp >= 0.35:             tags.append("Shooter")
+    if ppg >= 18 or usg >= 28:  tags.append("Volume Scorer")
+    if fg >= 0.56:               tags.append("Efficient Scorer")
+    if not tags:                 tags.append("Non-Shooter")
     return ", ".join(tags)
 
 # ── Scrape one player ──────────────────────────────────────────────────────────
 
 def scrape_player(url, team_name, year):
-    html  = strip_comments(fetch(url))
-    soup  = BeautifulSoup(html, "html.parser")
+    html = strip_comments(fetch(url))
+    soup = BeautifulSoup(html, "html.parser")
 
+    # Name
     tag  = soup.find("h1", {"itemprop": "name"}) or soup.find("h1")
     name = tag.get_text(strip=True) if tag else "Unknown"
 
-    team_parsed, pos, yr = "", "", ""
+    # Bio
+    pos, yr = "", ""
     bio = soup.find("div", {"id": "info"})
     if bio:
         text = bio.get_text(" ", strip=True)
         pm = re.search(r"Position[:\s]+([A-Z\-]+)", text)
         if pm: pos = normalise_pos(pm.group(1))
-        links = bio.find_all("a", href=re.compile(r"/cbb/schools/"))
-        if links: team_parsed = links[-1].get_text(strip=True)
         cm = re.search(r"\b(FR|SO|JR|SR|GR|Freshman|Sophomore|Junior|Senior|Graduate)\b", text, re.I)
         if cm: yr = normalise_class(cm.group(1))
 
-    pg     = parse_table(html, "players_per_game", year)
-    adv    = parse_table(html, "players_advanced", year)
+    pg  = parse_table(html, "players_per_game", year)
+    adv = parse_table(html, "players_advanced", year)
 
     if pg is None:
-        print(f"      ⚠  No stats for {name} — skipping"); return None
+        print(f"      ⚠  No stats for {name} — skipping")
+        return None
 
-    ppg  = safe_float(pg.get("PTS", 0)); rpg = safe_float(pg.get("TRB", 0))
-    apg  = safe_float(pg.get("AST", 0)); spg = safe_float(pg.get("STL", 0))
-    bpg  = safe_float(pg.get("BLK", 0)); tpg = safe_float(pg.get("TOV", 0))
-    orpg = safe_float(pg.get("ORB", 0)); drpg= safe_float(pg.get("DRB", 0))
-    mpg  = safe_float(pg.get("MP",  0)); tpa = safe_float(pg.get("3PA", 0))
-    fg   = safe_float(pg.get("FG%", 0)); ft  = safe_float(pg.get("FT%", 0))
-    tp   = safe_float(pg.get("3P%", 0))
+    ppg  = safe_float(pg.get("PTS",  0))
+    rpg  = safe_float(pg.get("TRB",  0))
+    apg  = safe_float(pg.get("AST",  0))
+    spg  = safe_float(pg.get("STL",  0))
+    bpg  = safe_float(pg.get("BLK",  0))
+    tpg  = safe_float(pg.get("TOV",  0))
+    orpg = safe_float(pg.get("ORB",  0))
+    drpg = safe_float(pg.get("DRB",  0))
+    mpg  = safe_float(pg.get("MP",   0))
+    tpa  = safe_float(pg.get("3PA",  0))
+    fg_v = safe_float(pg.get("FG%",  0))
+    ft_v = safe_float(pg.get("FT%",  0))
+    tp_v = safe_float(pg.get("3P%",  0))
 
     ast_tov = calc_ast_tov(apg, tpg)
-    usg = 0.0
+    atr     = round((apg / (apg + rpg)) * 100, 1) if (apg + rpg) > 0 else None
+
+    usg = None
     if adv is not None and "USG%" in adv.index:
-        usg = safe_float(adv.get("USG%", 0))
-        if usg <= 1.5: usg *= 100
-        usg = round(usg, 1)
+        raw_usg = safe_float(adv.get("USG%", 0))
+        usg = round(raw_usg * 100 if raw_usg <= 1.5 else raw_usg, 1)
 
-    if not pos and pg is not None: pos = normalise_pos(pg.get("Pos","G"))
-    if not yr  and pg is not None: yr  = normalise_class(pg.get("Class",""))
+    if not pos and pg is not None: pos = normalise_pos(pg.get("Pos", "G"))
+    if not yr  and pg is not None: yr  = normalise_class(pg.get("Class", ""))
 
-    row = {
-        "team":            team_name,
-        "name":            name,
-        "primary_position":pos,
-        "year":            yr,
-        "ppg":             round(ppg, 1),
-        "reb_g":           round(rpg, 1),
-        "ast_g":           round(apg, 1),
-        "usg_pct":         usg,
-        "fg_pct":          pct_str(fg),
-        "three_p_pct":     pct_str(tp),
-        "ft_pct":          pct_str(ft),
-        "three_pa_g":      round(tpa, 1),
-        "ast_tov":         ast_tov,
-        "stl_40":          per40(spg, mpg),
-        "blk_40":          per40(bpg, mpg),
-        "playmaker_tags":  auto_playmaker_tag(apg, ast_tov, usg),
-        "shooting_tags":   auto_shooting_tag(tp, ppg, fg, usg),
+    # player row (for `players` table)
+    player_row = {
+        "name":             name,
+        "current_team":     team_name,
+        "primary_position": pos,
+        "year":             yr,
+        "source":           "program",
+        "playmaker_tags":   auto_playmaker_tags(apg, ast_tov, usg or 0),
+        "shooting_tags":    auto_shooting_tags(tp_v, ppg, fg_v, usg or 0),
     }
-    print(f"      ✓ {name} | {pos} | {yr} | {ppg} PPG")
-    return row
+
+    # stats row (for `player_stats` table) — all numeric, pct as float
+    stats_row = {
+        "year":    yr,
+        "name":    name,
+        "ppg":     round(ppg,  1),
+        "rpg":     round(rpg,  1),
+        "apg":     round(apg,  1),
+        "3pg":     round(tpa,  1),
+        "usg":     usg,
+        "ast_tov": ast_tov,
+        "fg_pct":  pct(fg_v),
+        "ft_pct":  pct(ft_v),
+        "3p_pct":  pct(tp_v),
+        "atr_pct": atr,
+        "stl_40":  per40(spg,  mpg),
+        "blk_40":  per40(bpg,  mpg),
+        "drb_40":  per40(drpg, mpg),
+        "orb_40":  per40(orpg, mpg),
+        "trb_40":  per40(rpg,  mpg),
+        # cdi, dds, sei, smi, ris left null — filled by model
+    }
+
+    print(f"      ✓ {name} | {pos} | {yr} | {ppg} PPG / {rpg} RPG")
+    return player_row, stats_row
 
 def get_player_urls(team_name, slug, year):
     url  = f"https://www.sports-reference.com/cbb/schools/{slug}/men/{year}.html"
@@ -355,12 +364,15 @@ def get_player_urls(team_name, slug, year):
     html = fetch(url)
     soup = BeautifulSoup(html, "html.parser")
     table = soup.find("table", {"id": "roster"})
-    if not table: print(f"    ⚠  No roster table for {team_name}"); return []
+    if not table:
+        print(f"    ⚠  No roster table for {team_name}")
+        return []
     urls = []
     for a in table.find_all("a", href=re.compile(r"/cbb/players/")):
         href = "https://www.sports-reference.com" + a["href"] if not a["href"].startswith("http") else a["href"]
         href = href.split("?")[0].split("#")[0]
-        if href not in urls: urls.append(href)
+        if href not in urls:
+            urls.append(href)
     print(f"    Found {len(urls)} players")
     return urls
 
@@ -368,10 +380,10 @@ def get_player_urls(team_name, slug, year):
 
 def parse_args():
     p = argparse.ArgumentParser()
-    p.add_argument("--teams",    nargs="+", metavar="TEAM")
-    p.add_argument("--year",     type=int, default=DEFAULT_YEAR)
-    p.add_argument("--replace",  action="store_true", help="Delete existing rows for each team before inserting")
-    p.add_argument("--dry-run",  action="store_true", help="Print rows instead of upserting to Supabase")
+    p.add_argument("--teams",   nargs="+", metavar="TEAM")
+    p.add_argument("--year",    type=int, default=DEFAULT_YEAR)
+    p.add_argument("--replace", action="store_true", help="Delete existing team_players rows before inserting")
+    p.add_argument("--dry-run", action="store_true", help="Print rows instead of writing to Supabase")
     return p.parse_args()
 
 def main():
@@ -379,10 +391,7 @@ def main():
 
     if not args.dry_run:
         if not SUPABASE_URL or not SUPABASE_SERVICE_KEY:
-            sys.exit(
-                "Set SUPABASE_URL and SUPABASE_SERVICE_KEY env vars.\n"
-                "Or use --dry-run to test without a DB connection."
-            )
+            sys.exit("Set SUPABASE_URL and SUPABASE_SERVICE_KEY env vars, or use --dry-run.")
         db = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
     target = {t: TEAMS[t] for t in (args.teams or TEAMS) if t in TEAMS}
@@ -390,7 +399,7 @@ def main():
         unknown = [t for t in args.teams if t not in TEAMS]
         if unknown: print(f"⚠  Unknown teams: {unknown}")
 
-    print(f"\nBeyondThePortal → Supabase Roster Scraper")
+    print(f"\nBeyondThePortal → Supabase (players + player_stats + team_players)")
     print(f"  Season : {args.year-1}-{str(args.year)[-2:]}")
     print(f"  Teams  : {len(target)}")
     print(f"  Mode   : {'dry-run' if args.dry_run else ('replace' if args.replace else 'upsert')}\n")
@@ -403,33 +412,65 @@ def main():
         except Exception as e:
             print(f"  ✗ Roster page failed: {e}"); continue
 
-        rows = []
+        if args.replace and not args.dry_run:
+            db.table("team_players").delete().eq("team", team_name).eq("player_type", "returning").execute()
+            print(f"  Deleted existing team_players rows for {team_name}")
+
+        scraped = []
         for j, url in enumerate(urls, 1):
             print(f"    [{j}/{len(urls)}] {url}")
             try:
-                row = scrape_player(url, team_name, args.year)
-                if row: rows.append(row)
+                result = scrape_player(url, team_name, args.year)
+                if result:
+                    scraped.append(result)
             except Exception as e:
                 print(f"      ✗ {e}")
-            if j < len(urls): time.sleep(REQUEST_DELAY)
+            if j < len(urls):
+                time.sleep(REQUEST_DELAY)
 
-        if not rows:
+        if not scraped:
             print(f"  No rows scraped for {team_name}"); continue
 
         if args.dry_run:
-            print(json.dumps(rows[:2], indent=2))
-            print(f"  (dry-run) Would upsert {len(rows)} rows for {team_name}")
+            print(json.dumps(scraped[:1], indent=2, default=str))
+            print(f"  (dry-run) Would write {len(scraped)} players for {team_name}")
         else:
-            if args.replace:
-                db.table("rosters").delete().eq("team", team_name).execute()
-                print(f"  Deleted existing rows for {team_name}")
-            result = db.table("rosters").upsert(rows, on_conflict="team,name").execute()
-            print(f"  ✓ Upserted {len(rows)} players for {team_name}")
+            for player_row, stats_row in scraped:
+                try:
+                    # 1. Upsert player → get id back
+                    res = db.table("players").upsert(
+                        player_row,
+                        on_conflict="name,current_team,source"
+                    ).execute()
+                    player_id = res.data[0]["id"]
 
-        total += len(rows)
-        if i < len(target): time.sleep(ROSTER_DELAY)
+                    # 2. Upsert stats
+                    db.table("player_stats").upsert(
+                        {**stats_row, "player_id": player_id},
+                        on_conflict="player_id,year"
+                    ).execute()
 
-    print(f"\n✓ Done. {total} total players {'would be ' if args.dry_run else ''}written to Supabase.")
+                    # 3. Upsert team_players link
+                    db.table("team_players").upsert(
+                        {
+                            "team":      team_name,
+                            "player_id": player_id,
+                            "name":      player_row["name"],
+                            "year":      player_row["year"],
+                        },
+                        on_conflict="team,player_id"
+                    ).execute()
+
+                except Exception as e:
+                    print(f"      ✗ DB error for {player_row.get('name')}: {e}")
+
+            print(f"  ✓ Wrote {len(scraped)} players for {team_name}")
+
+        total += len(scraped)
+        if i < len(target):
+            time.sleep(ROSTER_DELAY)
+
+    print(f"\n✓ Done. {total} total players {'would be ' if args.dry_run else ''}written.")
 
 if __name__ == "__main__":
     main()

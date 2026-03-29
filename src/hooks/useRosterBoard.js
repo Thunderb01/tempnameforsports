@@ -59,24 +59,25 @@ export function useRosterBoard(team) {
 
   const loadPortalBoard = useCallback(async () => {
     const { data, error } = await supabase
-      .from("portal_board")
+      .from("players")
       .select("*")
+      .eq("source", "portal")
       .order("name");
 
-    if (error) { console.error("portal_board fetch:", error); return; }
+    if (error) { console.error("players fetch:", error); return; }
 
     const players = (data || []).map(row => ({
       id:            row.id,
       name:          row.name,
-      team:          row.team,
+      team:          row.current_team,
       pos:           row.primary_position,
       year:          row.year,
       marketLow:     row.market_low  ?? 0,
       marketHigh:    row.market_high ?? 0,
-      playmakerTags: row.playmaker_tags  ? row.playmaker_tags.split(",").map(t => t.trim()).filter(Boolean) : [],
-      shootingTags:  row.shooting_tags   ? row.shooting_tags.split(",").map(t => t.trim()).filter(Boolean)  : [],
+      playmakerTags: row.playmaker_tags ? row.playmaker_tags.split(",").map(t => t.trim()).filter(Boolean) : [],
+      shootingTags:  row.shooting_tags  ? row.shooting_tags.split(",").map(t => t.trim()).filter(Boolean)  : [],
       tags:          [],
-      stats:         row,
+      stats:         { name: row.name, team: row.current_team, primary_position: row.primary_position, year: row.year, market_low: row.market_low, market_high: row.market_high, open_market_low: row.open_market_low, open_market_high: row.open_market_high, playmaker_tags: row.playmaker_tags, shooting_tags: row.shooting_tags, ...(row.stats || {}) },
     }));
 
     setState(s => ({ ...s, board: players }));
@@ -89,13 +90,24 @@ export function useRosterBoard(team) {
   const loadReturningRoster = useCallback(async (teamName) => {
     if (!teamName) return;
     const { data, error } = await supabase
-      .from("rosters")
-      .select("*")
-      .eq("team", teamName)
-      .order("name");
+      .from("team_players")
+      .select("*, players(*)")
+      .eq("team", teamName);
 
-    if (error) { console.error("rosters fetch:", error); return; }
-    setReturningPlayers(data || []);
+    if (error) { console.error("team_players fetch:", error); return; }
+
+    const returning = (data || [])
+      .map(row => ({
+        ...row.players,
+        name:             row.players.name,
+        team:             row.players.current_team,
+        primary_position: row.players.primary_position,
+        pos:              row.players.primary_position,
+        year:             row.players.year,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+
+    setReturningPlayers(returning);
   }, []);
 
   // ── Board actions ───────────────────────────────────────────────────────────
