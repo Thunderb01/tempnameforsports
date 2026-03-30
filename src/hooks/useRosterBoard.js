@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 
 const STORAGE_KEY    = "bp_roster_builder";
-const STORAGE_VERSION = 5; // bump this whenever the state shape changes
+const STORAGE_VERSION = 6; // bump this whenever the state shape changes
 
 // Legacy keys to purge on load
 const LEGACY_KEYS = ["bp_roster_builder_v1"];
@@ -33,6 +33,7 @@ function defaultState(team = "") {
     roster:        [],   // [{ id, nilOffer }]
     statusById:    {},
     retentionById: {},
+    nilById:       {},   // returning player NIL valuations { [playerId]: number }
   };
 }
 
@@ -183,18 +184,27 @@ export function useRosterBoard(team) {
     setState(s => ({ ...s, retentionById: { ...s.retentionById, [id]: value } }));
   }
 
+  function updateReturningNil(id, nilValue) {
+    setState(s => ({
+      ...s,
+      nilById: { ...s.nilById, [id]: Math.max(0, Number(nilValue) || 0) },
+    }));
+  }
+
   // Restores a saved roster into live state: portal adds + retention statuses
   function loadFromSaved(savedPlayers) {
     const roster        = [];
     const retentionById = {};
+    const nilById       = {};
     savedPlayers.forEach(p => {
       if (p._typeKey === "transfer") {
         roster.push({ id: p.id, nilOffer: p.nilOffer || 0 });
       } else {
         retentionById[p.id] = p._typeKey; // "returning" | "undecided"
+        if (p.nilOffer) nilById[p.id] = p.nilOffer;
       }
     });
-    setState(s => ({ ...s, roster, retentionById }));
+    setState(s => ({ ...s, roster, retentionById, nilById }));
   }
 
   function commitSettings(settings) {
@@ -215,12 +225,15 @@ export function useRosterBoard(team) {
   // ── Calc ────────────────────────────────────────────────────────────────────
 
   function calc() {
-    const { settings, roster, retentionById } = state;
+    const { settings, roster, retentionById, nilById } = state;
     const committedReturning = returningPlayers.filter(
       p => (retentionById[p.id] || "returning") === "returning"
     ).length;
     const totalRoster        = roster.length + committedReturning;
-    const nilCommitted       = roster.reduce((sum, r) => sum + (r.nilOffer || 0), 0);
+    const returningNil       = returningPlayers
+      .filter(p => (retentionById[p.id] || "returning") === "returning")
+      .reduce((sum, p) => sum + (nilById[p.id] || 0), 0);
+    const nilCommitted       = roster.reduce((sum, r) => sum + (r.nilOffer || 0), 0) + returningNil;
     const nilRemaining       = settings.nilTotal - nilCommitted;
     const scholarshipsRemaining = settings.scholarships - totalRoster;
     const maxPerPlayer       = settings.nilTotal * settings.maxPct;
@@ -248,7 +261,7 @@ export function useRosterBoard(team) {
     byId, inRoster, inShort,
     addToShortlist, removeFromShortlist,
     addToRoster, removeFromRoster,
-    updateOffer, setStatus, setRetention, loadFromSaved, commitSettings, reset,
+    updateOffer, setStatus, setRetention, updateReturningNil, loadFromSaved, commitSettings, reset,
     calc,
   };
 }

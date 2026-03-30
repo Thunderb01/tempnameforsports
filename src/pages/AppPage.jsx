@@ -100,9 +100,10 @@ export function AppPage() {
       if (rErr) throw rErr;
 
       const retentionById = board.state.retentionById || {};
+      const nilById       = board.state.nilById       || {};
       const returning = board.returningPlayers
         .filter(p => (retentionById[p.id] || "returning") !== "entering_portal")
-        .map(p => ({ roster_id: row.id, player_id: p.id, player_type: retentionById[p.id] || "returning", nil_offer: 0 }));
+        .map(p => ({ roster_id: row.id, player_id: p.id, player_type: retentionById[p.id] || "returning", nil_offer: nilById[p.id] || 0 }));
       const transfers = board.state.roster
         .map(e => ({ roster_id: row.id, player_id: e.id, player_type: "transfer", nil_offer: e.nilOffer || 0 }));
 
@@ -400,10 +401,18 @@ export function AppPage() {
                   <div className="sub-label">Returning ({returningByStatus.returning.length})</div>
                   {returningByStatus.returning.map((p, i) => (
                     <div key={i} className="row row-click" style={{ opacity: .75 }}
-                      onClick={e => { if (!e.target.closest("select")) setModal(p); }}>
+                      onClick={e => { if (!e.target.closest("select,input")) setModal(p); }}>
                       <div className="row-main">
                         <div className="row-title" style={{ fontSize: 13 }}>{p.name}</div>
                         <div className="row-sub" style={{ fontSize: 11 }}>{p.primary_position || p.pos} · {p.year}</div>
+                        <div className="offer">
+                          <label>NIL</label>
+                          <input className="input" type="number" min="0" step="1000"
+                            value={board.state.nilById?.[p.id] || 0}
+                            onChange={e => board.updateReturningNil(p.id, e.target.value)}
+                            onClick={e => e.stopPropagation()} />
+                          <span className="muted">{money(board.state.nilById?.[p.id] || 0)}</span>
+                        </div>
                       </div>
                       <select className="input" style={{ fontSize: 11, padding: "3px 6px", width: "auto" }}
                         value="returning"
@@ -424,10 +433,18 @@ export function AppPage() {
                   <div className="sub-label" style={{ color: "var(--warning, #f5a623)" }}>Undecided ({returningByStatus.undecided.length})</div>
                   {returningByStatus.undecided.map((p, i) => (
                     <div key={i} className="row row-click"
-                      onClick={e => { if (!e.target.closest("select")) setModal(p); }}>
+                      onClick={e => { if (!e.target.closest("select,input")) setModal(p); }}>
                       <div className="row-main">
                         <div className="row-title" style={{ fontSize: 13 }}>{p.name}</div>
                         <div className="row-sub" style={{ fontSize: 11 }}>{p.primary_position || p.pos} · {p.year}</div>
+                        <div className="offer">
+                          <label>NIL</label>
+                          <input className="input" type="number" min="0" step="1000"
+                            value={board.state.nilById?.[p.id] || 0}
+                            onChange={e => board.updateReturningNil(p.id, e.target.value)}
+                            onClick={e => e.stopPropagation()} />
+                          <span className="muted">{money(board.state.nilById?.[p.id] || 0)}</span>
+                        </div>
                       </div>
                       <select className="input" style={{ fontSize: 11, padding: "3px 6px", width: "auto" }}
                         value="undecided"
