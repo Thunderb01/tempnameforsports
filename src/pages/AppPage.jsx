@@ -143,14 +143,26 @@ export function AppPage() {
     setDrawerOpen(false);
   }
 
+  function getTagPool(p, group) {
+    if (group === "playmaker")  return p.playmakerTags  || [];
+    if (group === "shooting")   return p.shootingTags   || [];
+    if (group === "shotmaking") return p.shotmakingTags || [];
+    if (group === "interior")   return p.interiorTags   || [];
+    if (group === "defensive")  return p.defensiveTags  || [];
+    return [
+      ...(p.playmakerTags  || []),
+      ...(p.shootingTags   || []),
+      ...(p.shotmakingTags || []),
+      ...(p.interiorTags   || []),
+      ...(p.defensiveTags  || []),
+    ];
+  }
+
   // ── Derived tag list ────────────────────────────────────────────────────────
   const allTags = useMemo(() => {
     const set = new Map();
     board.state.board.forEach(p => {
-      const pool = tagGroup === "playmaker" ? p.playmakerTags
-                 : tagGroup === "shooting"  ? p.shootingTags
-                 : [...(p.playmakerTags||[]), ...(p.shootingTags||[])];
-      (pool || []).forEach(t => {
+      getTagPool(p, tagGroup).forEach(t => {
         if (t && !set.has(t.toLowerCase())) set.set(t.toLowerCase(), t);
       });
     });
@@ -164,12 +176,7 @@ export function AppPage() {
       if (q && !p.name.toLowerCase().includes(q) &&
                !(p.team||"").toLowerCase().includes(q)) return false;
       if (posFilter !== "all" && p.pos !== posFilter) return false;
-      if (tagFilter !== "all") {
-        const pool = tagGroup === "playmaker" ? p.playmakerTags
-                   : tagGroup === "shooting"  ? p.shootingTags
-                   : [...(p.playmakerTags||[]), ...(p.shootingTags||[])];
-        if (!(pool||[]).includes(tagFilter)) return false;
-      }
+      if (tagFilter !== "all" && !getTagPool(p, tagGroup).includes(tagFilter)) return false;
       return true;
     });
   }, [board.state.board, search, posFilter, tagGroup, tagFilter]);
@@ -334,6 +341,9 @@ export function AppPage() {
                   <option value="all">All tag types</option>
                   <option value="playmaker">Play Maker</option>
                   <option value="shooting">Shooting &amp; Scoring</option>
+                  <option value="shotmaking">Shotmaking</option>
+                  <option value="interior">Interior</option>
+                  <option value="defensive">Defense</option>
                 </select>
                 <select className="input" value={tagFilter} onChange={e => setTagFilter(e.target.value)}>
                   <option value="all">All tags</option>

@@ -82,19 +82,22 @@ export function useRosterBoard(team) {
     if (error) { console.error("players fetch:", error); return; }
 
     const players = (data || []).map(row => ({
-      id:            row.id,
-      name:          row.name,
-      team:          row.current_team,
-      pos:           row.primary_position,
-      year:          row.year,
-      height:        row.height   ?? null,
-      hometown:      row.hometown ?? null,
-      marketLow:     row.open_market_low  ?? 0,
-      marketHigh:    row.open_market_high ?? 0,
-      playmakerTags: row.playmaker_tags ? row.playmaker_tags.split(",").map(t => t.trim()).filter(Boolean) : [],
-      shootingTags:  row.shooting_tags  ? row.shooting_tags.split(",").map(t => t.trim()).filter(Boolean)  : [],
-      tags:          [],
-      stats:         { name: row.name, team: row.current_team, primary_position: row.primary_position, year: row.year, market_low: row.market_low, market_high: row.market_high, open_market_low: row.open_market_low, open_market_high: row.open_market_high, playmaker_tags: row.playmaker_tags, shooting_tags: row.shooting_tags, ...(row.stats || {}) },
+      id:             row.id,
+      name:           row.name,
+      team:           row.current_team,
+      pos:            row.primary_position,
+      year:           row.year,
+      height:         row.height   ?? null,
+      hometown:       row.hometown ?? null,
+      marketLow:      row.open_market_low  ?? 0,
+      marketHigh:     row.open_market_high ?? 0,
+      playmakerTags:  row.playmaker_tags  ? row.playmaker_tags.split(",").map(t => t.trim()).filter(Boolean)  : [],
+      shootingTags:   row.shooting_tags   ? row.shooting_tags.split(",").map(t => t.trim()).filter(Boolean)   : [],
+      shotmakingTags: row.shotmaking_tags ? row.shotmaking_tags.split(",").map(t => t.trim()).filter(Boolean) : [],
+      interiorTags:   row.interior_tags   ? row.interior_tags.split(",").map(t => t.trim()).filter(Boolean)   : [],
+      defensiveTags:  row.defensive_tags  ? row.defensive_tags.split(",").map(t => t.trim()).filter(Boolean)  : [],
+      tags:           [],
+      stats:          { name: row.name, team: row.current_team, primary_position: row.primary_position, year: row.year, market_low: row.market_low, market_high: row.market_high, open_market_low: row.open_market_low, open_market_high: row.open_market_high, playmaker_tags: row.playmaker_tags, shooting_tags: row.shooting_tags, ...(row.stats || {}) },
     }));
 
     setState(s => ({ ...s, board: players }));
@@ -116,15 +119,20 @@ export function useRosterBoard(team) {
     const returning = (data || [])
       .map(row => ({
         ...row.players,
-        name:        row.players.name,
-        team:        row.players.current_team,
-        pos:         row.players.primary_position,
-        year:        row.players.year,
-        height:      row.players.height   ?? null,
-        hometown:    row.players.hometown ?? null,
-        marketLow:   row.players.open_market_low  ?? 0,
-        marketHigh:  row.players.open_market_high ?? 0,
-        stats:       { ...(row.players.player_stats?.[0] || {}) },
+        name:           row.players.name,
+        team:           row.players.current_team,
+        pos:            row.players.primary_position,
+        year:           row.players.year,
+        height:         row.players.height   ?? null,
+        hometown:       row.players.hometown ?? null,
+        marketLow:      row.players.open_market_low  ?? 0,
+        marketHigh:     row.players.open_market_high ?? 0,
+        playmakerTags:  row.players.playmaker_tags  ? row.players.playmaker_tags.split(",").map(t => t.trim()).filter(Boolean)  : [],
+        shootingTags:   row.players.shooting_tags   ? row.players.shooting_tags.split(",").map(t => t.trim()).filter(Boolean)   : [],
+        shotmakingTags: row.players.shotmaking_tags ? row.players.shotmaking_tags.split(",").map(t => t.trim()).filter(Boolean) : [],
+        interiorTags:   row.players.interior_tags   ? row.players.interior_tags.split(",").map(t => t.trim()).filter(Boolean)   : [],
+        defensiveTags:  row.players.defensive_tags  ? row.players.defensive_tags.split(",").map(t => t.trim()).filter(Boolean)  : [],
+        stats:          { ...(row.players.player_stats?.[0] || {}) },
       }))
       .sort((a, b) => a.name.localeCompare(b.name));
 

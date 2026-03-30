@@ -48,7 +48,7 @@ const STATUSES = [
 ];
 
 export function BoardPage() {
-  const { profile } = useAuth();
+  useAuth();
 
   const [players,   setPlayers]   = useState([]);
   const [loading,   setLoading]   = useState(true);
@@ -74,31 +74,48 @@ export function BoardPage() {
       .then(({ data, error: err }) => {
         if (err) { setError(err.message); setLoading(false); return; }
         setPlayers((data || []).map(row => ({
-          id:            row.id,
-          name:          row.name,
-          team:          row.current_team,
-          pos:           row.primary_position,
-          year:          row.year,
-          height:        row.height   ?? null,
-          hometown:      row.hometown ?? null,
-          marketLow:     row.open_market_low  ?? 0,
-          marketHigh:    row.open_market_high ?? 0,
-          playmakerTags: row.playmaker_tags ? row.playmaker_tags.split(",").map(t => t.trim()).filter(Boolean) : [],
-          shootingTags:  row.shooting_tags  ? row.shooting_tags.split(",").map(t => t.trim()).filter(Boolean)  : [],
-          stats:         { ...(row.player_stats?.[0] || {}) },
+          id:             row.id,
+          name:           row.name,
+          team:           row.current_team,
+          pos:            row.primary_position,
+          year:           row.year,
+          height:         row.height   ?? null,
+          hometown:       row.hometown ?? null,
+          marketLow:      row.open_market_low  ?? 0,
+          marketHigh:     row.open_market_high ?? 0,
+          playmakerTags:  row.playmaker_tags  ? row.playmaker_tags.split(",").map(t => t.trim()).filter(Boolean)  : [],
+          shootingTags:   row.shooting_tags   ? row.shooting_tags.split(",").map(t => t.trim()).filter(Boolean)   : [],
+          shotmakingTags: row.shotmaking_tags ? row.shotmaking_tags.split(",").map(t => t.trim()).filter(Boolean) : [],
+          interiorTags:   row.interior_tags   ? row.interior_tags.split(",").map(t => t.trim()).filter(Boolean)   : [],
+          defensiveTags:  row.defensive_tags  ? row.defensive_tags.split(",").map(t => t.trim()).filter(Boolean)  : [],
+          stats:          { ...(row.player_stats?.[0] || {}) },
         })));
         setLoading(false);
       });
   }, []);
 
   // ── Tags ────────────────────────────────────────────────────────────────────
+  function getTagPool(p, group) {
+    if (group === "playmaker")  return p.playmakerTags  || [];
+    if (group === "shooting")   return p.shootingTags   || [];
+    if (group === "shotmaking") return p.shotmakingTags || [];
+    if (group === "interior")   return p.interiorTags   || [];
+    if (group === "defensive")  return p.defensiveTags  || [];
+    return [
+      ...(p.playmakerTags  || []),
+      ...(p.shootingTags   || []),
+      ...(p.shotmakingTags || []),
+      ...(p.interiorTags   || []),
+      ...(p.defensiveTags  || []),
+    ];
+  }
+
   const allTags = useMemo(() => {
     const set = new Map();
     players.forEach(p => {
-      const pool = tagGroup === "playmaker" ? p.playmakerTags
-                 : tagGroup === "shooting"  ? p.shootingTags
-                 : [...(p.playmakerTags||[]), ...(p.shootingTags||[])];
-      (pool||[]).forEach(t => { if (t && !set.has(t.toLowerCase())) set.set(t.toLowerCase(), t); });
+      getTagPool(p, tagGroup).forEach(t => {
+        if (t && !set.has(t.toLowerCase())) set.set(t.toLowerCase(), t);
+      });
     });
     return Array.from(set.values()).sort();
   }, [players, tagGroup]);
@@ -113,12 +130,7 @@ export function BoardPage() {
       if (q && !p.name.toLowerCase().includes(q) &&
                !(p.team||"").toLowerCase().includes(q)) return false;
       if (posFilter !== "all" && p.pos !== posFilter) return false;
-      if (tagFilter !== "all") {
-        const pool = tagGroup === "playmaker" ? p.playmakerTags
-                   : tagGroup === "shooting"  ? p.shootingTags
-                   : [...(p.playmakerTags||[]), ...(p.shootingTags||[])];
-        if (!(pool||[]).includes(tagFilter)) return false;
-      }
+      if (tagFilter !== "all" && !getTagPool(p, tagGroup).includes(tagFilter)) return false;
       return true;
     });
 
@@ -221,6 +233,9 @@ export function BoardPage() {
               <option value="all">All tag types</option>
               <option value="playmaker">Play Maker</option>
               <option value="shooting">Shooting &amp; Scoring</option>
+              <option value="shotmaking">Shotmaking</option>
+              <option value="interior">Interior</option>
+              <option value="defensive">Defense</option>
             </select>
             <select className="input" style={{ width: 180 }} value={tagFilter} onChange={e => setTagFilter(e.target.value)}>
               <option value="all">All tags</option>
@@ -240,8 +255,6 @@ export function BoardPage() {
             {filtered.length === 0
               ? <div className="empty">No players match your filters.</div>
               : filtered.map(p => {
-                  const pm = (p.playmakerTags||[]).slice(0, 5);
-                  const ss = (p.shootingTags||[]).slice(0, 5);
                   return (
                     <div key={p.id} className="row row-click"
                       style={{ background: "var(--panel)", borderRadius: 8, marginBottom: 2 }}
@@ -252,18 +265,22 @@ export function BoardPage() {
                           {[p.team, p.pos, p.year, p.height, p.hometown].filter(Boolean).join(" · ")}
                         </div>
                         <div className="row-sub">Market: {money(p.marketLow)} – {money(p.marketHigh)}</div>
-                        {pm.length > 0 && (
-                          <div className="row-sub tag-row">
-                            <span className="muted" style={{ marginRight: 4 }}>Play Maker:</span>
-                            {pm.map(t => <span key={t} className="tag-chip">{t}</span>)}
-                          </div>
-                        )}
-                        {ss.length > 0 && (
-                          <div className="row-sub tag-row">
-                            <span className="muted" style={{ marginRight: 4 }}>Shooting &amp; Scoring:</span>
-                            {ss.map(t => <span key={t} className="tag-chip">{t}</span>)}
-                          </div>
-                        )}
+                        {[
+                          { tags: p.playmakerTags,  label: "Play Maker" },
+                          { tags: p.shootingTags,   label: "Shooting & Scoring" },
+                          { tags: p.shotmakingTags, label: "Shotmaking" },
+                          { tags: p.interiorTags,   label: "Interior" },
+                          { tags: p.defensiveTags,  label: "Defense" },
+                        ].map(({ tags, label }) => {
+                          const t = (tags || []).slice(0, 5);
+                          if (!t.length) return null;
+                          return (
+                            <div key={label} className="row-sub tag-row">
+                              <span className="muted" style={{ marginRight: 4 }}>{label}:</span>
+                              {t.map(tag => <span key={tag} className="tag-chip">{tag}</span>)}
+                            </div>
+                          );
+                        })}
                         <div className="row-sub" style={{ marginTop: 8 }}>
                           <label className="status-control">
                             <span>Status</span>

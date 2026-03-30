@@ -5,28 +5,31 @@ function money(n) {
   });
 }
 
-export function PlayerCard({ player, inRoster, inShortlist, onRoster, onShortlist, onClick }) {
-  const pm = (player.playmakerTags || []).slice(0, 5);
-  const ss = (player.shootingTags  || []).slice(0, 5);
+const TAG_GROUPS = [
+  { key: "playmakerTags",  label: "Play Maker" },
+  { key: "shootingTags",   label: "Shooting & Scoring" },
+  { key: "shotmakingTags", label: "Shotmaking" },
+  { key: "interiorTags",   label: "Interior" },
+  { key: "defensiveTags",  label: "Defense" },
+];
 
+export function PlayerCard({ player, inRoster, inShortlist, onRoster, onShortlist, onClick }) {
   return (
     <div className="row row-click" onClick={e => { if (!e.target.closest("button,select")) onClick?.(player); }}>
       <div className="row-main">
         <div className="row-title">{player.name}</div>
         <div className="row-sub">{player.team} · {player.pos} · {player.year}</div>
         <div className="row-sub">Market: {money(player.marketLow)} – {money(player.marketHigh)}</div>
-        {pm.length > 0 && (
-          <div className="row-sub tag-row">
-            <span className="muted" style={{ marginRight: 4 }}>Play Maker:</span>
-            {pm.map(t => <span key={t} className="tag-chip">{t}</span>)}
-          </div>
-        )}
-        {ss.length > 0 && (
-          <div className="row-sub tag-row">
-            <span className="muted" style={{ marginRight: 4 }}>Shooting &amp; Scoring:</span>
-            {ss.map(t => <span key={t} className="tag-chip">{t}</span>)}
-          </div>
-        )}
+        {TAG_GROUPS.map(({ key, label }) => {
+          const tags = (player[key] || []).slice(0, 5);
+          if (!tags.length) return null;
+          return (
+            <div key={key} className="row-sub tag-row">
+              <span className="muted" style={{ marginRight: 4 }}>{label}:</span>
+              {tags.map(t => <span key={t} className="tag-chip">{t}</span>)}
+            </div>
+          );
+        })}
       </div>
 
       <div className="row-actions">
