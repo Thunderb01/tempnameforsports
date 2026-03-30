@@ -2,6 +2,7 @@ import { NavLink, useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 import logo from "/logo.jpg";
+import teamLogos from "@/data/teamLogos.json";
 
 export function SiteHeader() {
   const { profile } = useAuth();
@@ -32,9 +33,11 @@ export function SiteHeader() {
           </NavLink>
 
           {profile && (
-            <span style={{ fontSize: 13, opacity: .45, padding: "0 6px" }}>
-              {profile.team}
-            </span>
+            teamLogos[profile.team]
+              ? <div title={profile.team} style={{ height: 32, width: 32, borderRadius: "50%", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", padding: 3 }}>
+                  <img src={teamLogos[profile.team]} alt={profile.team} style={{ height: "100%", width: "100%", objectFit: "contain" }} />
+                </div>
+              : <span style={{ fontSize: 13, opacity: .45, padding: "0 6px" }}>{profile.team}</span>
           )}
 
           <button className="btn btn-ghost" onClick={handleSignOut} style={{ fontSize: 13 }}>

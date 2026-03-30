@@ -1,11 +1,3 @@
-const STATUSES = [
-  { key: "none",       label: "No status" },
-  { key: "interested", label: "Interested" },
-  { key: "contacted",  label: "Contacted" },
-  { key: "visit",      label: "Visit" },
-  { key: "signed",     label: "Signed" },
-  { key: "passed",     label: "Passed" },
-];
 
 function money(n) {
   return Number(n || 0).toLocaleString(undefined, {
@@ -13,7 +5,7 @@ function money(n) {
   });
 }
 
-export function PlayerCard({ player, inRoster, inShortlist, status, onRoster, onShortlist, onStatus, onClick }) {
+export function PlayerCard({ player, inRoster, inShortlist, onRoster, onShortlist, onClick }) {
   const pm = (player.playmakerTags || []).slice(0, 5);
   const ss = (player.shootingTags  || []).slice(0, 5);
 
@@ -35,18 +27,6 @@ export function PlayerCard({ player, inRoster, inShortlist, status, onRoster, on
             {ss.map(t => <span key={t} className="tag-chip">{t}</span>)}
           </div>
         )}
-        <div className="row-sub" style={{ marginTop: 8 }}>
-          <label className="status-control">
-            <span>Status</span>
-            <select
-              value={status || "none"}
-              onChange={e => onStatus?.(player.id, e.target.value)}
-              onClick={e => e.stopPropagation()}
-            >
-              {STATUSES.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
-            </select>
-          </label>
-        </div>
       </div>
 
       <div className="row-actions">

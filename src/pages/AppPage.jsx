@@ -12,14 +12,14 @@ function money(n) {
   });
 }
 
-const STATUSES = [
-  { key: "none",       label: "No status" },
-  { key: "interested", label: "Interested" },
-  { key: "contacted",  label: "Contacted" },
-  { key: "visit",      label: "Visit" },
-  { key: "signed",     label: "Signed" },
-  { key: "passed",     label: "Passed" },
-];
+// const STATUSES = [
+//   { key: "none",       label: "No status" },
+//   { key: "interested", label: "Interested" },
+//   { key: "contacted",  label: "Contacted" },
+//   { key: "visit",      label: "Visit" },
+//   { key: "signed",     label: "Signed" },
+//   { key: "passed",     label: "Passed" },
+// ];
 
 export function AppPage() {
   
@@ -347,10 +347,8 @@ export function AppPage() {
                   <PlayerCard key={p.id} player={p}
                     inRoster={board.inRoster(p.id)}
                     inShortlist={board.inShort(p.id)}
-                    status={board.state.statusById[p.id]}
                     onRoster={board.addToRoster}
                     onShortlist={board.addToShortlist}
-                    onStatus={board.setStatus}
                     onClick={setModal}
                   />
                 ))
@@ -376,16 +374,6 @@ export function AppPage() {
                         <div className="row-main">
                           <div className="row-title">{p.name}</div>
                           <div className="row-sub">{p.team} · {p.pos} · {p.year}</div>
-                          <div className="row-sub" style={{ marginTop: 8 }}>
-                            <label className="status-control">
-                              <span>Status</span>
-                              <select value={board.state.statusById[id] || "none"}
-                                onChange={e => board.setStatus(id, e.target.value)}
-                                onClick={e => e.stopPropagation()}>
-                                {STATUSES.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
-                              </select>
-                            </label>
-                          </div>
                         </div>
                         <div className="row-actions">
                           <button className="btn btn-ghost" onClick={e => { e.stopPropagation(); board.removeFromShortlist(id); }}>Remove</button>
@@ -493,16 +481,6 @@ export function AppPage() {
                         <div className="row-main">
                           <div className="row-title">{p.name}</div>
                           <div className="row-sub">{p.team} · {p.pos} · {p.year}</div>
-                          <div className="row-sub" style={{ marginTop: 8 }}>
-                            <label className="status-control">
-                              <span>Status</span>
-                              <select value={board.state.statusById[entry.id] || "none"}
-                                onChange={e => board.setStatus(entry.id, e.target.value)}
-                                onClick={e => e.stopPropagation()}>
-                                {STATUSES.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
-                              </select>
-                            </label>
-                          </div>
                           <div className="offer">
                             <label>NIL Offer</label>
                             <input className="input" type="number" min="0" step="1000"
@@ -530,8 +508,6 @@ export function AppPage() {
       {modal && (
         <PlayerModal
           player={modal}
-          status={board.state.statusById[modal.id]}
-          onStatus={board.setStatus}
           onClose={() => setModal(null)}
         />
       )}

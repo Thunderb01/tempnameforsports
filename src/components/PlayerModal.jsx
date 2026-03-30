@@ -1,14 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 
-const STATUSES = [
-  { key: "none", label: "No status" },
-  { key: "interested", label: "Interested" },
-  { key: "contacted",  label: "Contacted" },
-  { key: "visit",      label: "Visit" },
-  { key: "signed",     label: "Signed" },
-  { key: "passed",     label: "Passed" },
-];
 
 function money(n) {
   return Number(n || 0).toLocaleString(undefined, {
@@ -49,7 +41,7 @@ const ADV_ROWS = [
   { key: "ris", label: "RIS" },
 ];
 
-export function PlayerModal({ player, status, onStatus, onClose }) {
+export function PlayerModal({ player, onClose }) {
   const [stats, setStats] = useState(null);
   const [loadingStats, setLoadingStats] = useState(true);
 
@@ -158,22 +150,6 @@ export function PlayerModal({ player, status, onStatus, onClose }) {
             )}
           </div>
 
-          <div className="modal-section">
-            <h4>Status</h4>
-            <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-              <span className={`status-pill status-${status || "none"}`}>
-                {STATUSES.find(s => s.key === (status || "none"))?.label}
-              </span>
-              <label className="status-control">
-                <select
-                  value={status || "none"}
-                  onChange={e => onStatus?.(player.id, e.target.value)}
-                >
-                  {STATUSES.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
-                </select>
-              </label>
-            </div>
-          </div>
 
         </div>
       </div>
