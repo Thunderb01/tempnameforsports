@@ -6,8 +6,9 @@ import "@/styles/global.css";
 import { LandingPage }      from "@/pages/LandingPage";
 import { LoginPage }        from "@/pages/LoginPage";
 import { ResetPasswordPage }from "@/pages/ResetPasswordPage";
-import { AppPage }          from "@/pages/AppPage";
-import { BoardPage }        from "@/pages/BoardPage";
+import { AppPage }             from "@/pages/AppPage";
+import { BoardPage }           from "@/pages/BoardPage";
+import { RosterSandboxPage }   from "@/pages/RosterSandboxPage";
 import { ProtectedRoute }   from "@/components/ProtectedRoute";
 
 createRoot(document.getElementById("root")).render(
@@ -21,8 +22,9 @@ createRoot(document.getElementById("root")).render(
 
         {/* Protected */}
         <Route element={<ProtectedRoute />}>
-          <Route path="/app"   element={<AppPage />} />
-          <Route path="/board" element={<BoardPage />} />
+          <Route path="/app"     element={<AppPage />} />
+          <Route path="/board"   element={<BoardPage />} />
+          <Route path="/sandbox" element={<RosterSandboxPage />} />
         </Route>
 
         {/* Fallback */}

@@ -189,7 +189,7 @@ TEAMS = {
     "Weber State": "weber-state", "West Virginia": "west-virginia",
     "Western Kentucky": "western-kentucky",
     "Western Michigan": "western-michigan", "Wichita State": "wichita-state",
-    "Wisconsin": "wisconsin", "Wofford": "wofford",
+    "William & Mary": "william-mary", "Wisconsin": "wisconsin", "Wofford": "wofford",
     "Wyoming": "wyoming", "Xavier": "xavier", "Yale": "yale",
 }
 

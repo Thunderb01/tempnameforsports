@@ -27,6 +27,9 @@ export function SiteHeader() {
           <NavLink to="/board" className={({ isActive }) => "nav-link" + (isActive ? " active" : "")}>
             Full Board
           </NavLink>
+          <NavLink to="/sandbox" className={({ isActive }) => "nav-link" + (isActive ? " active" : "")}>
+            Roster Sandbox
+          </NavLink>
 
           {profile && (
             <span style={{ fontSize: 13, opacity: .45, padding: "0 6px" }}>

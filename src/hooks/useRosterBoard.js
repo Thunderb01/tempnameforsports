@@ -6,7 +6,8 @@ const STORAGE_KEY = "bp_roster_builder_v1";
 function loadLocal() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : null;
+    if (!raw) return null;
+    return { ...JSON.parse(raw), board: [] };
   } catch { return null; }
 }
 
@@ -51,7 +52,9 @@ export function useRosterBoard(team) {
   function setState(updater) {
     _setState(prev => {
       const next = typeof updater === "function" ? updater(prev) : updater;
-      saveLocal(next);
+      // Only persist user-driven state — never the fetched board (too large for localStorage)
+      const { board: _omit, ...persist } = next;
+      saveLocal(persist);
       return next;
     });
   }
@@ -170,13 +173,33 @@ export function useRosterBoard(team) {
     setState(s => ({ ...s, retentionById: { ...s.retentionById, [id]: value } }));
   }
 
+  // Restores a saved roster into live state: portal adds + retention statuses
+  function loadFromSaved(savedPlayers) {
+    const roster        = [];
+    const retentionById = {};
+    savedPlayers.forEach(p => {
+      if (p._typeKey === "transfer") {
+        roster.push({ id: p.id, nilOffer: p.nilOffer || 0 });
+      } else {
+        retentionById[p.id] = p._typeKey; // "returning" | "undecided"
+      }
+    });
+    setState(s => ({ ...s, roster, retentionById }));
+  }
+
   function commitSettings(settings) {
     setState(s => ({ ...s, settings }));
   }
 
   function reset() {
-    localStorage.removeItem(STORAGE_KEY);
-    _setState(defaultState(team));
+    setState(s => ({
+      ...s,
+      shortlistIds:  [],
+      roster:        [],
+      statusById:    {},
+      retentionById: {},
+    }));
+    setReturningPlayers([]);
   }
 
   // ── Calc ────────────────────────────────────────────────────────────────────
@@ -215,7 +238,7 @@ export function useRosterBoard(team) {
     byId, inRoster, inShort,
     addToShortlist, removeFromShortlist,
     addToRoster, removeFromRoster,
-    updateOffer, setStatus, setRetention, commitSettings, reset,
+    updateOffer, setStatus, setRetention, loadFromSaved, commitSettings, reset,
     calc,
   };
 }

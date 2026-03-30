@@ -53,7 +53,13 @@ export function AppPage() {
   // Load data on mount
   useEffect(() => {
     board.loadPortalBoard();
-    if (team) board.loadReturningRoster(team);
+    // Auto-load returning roster if a saved roster was loaded in the Sandbox
+    // (indicated by retentionById or roster entries already being present)
+    if (team) {
+      const hasRetention = Object.keys(board.state.retentionById || {}).length > 0;
+      const hasRoster    = (board.state.roster || []).length > 0;
+      if (hasRetention || hasRoster) board.loadReturningRoster(team);
+    }
   }, [team]);
 
   // Sync local settings state
@@ -100,17 +106,15 @@ export function AppPage() {
     setSettings(next);
   }
 
-  // ── Returning roster grouped by position ───────────────────────────────────
-  // Must be before any conditional return to satisfy Rules of Hooks
-  const returningByPos = useMemo(() => {
-    const groups = {};
+  // ── Returning roster grouped by retention status ────────────────────────────
+  const returningByStatus = useMemo(() => {
+    const groups = { returning: [], undecided: [], entering_portal: [] };
     board.returningPlayers.forEach(p => {
-      const pos = p.primary_position || p.pos || "Other";
-      if (!groups[pos]) groups[pos] = [];
-      groups[pos].push(p);
+      const status = board.state.retentionById?.[p.id] || "returning";
+      groups[status].push(p);
     });
     return groups;
-  }, [board.returningPlayers]);
+  }, [board.returningPlayers, board.state.retentionById]);
 
   if (!settings) {
     return (
@@ -315,34 +319,82 @@ export function AppPage() {
             <div className="panel-head">
               <h2>Roster</h2>
               <p className="muted">Returning players + portal adds.</p>
+              {board.returningPlayers.length === 0 && (
+                <button className="btn btn-ghost" style={{ marginTop: 8 }}
+                  onClick={() => board.loadReturningRoster(team)}>
+                  Load Current Roster
+                </button>
+              )}
             </div>
             <div className="list">
+
               {/* Returning */}
-              {board.returningPlayers.length > 0 && (
+              {returningByStatus.returning.length > 0 && (
                 <>
-                  <div className="sub-label">Returning</div>
-                  {Object.entries(returningByPos).map(([pos, players]) => (
-                    <div key={pos}>
-                      <div className="sub-label" style={{ opacity: .25, fontSize: 9 }}>{pos}s ({players.length})</div>
-                      {players.map((p, i) => (
-                        <div key={i} className="row row-click" style={{ opacity: .75 }}
-                          onClick={e => { if (!e.target.closest("select")) setModal(p); }}>
-                          <div className="row-main">
-                            <div className="row-title" style={{ fontSize: 13 }}>{p.name}</div>
-                            <div className="row-sub" style={{ fontSize: 11 }}>{p.primary_position || p.pos} · {p.year}</div>
-                          </div>
-                          <select
-                            className="input"
-                            style={{ fontSize: 11, padding: "3px 6px", width: "auto" }}
-                            value={board.state.retentionById?.[p.id] || "returning"}
-                            onChange={e => { e.stopPropagation(); board.setRetention(p.id, e.target.value); }}
-                            onClick={e => e.stopPropagation()}>
-                            <option value="returning">Returning</option>
-                            <option value="undecided">Undecided</option>
-                            <option value="entering_portal">Entering Portal</option>
-                          </select>
-                        </div>
-                      ))}
+                  <div className="sub-label">Returning ({returningByStatus.returning.length})</div>
+                  {returningByStatus.returning.map((p, i) => (
+                    <div key={i} className="row row-click" style={{ opacity: .75 }}
+                      onClick={e => { if (!e.target.closest("select")) setModal(p); }}>
+                      <div className="row-main">
+                        <div className="row-title" style={{ fontSize: 13 }}>{p.name}</div>
+                        <div className="row-sub" style={{ fontSize: 11 }}>{p.primary_position || p.pos} · {p.year}</div>
+                      </div>
+                      <select className="input" style={{ fontSize: 11, padding: "3px 6px", width: "auto" }}
+                        value="returning"
+                        onChange={e => { e.stopPropagation(); board.setRetention(p.id, e.target.value); }}
+                        onClick={e => e.stopPropagation()}>
+                        <option value="returning">Returning</option>
+                        <option value="undecided">Undecided</option>
+                        <option value="entering_portal">Entering Portal</option>
+                      </select>
+                    </div>
+                  ))}
+                </>
+              )}
+
+              {/* Undecided */}
+              {returningByStatus.undecided.length > 0 && (
+                <>
+                  <div className="sub-label" style={{ color: "var(--warning, #f5a623)" }}>Undecided ({returningByStatus.undecided.length})</div>
+                  {returningByStatus.undecided.map((p, i) => (
+                    <div key={i} className="row row-click"
+                      onClick={e => { if (!e.target.closest("select")) setModal(p); }}>
+                      <div className="row-main">
+                        <div className="row-title" style={{ fontSize: 13 }}>{p.name}</div>
+                        <div className="row-sub" style={{ fontSize: 11 }}>{p.primary_position || p.pos} · {p.year}</div>
+                      </div>
+                      <select className="input" style={{ fontSize: 11, padding: "3px 6px", width: "auto" }}
+                        value="undecided"
+                        onChange={e => { e.stopPropagation(); board.setRetention(p.id, e.target.value); }}
+                        onClick={e => e.stopPropagation()}>
+                        <option value="returning">Returning</option>
+                        <option value="undecided">Undecided</option>
+                        <option value="entering_portal">Entering Portal</option>
+                      </select>
+                    </div>
+                  ))}
+                </>
+              )}
+
+              {/* Entering Portal */}
+              {returningByStatus.entering_portal.length > 0 && (
+                <>
+                  <div className="sub-label" style={{ color: "var(--danger, #e05c5c)" }}>Entering Portal ({returningByStatus.entering_portal.length})</div>
+                  {returningByStatus.entering_portal.map((p, i) => (
+                    <div key={i} className="row row-click" style={{ opacity: .6 }}
+                      onClick={e => { if (!e.target.closest("select")) setModal(p); }}>
+                      <div className="row-main">
+                        <div className="row-title" style={{ fontSize: 13 }}>{p.name}</div>
+                        <div className="row-sub" style={{ fontSize: 11 }}>{p.primary_position || p.pos} · {p.year}</div>
+                      </div>
+                      <select className="input" style={{ fontSize: 11, padding: "3px 6px", width: "auto" }}
+                        value="entering_portal"
+                        onChange={e => { e.stopPropagation(); board.setRetention(p.id, e.target.value); }}
+                        onClick={e => e.stopPropagation()}>
+                        <option value="returning">Returning</option>
+                        <option value="undecided">Undecided</option>
+                        <option value="entering_portal">Entering Portal</option>
+                      </select>
                     </div>
                   ))}
                 </>
