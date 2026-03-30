@@ -7,7 +7,7 @@ const STORAGE_VERSION = 6; // bump this whenever the state shape changes
 // Legacy keys to purge on load
 const LEGACY_KEYS = ["bp_roster_builder_v1"];
 
-function loadLocal() {
+function loadLocal(team) {
   try {
     LEGACY_KEYS.forEach(k => localStorage.removeItem(k));
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -17,12 +17,17 @@ function loadLocal() {
       localStorage.removeItem(STORAGE_KEY); // stale schema — discard
       return null;
     }
+    // If the saved state belongs to a different team, discard it
+    if (team && parsed._team && parsed._team !== team) {
+      localStorage.removeItem(STORAGE_KEY);
+      return null;
+    }
     return { ...parsed, board: [] };
   } catch { return null; }
 }
 
-function saveLocal(state) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...state, _version: STORAGE_VERSION }));
+function saveLocal(state, team) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...state, _team: team, _version: STORAGE_VERSION }));
 }
 
 function defaultState(team = "") {
@@ -49,11 +54,11 @@ function money(n) {
  */
 export function useRosterBoard(team) {
   const [state, _setState] = useState(() => {
-    const saved = loadLocal();
+    const saved = loadLocal(team);
     return saved ?? defaultState(team);
   });
 
-  // Sync program name from auth if state was blank
+  // Sync program name from auth if blank or mismatched team
   useEffect(() => {
     if (team && !state.settings.program) {
       setState(s => ({ ...s, settings: { ...s.settings, program: team } }));
@@ -65,7 +70,7 @@ export function useRosterBoard(team) {
       const next = typeof updater === "function" ? updater(prev) : updater;
       // Only persist user-driven state — never the fetched board (too large for localStorage)
       const { board: _omit, ...persist } = next;
-      saveLocal(persist);
+      saveLocal(persist, team);
       return next;
     });
   }
