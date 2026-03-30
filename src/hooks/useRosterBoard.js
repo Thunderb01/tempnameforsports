@@ -1,18 +1,28 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 
-const STORAGE_KEY = "bp_roster_builder_v1";
+const STORAGE_KEY    = "bp_roster_builder";
+const STORAGE_VERSION = 5; // bump this whenever the state shape changes
+
+// Legacy keys to purge on load
+const LEGACY_KEYS = ["bp_roster_builder_v1"];
 
 function loadLocal() {
   try {
+    LEGACY_KEYS.forEach(k => localStorage.removeItem(k));
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
-    return { ...JSON.parse(raw), board: [] };
+    const parsed = JSON.parse(raw);
+    if (parsed._version !== STORAGE_VERSION) {
+      localStorage.removeItem(STORAGE_KEY); // stale schema — discard
+      return null;
+    }
+    return { ...parsed, board: [] };
   } catch { return null; }
 }
 
 function saveLocal(state) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...state, _version: STORAGE_VERSION }));
 }
 
 function defaultState(team = "") {
@@ -191,7 +201,7 @@ export function useRosterBoard(team) {
     setState(s => ({ ...s, settings }));
   }
 
-  function reset() {
+  function reset(teamName) {
     setState(s => ({
       ...s,
       shortlistIds:  [],
@@ -199,7 +209,7 @@ export function useRosterBoard(team) {
       statusById:    {},
       retentionById: {},
     }));
-    setReturningPlayers([]);
+    if (teamName) loadReturningRoster(teamName);
   }
 
   // ── Calc ────────────────────────────────────────────────────────────────────

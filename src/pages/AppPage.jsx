@@ -4,6 +4,7 @@ import { PlayerCard }   from "@/components/PlayerCard";
 import { PlayerModal }  from "@/components/PlayerModal";
 import { useAuth }      from "@/hooks/useAuth";
 import { useRosterBoard } from "@/hooks/useRosterBoard";
+import { supabase }       from "@/lib/supabase";
 
 function money(n) {
   return Number(n || 0).toLocaleString(undefined, {
@@ -22,8 +23,9 @@ const STATUSES = [
 
 export function AppPage() {
   
-  const { profile } = useAuth();
-  const team        = profile?.team || "";
+  const { profile, user } = useAuth();
+  const team   = profile?.team || "";
+  const userId = user?.id      || "";
 
   const board = useRosterBoard(team);
   //some debug logs to help track down state loading issues
@@ -47,25 +49,98 @@ export function AppPage() {
   const [posFilter,setPosFilter]= useState("all");
   const [tagGroup, setTagGroup] = useState("all");
   const [tagFilter,setTagFilter]= useState("all");
-  const [modal,    setModal]    = useState(null); // player object or null
-  const [settings, setSettings] = useState(null); // loaded from board.state
+  const [modal,         setModal]         = useState(null);
+  const [settings,      setSettings]      = useState(null);
+  const [drawerOpen,    setDrawerOpen]    = useState(false);
+  const [myRosters,     setMyRosters]     = useState([]);
+  const [teamRosters,   setTeamRosters]   = useState([]);
+  const [coaches,       setCoaches]       = useState({});
+  const [loadingDrawer, setLoadingDrawer] = useState(false);
+  const [saveName,      setSaveName]      = useState("");
+  const [saving,        setSaving]        = useState(false);
 
   // Load data on mount
   useEffect(() => {
     board.loadPortalBoard();
-    // Auto-load returning roster if a saved roster was loaded in the Sandbox
-    // (indicated by retentionById or roster entries already being present)
-    if (team) {
-      const hasRetention = Object.keys(board.state.retentionById || {}).length > 0;
-      const hasRoster    = (board.state.roster || []).length > 0;
-      if (hasRetention || hasRoster) board.loadReturningRoster(team);
-    }
+    if (team) board.loadReturningRoster(team);
   }, [team]);
 
   // Sync local settings state
   useEffect(() => {
     setSettings(board.state.settings);
   }, [board.state.settings]);
+
+  // Load saved rosters when drawer opens
+  useEffect(() => {
+    if (!drawerOpen || !team) return;
+    setLoadingDrawer(true);
+    Promise.all([
+      supabase.from("saved_rosters").select("id, name, created_at, user_id").eq("team", team).order("created_at", { ascending: false }),
+      supabase.from("coaches").select("user_id, display_name").eq("team", team),
+    ]).then(([{ data: rosters }, { data: coachRows }]) => {
+      const coachMap = {};
+      (coachRows || []).forEach(c => { coachMap[c.user_id] = c.display_name || "Coach"; });
+      setCoaches(coachMap);
+      const all = rosters || [];
+      setMyRosters(all.filter(r => r.user_id === userId));
+      setTeamRosters(all.filter(r => r.user_id !== userId));
+      setLoadingDrawer(false);
+    });
+  }, [drawerOpen, team, userId]);
+
+  async function handleSaveRoster() {
+    if (!saveName.trim()) return;
+    setSaving(true);
+    try {
+      const { data: row, error: rErr } = await supabase
+        .from("saved_rosters")
+        .insert({ name: saveName.trim(), team, user_id: userId })
+        .select("id")
+        .single();
+      if (rErr) throw rErr;
+
+      const retentionById = board.state.retentionById || {};
+      const returning = board.returningPlayers
+        .filter(p => (retentionById[p.id] || "returning") !== "entering_portal")
+        .map(p => ({ roster_id: row.id, player_id: p.id, player_type: retentionById[p.id] || "returning", nil_offer: 0 }));
+      const transfers = board.state.roster
+        .map(e => ({ roster_id: row.id, player_id: e.id, player_type: "transfer", nil_offer: e.nilOffer || 0 }));
+
+      const { error: pErr } = await supabase.from("saved_roster_players").insert([...returning, ...transfers]);
+      if (pErr) throw pErr;
+
+      setMyRosters(prev => [{ id: row.id, name: saveName.trim(), created_at: new Date().toISOString(), user_id: userId }, ...prev]);
+      setSaveName("");
+    } catch (e) {
+      alert("Save failed: " + e.message);
+    }
+    setSaving(false);
+  }
+
+  async function handleLoadRoster(rosterId) {
+    const { data, error } = await supabase
+      .from("saved_roster_players")
+      .select("player_type, nil_offer, players(*, player_stats(*))")
+      .eq("roster_id", rosterId);
+    if (error) { alert("Load failed: " + error.message); return; }
+
+    const players = (data || []).map(row => ({
+      ...row.players,
+      pos:       row.players.primary_position,
+      year:      row.players.year,
+      height:    row.players.height   ?? null,
+      hometown:  row.players.hometown ?? null,
+      marketLow:  row.players.open_market_low  ?? 0,
+      marketHigh: row.players.open_market_high ?? 0,
+      stats:      { ...(row.players.player_stats?.[0] || {}) },
+      _typeKey:   row.player_type,
+      nilOffer:   row.nil_offer,
+    }));
+
+    board.loadFromSaved(players);
+    if (team) board.loadReturningRoster(team);
+    setDrawerOpen(false);
+  }
 
   // ── Derived tag list ────────────────────────────────────────────────────────
   const allTags = useMemo(() => {
@@ -212,7 +287,13 @@ export function AppPage() {
               )}
             </div>
 
-            <div className="setting setting-wide" style={{ flexDirection: "row", gap: 8 }}>
+            <div className="setting setting-wide" style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
+              <input className="input" placeholder="Name this roster…" style={{ flex: 1, minWidth: 160 }}
+                value={saveName} onChange={e => setSaveName(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && handleSaveRoster()} />
+              <button className="btn btn-primary" disabled={!saveName.trim() || saving} onClick={handleSaveRoster}>
+                {saving ? "Saving…" : "Save Roster"}
+              </button>
               <button className="btn btn-ghost" onClick={() => {
                 const blob = new Blob([JSON.stringify(board.state, null, 2)], { type: "application/json" });
                 const a = Object.assign(document.createElement("a"), {
@@ -220,8 +301,11 @@ export function AppPage() {
                 });
                 a.click(); URL.revokeObjectURL(a.href);
               }}>Export Build</button>
+              <button className="btn btn-ghost" onClick={() => setDrawerOpen(true)}>
+                Saved Rosters
+              </button>
               <button className="btn btn-ghost" style={{ color: "#f77", borderColor: "rgba(220,70,70,.3)" }}
-                onClick={() => { if (confirm("Reset all roster data?")) board.reset(); }}>
+                onClick={() => { if (confirm("Reset all roster data?")) board.reset(team); }}>
                 Reset
               </button>
             </div>
@@ -319,12 +403,6 @@ export function AppPage() {
             <div className="panel-head">
               <h2>Roster</h2>
               <p className="muted">Returning players + portal adds.</p>
-              {board.returningPlayers.length === 0 && (
-                <button className="btn btn-ghost" style={{ marginTop: 8 }}
-                  onClick={() => board.loadReturningRoster(team)}>
-                  Load Current Roster
-                </button>
-              )}
             </div>
             <div className="list">
 
@@ -456,6 +534,75 @@ export function AppPage() {
           onStatus={board.setStatus}
           onClose={() => setModal(null)}
         />
+      )}
+
+      {/* ── Saved Rosters Drawer ── */}
+      {drawerOpen && (
+        <>
+          <div className="modal-backdrop" onClick={() => setDrawerOpen(false)} />
+          <div style={{
+            position: "fixed", top: 0, right: 0, bottom: 0, zIndex: 201,
+            width: "min(400px, 100vw)", background: "#0e1521",
+            borderLeft: "1px solid var(--border)", display: "flex", flexDirection: "column",
+          }}>
+            <div style={{ padding: "20px 20px 16px", borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <h3 style={{ margin: 0, fontSize: 16 }}>Saved Rosters</h3>
+              <button className="btn btn-ghost" onClick={() => setDrawerOpen(false)}>Close</button>
+            </div>
+            <div style={{ overflowY: "auto", flex: 1, padding: 20, display: "flex", flexDirection: "column", gap: 24 }}>
+              {loadingDrawer ? (
+                <div style={{ opacity: .4, fontSize: 13 }}>Loading…</div>
+              ) : (
+                <>
+                  <div>
+                    <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".06em", opacity: .4, marginBottom: 10, fontWeight: 500 }}>
+                      My Rosters ({myRosters.length})
+                    </div>
+                    {myRosters.length === 0
+                      ? <div style={{ fontSize: 13, opacity: .35 }}>No saved rosters yet.</div>
+                      : <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                          {myRosters.map(r => (
+                            <div key={r.id} style={{ background: "rgba(255,255,255,.04)", border: "1px solid var(--border)", borderRadius: 8, padding: "10px 14px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                              <div>
+                                <div style={{ fontWeight: 600, fontSize: 13 }}>{r.name}</div>
+                                <div style={{ fontSize: 11, opacity: .4, marginTop: 2 }}>{new Date(r.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}</div>
+                              </div>
+                              <button className="btn btn-ghost" style={{ fontSize: 11, padding: "3px 10px" }} onClick={() => handleLoadRoster(r.id)}>
+                                Load
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                    }
+                  </div>
+                  {teamRosters.length > 0 && (
+                    <div>
+                      <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".06em", opacity: .4, marginBottom: 10, fontWeight: 500 }}>
+                        Staff Rosters ({teamRosters.length})
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                        {teamRosters.map(r => (
+                          <div key={r.id}>
+                            <div style={{ fontSize: 10, opacity: .35, marginBottom: 4, paddingLeft: 2 }}>{coaches[r.user_id] || "Coach"}</div>
+                            <div style={{ background: "rgba(255,255,255,.04)", border: "1px solid var(--border)", borderRadius: 8, padding: "10px 14px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                              <div>
+                                <div style={{ fontWeight: 600, fontSize: 13 }}>{r.name}</div>
+                                <div style={{ fontSize: 11, opacity: .4, marginTop: 2 }}>{new Date(r.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}</div>
+                              </div>
+                              <button className="btn btn-ghost" style={{ fontSize: 11, padding: "3px 10px" }} onClick={() => handleLoadRoster(r.id)}>
+                                Load
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        </>
       )}
     </>
   );
