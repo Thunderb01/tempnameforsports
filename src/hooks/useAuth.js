@@ -6,6 +6,7 @@ export function useAuth() {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const fetchingFor = useRef(null); // tracks which user_id we last fetched for
+  const initDone = useRef(false);  // prevents auth listener from acting before init completes
 
   useEffect(() => {
     let mounted = true;
@@ -21,20 +22,22 @@ export function useAuth() {
 
       // 2. If there's a session, fetch the profile before marking loading=false
       if (initialSession) {
-      
         await fetchProfile(initialSession.user.id, mounted);
       } else {
         setLoading(false);
       }
+
+      initDone.current = true;
     }
 
     init();
-    
 
     // 3. Listen for future auth changes (sign in, sign out, token refresh)
+    //    Skip events that fire before init() completes to avoid the race where
+    //    a null INITIAL_SESSION event redirects the user before the session is restored.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, newSession) => {
-        if (!mounted) return;
+        if (!mounted || !initDone.current) return;
         setSession(newSession ?? null);
 
         if (newSession) {
