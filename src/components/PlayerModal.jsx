@@ -86,7 +86,7 @@ export function PlayerModal({ player, onClose }) {
           </div>
 
           <div className="modal-section">
-            <h4>Market Band</h4>
+            <h4>Market Production Value Range</h4>
             <div className="modal-sub">{money(player.marketLow)} – {money(player.marketHigh)}</div>
           </div>
 

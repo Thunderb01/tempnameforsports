@@ -34,7 +34,7 @@ export function SiteHeader() {
 
           {profile && (
             teamLogos[profile.team]
-              ? <div title={profile.team} style={{ height: 32, width: 32, borderRadius: "50%", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", padding: 3 }}>
+              ? <div title={profile.team} style={{ height: 42, width: 42, borderRadius: "50%", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", padding: 5 }}>
                   <img src={teamLogos[profile.team]} alt={profile.team} style={{ height: "100%", width: "100%", objectFit: "contain" }} />
                 </div>
               : <span style={{ fontSize: 13, opacity: .45, padding: "0 6px" }}>{profile.team}</span>

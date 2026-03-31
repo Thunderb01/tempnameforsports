@@ -17,7 +17,7 @@ function fmtDate(iso) {
 
 const COLS = [
   { label: "Name",     get: p => p.name },
-  { label: "Type",     get: p => p._type },
+  { label: "Status",   get: p => p._type },
   { label: "Pos",      get: p => p.pos  || p.primary_position || "—" },
   { label: "Yr",       get: p => p.year || "—" },
   { label: "Ht",       get: p => p.height   || "—" },
@@ -25,8 +25,7 @@ const COLS = [
   { label: "PPG",      get: p => p.stats?.ppg ?? "—" },
   { label: "RPG",      get: p => p.stats?.rpg ?? "—" },
   { label: "APG",      get: p => p.stats?.apg ?? "—" },
-  { label: "Mkt Low",  get: p => p.marketLow  ? money(p.marketLow)  : "—" },
-  { label: "Mkt High", get: p => p.marketHigh ? money(p.marketHigh) : "—" },
+  { label: "NIL",      get: p => p.nilOffer ?? 0, isNil: true },
 ];
 
 const TYPE_COLOR = {
@@ -106,6 +105,7 @@ export function RosterSandboxPage() {
   // ── Combined live player list ───────────────────────────────────────────────
   const rosterPlayers = useMemo(() => {
     const retentionById = board.state.retentionById || {};
+    const nilById       = board.state.nilById       || {};
 
     const returning = board.returningPlayers
       .filter(p => (retentionById[p.id] || "returning") !== "entering_portal")
@@ -113,6 +113,7 @@ export function RosterSandboxPage() {
         ...p,
         _type:    retentionById[p.id] === "undecided" ? "Undecided" : "Returning",
         _typeKey: retentionById[p.id] || "returning",
+        nilOffer: nilById[p.id] || 0,
       }));
 
     const transfers = board.state.roster
@@ -123,7 +124,7 @@ export function RosterSandboxPage() {
       .filter(Boolean);
 
     return [...returning, ...transfers];
-  }, [board.returningPlayers, board.state.roster, board.state.retentionById]);
+  }, [board.returningPlayers, board.state.roster, board.state.retentionById, board.state.nilById]);
 
   const displayPlayers = activeRoster ? activeRoster.players : rosterPlayers;
 
@@ -243,6 +244,32 @@ export function RosterSandboxPage() {
             </div>
           </div>
 
+          {/* ── Summary strip ── */}
+          {(() => {
+            const calc = board.calc();
+            const settings = board.state.settings;
+            return (
+              <div style={{ display: "flex", gap: 24, flexWrap: "wrap", marginTop: 14, padding: "10px 16px", background: "rgba(255,255,255,.04)", border: "1px solid var(--border)", borderRadius: 8 }}>
+                <div>
+                  <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".06em", opacity: .4, fontWeight: 500 }}>Program</div>
+                  <div style={{ fontSize: 15, fontWeight: 600, marginTop: 2 }}>{settings.program || "—"}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".06em", opacity: .4, fontWeight: 500 }}>Roster</div>
+                  <div style={{ fontSize: 15, fontWeight: 600, marginTop: 2 }}>{calc.totalRoster} / {settings.scholarships}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".06em", opacity: .4, fontWeight: 500 }}>NIL Committed</div>
+                  <div style={{ fontSize: 15, fontWeight: 600, marginTop: 2 }}>{money(calc.nilCommitted)}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".06em", opacity: .4, fontWeight: 500 }}>NIL Remaining</div>
+                  <div style={{ fontSize: 15, fontWeight: 600, marginTop: 2, color: calc.nilRemaining < 0 ? "#e05c5c" : "inherit" }}>{money(calc.nilRemaining)}</div>
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Save bar — only when in live mode */}
           {!activeRoster && (
             <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
@@ -276,14 +303,34 @@ export function RosterSandboxPage() {
                   {sorted.map((p, i) => (
                     <tr key={p.id ?? i} className="row-click"
                       style={{ borderBottom: "1px solid var(--border)" }}
-                      onClick={() => setModal(p)}>
+                      onClick={e => { if (!e.target.closest("input")) setModal(p); }}>
                       {COLS.map(col => (
                         <td key={col.label} style={{
                           ...tdStyle,
-                          color:      col.label === "Type" ? TYPE_COLOR[p._type] || "inherit" : "inherit",
-                          fontWeight: col.label === "Type" ? 500 : "inherit",
+                          color:      col.label === "Status" ? TYPE_COLOR[p._type] || "inherit" : "inherit",
+                          fontWeight: col.label === "Status" ? 500 : "inherit",
                         }}>
-                          {col.get(p)}
+                          {col.isNil && !activeRoster ? (
+                            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                              <input
+                                className="input"
+                                type="number" min="0" step="1000"
+                                value={p.nilOffer || 0}
+                                style={{ width: 100, padding: "2px 6px", fontSize: 12 }}
+                                onClick={e => e.stopPropagation()}
+                                onChange={e => {
+                                  p._typeKey === "transfer"
+                                    ? board.updateOffer(p.id, e.target.value)
+                                    : board.updateReturningNil(p.id, e.target.value);
+                                }}
+                              />
+                              <span style={{ opacity: .5, fontSize: 11 }}>{money(p.nilOffer || 0)}</span>
+                            </div>
+                          ) : col.isNil ? (
+                            money(p.nilOffer || 0)
+                          ) : (
+                            col.get(p)
+                          )}
                         </td>
                       ))}
                     </tr>
