@@ -104,8 +104,8 @@ export function AppPage() {
       const retentionById = board.state.retentionById || {};
       const nilById       = board.state.nilById       || {};
       const returning = board.returningPlayers
-        .filter(p => (retentionById[p.id] || "returning") !== "entering_portal")
-        .map(p => ({ roster_id: row.id, player_id: p.id, player_type: retentionById[p.id] || "returning", nil_offer: nilById[p.id] || 0 }));
+        .map(p => ({ roster_id: row.id, player_id: p.id, player_type: retentionById[p.id] || "returning", nil_offer: nilById[p.id] || 0 }))
+        .filter(p => p.player_type !== "entering_portal");
       const transfers = board.state.roster
         .map(e => ({ roster_id: row.id, player_id: e.id, player_type: "transfer", nil_offer: e.nilOffer || 0 }));
 
