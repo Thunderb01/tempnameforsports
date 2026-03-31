@@ -503,6 +503,7 @@ def fetch(url, label="page"):
         time.sleep(90)
         resp = requests.get(url, headers=HEADERS, timeout=30)
     resp.raise_for_status()
+    resp.encoding = "utf-8"
     return resp.text
 
 def strip_comments(html):

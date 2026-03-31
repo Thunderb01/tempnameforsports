@@ -55,9 +55,9 @@ export function BoardPage() {
   const [error,     setError]     = useState("");
   const [search,    setSearch]    = useState("");
   const [posFilter, setPosFilter] = useState("all");
-  const [tagGroup,  setTagGroup]  = useState("all");
-  const [tagFilter, setTagFilter] = useState("all");
-  const [viewMode,  setViewMode]  = useState("cards"); // "cards" | "table"
+  const [tagGroup,       setTagGroup]       = useState("all");
+  const [tagFilter,      setTagFilter]      = useState("all");
+  const [viewMode,  setViewMode]  = useState("table"); // "cards" | "table"
   const [sortKey,   setSortKey]   = useState(null);
   const [sortDir,   setSortDir]   = useState("asc");
   const [modal,     setModal]     = useState(null);
@@ -128,7 +128,8 @@ export function BoardPage() {
     const q = search.trim().toLowerCase();
     let out = players.filter(p => {
       if (q && !p.name.toLowerCase().includes(q) &&
-               !(p.team||"").toLowerCase().includes(q)) return false;
+               !(p.team||"").toLowerCase().includes(q) &&
+               !(p.hometown||"").toLowerCase().includes(q)) return false;
       if (posFilter !== "all" && p.pos !== posFilter) return false;
       if (tagFilter !== "all" && !getTagPool(p, tagGroup).includes(tagFilter)) return false;
       return true;

@@ -50,9 +50,9 @@ npm run dev
 
 ### 5. Create your first coach account
 
-```bash
-export SUPABASE_URL="https://YOUR_PROJECT.supabase.co"
-export SUPABASE_SERVICE_KEY="your-service-role-key"
+```powershell
+$env:SUPABASE_URL="https://YOUR_PROJECT.supabase.co"
+$env:SUPABASE_SERVICE_KEY="your-service-role-key"
 
 python create_coach.py --email you@program.edu --team "Rutgers" --name "Coach Smith"
 ```
