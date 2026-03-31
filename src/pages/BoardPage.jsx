@@ -358,6 +358,11 @@ export function BoardPage() {
             }
           </div>
         )}
+
+        {/* ── Disclaimer ── */}
+        <div style={{ marginTop: 24, textAlign: "center", fontSize: 11, opacity: .4 }}>
+          This is Demo, all players are portal eligible, but not all have announced official intent to enter the portal
+        </div>
       </div>
 
       {modal && (

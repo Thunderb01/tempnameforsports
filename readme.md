@@ -152,3 +152,11 @@ python create_coach.py --list
 # Remove a coach
 python create_coach.py --delete coach@rutgers.edu
 ```
+
+## Managing players in database
+
+```bash
+# Update Hometowns and heights
+python torvik_update_players.py
+
+```
