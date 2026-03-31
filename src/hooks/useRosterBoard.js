@@ -80,7 +80,7 @@ export function useRosterBoard(team) {
   const loadPortalBoard = useCallback(async () => {
     const { data, error } = await supabase
       .from("players")
-      .select("*")
+      .select("*, player_stats(*)")
       .eq("source", "portal")
       .order("name");
 
@@ -102,7 +102,7 @@ export function useRosterBoard(team) {
       interiorTags:   row.interior_tags   ? row.interior_tags.split(",").map(t => t.trim()).filter(Boolean)   : [],
       defensiveTags:  row.defensive_tags  ? row.defensive_tags.split(",").map(t => t.trim()).filter(Boolean)  : [],
       tags:           [],
-      stats:          { name: row.name, team: row.current_team, primary_position: row.primary_position, year: row.year, market_low: row.market_low, market_high: row.market_high, open_market_low: row.open_market_low, open_market_high: row.open_market_high, playmaker_tags: row.playmaker_tags, shooting_tags: row.shooting_tags, ...(row.stats || {}) },
+      stats:          { ...(row.player_stats?.[0] || {}) },
     }));
 
     setState(s => ({ ...s, board: players }));
