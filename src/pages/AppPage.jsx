@@ -4,6 +4,8 @@ import { PlayerCard }   from "@/components/PlayerCard";
 import { PlayerModal }  from "@/components/PlayerModal";
 import { useAuth }      from "@/hooks/useAuth";
 import { useRosterBoard } from "@/hooks/useRosterBoard";
+import { useAdminTeam }       from "@/hooks/useAdminTeam";
+import { TeamAutocomplete }   from "@/components/TeamAutocomplete";
 import { supabase }       from "@/lib/supabase";
 
 function money(n) {
@@ -24,13 +26,13 @@ function money(n) {
 export function AppPage() {
   
   const { profile, user } = useAuth();
-  const team   = profile?.team || "";
-  const userId = user?.id      || "";
+  const userId = user?.id || "";
+  const { isAdmin, activeTeam, selectedTeam, setSelectedTeam, allTeams } = useAdminTeam(profile);
 
-  const board = useRosterBoard(team);
+  const board = useRosterBoard(activeTeam);
   //some debug logs to help track down state loading issues
   console.log("DEBUG profile:", profile);
-  console.log("DEBUG team:", team);
+  console.log("DEBUG team:", activeTeam);
   console.log("DEBUG board object:", board);
   console.log("DEBUG board.state:", board?.state);
   console.log("DEBUG board.state.board:", board?.state?.board);
@@ -59,11 +61,11 @@ export function AppPage() {
   const [saveName,      setSaveName]      = useState("");
   const [saving,        setSaving]        = useState(false);
 
-  // Load data on mount
+  // Load data on mount / when active team changes
   useEffect(() => {
     board.loadPortalBoard();
-    if (team) board.loadReturningRoster(team);
-  }, [team]);
+    if (activeTeam) board.loadReturningRoster(activeTeam);
+  }, [activeTeam]);
 
   // Sync local settings state
   useEffect(() => {
@@ -72,11 +74,11 @@ export function AppPage() {
 
   // Load saved rosters when drawer opens
   useEffect(() => {
-    if (!drawerOpen || !team) return;
+    if (!drawerOpen || !activeTeam) return;
     setLoadingDrawer(true);
     Promise.all([
-      supabase.from("saved_rosters").select("id, name, created_at, user_id").eq("team", team).order("created_at", { ascending: false }),
-      supabase.from("coaches").select("user_id, display_name").eq("team", team),
+      supabase.from("saved_rosters").select("id, name, created_at, user_id").eq("team", activeTeam).order("created_at", { ascending: false }),
+      supabase.from("coaches").select("user_id, display_name").eq("team", activeTeam),
     ]).then(([{ data: rosters }, { data: coachRows }]) => {
       const coachMap = {};
       (coachRows || []).forEach(c => { coachMap[c.user_id] = c.display_name || "Coach"; });
@@ -86,7 +88,7 @@ export function AppPage() {
       setTeamRosters(all.filter(r => r.user_id !== userId));
       setLoadingDrawer(false);
     });
-  }, [drawerOpen, team, userId]);
+  }, [drawerOpen, activeTeam, userId]);
 
   async function handleSaveRoster() {
     if (!saveName.trim()) return;
@@ -94,7 +96,7 @@ export function AppPage() {
     try {
       const { data: row, error: rErr } = await supabase
         .from("saved_rosters")
-        .insert({ name: saveName.trim(), team, user_id: userId })
+        .insert({ name: saveName.trim(), team: activeTeam, user_id: userId })
         .select("id")
         .single();
       if (rErr) throw rErr;
@@ -139,7 +141,7 @@ export function AppPage() {
     }));
 
     board.loadFromSaved(players);
-    if (team) board.loadReturningRoster(team);
+    if (activeTeam) board.loadReturningRoster(activeTeam);
     setDrawerOpen(false);
   }
 
@@ -213,7 +215,7 @@ export function AppPage() {
   // more debug logs to verify data is present before rendering
   const debug = {
     hasProfile: !!profile,
-    team,
+    team: activeTeam,
     hasState: !!board?.state,
     boardIsArray: Array.isArray(board?.state?.board),
     boardLength: Array.isArray(board?.state?.board) ? board.state.board.length : "not array",
@@ -235,7 +237,17 @@ export function AppPage() {
 
         {/* ── Top / Settings ── */}
         <div className="app-top">
-          <h1>Roster Builder</h1>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+            <h1 style={{ margin: 0 }}>Roster Builder</h1>
+            {isAdmin && (
+              <TeamAutocomplete
+                value={selectedTeam}
+                onChange={t => { setSelectedTeam(t); handleSettingChange("program", t); }}
+                teams={allTeams}
+                placeholder="Select team…"
+              />
+            )}
+          </div>
           <div className="settings">
             {[
               { id: "program",     label: "Program",            type: "text",   step: undefined },
@@ -313,7 +325,7 @@ export function AppPage() {
                 Saved Rosters
               </button>
               <button className="btn btn-ghost" style={{ color: "#f77", borderColor: "rgba(220,70,70,.3)" }}
-                onClick={() => { if (confirm("Reset all roster data?")) board.reset(team); }}>
+                onClick={() => { if (confirm("Reset all roster data?")) board.reset(activeTeam); }}>
                 Reset
               </button>
             </div>

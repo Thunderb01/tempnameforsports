@@ -3,6 +3,8 @@ import { SiteHeader }     from "@/components/SiteHeader";
 import { PlayerModal }    from "@/components/PlayerModal";
 import { useAuth }        from "@/hooks/useAuth";
 import { useRosterBoard } from "@/hooks/useRosterBoard";
+import { useAdminTeam }       from "@/hooks/useAdminTeam";
+import { TeamAutocomplete }   from "@/components/TeamAutocomplete";
 import { supabase }       from "@/lib/supabase";
 
 function money(n) {
@@ -57,39 +59,39 @@ function RosterCard({ r, canDelete, onLoad, onDelete }) {
 
 export function RosterSandboxPage() {
   const { profile, user } = useAuth();
-  const team   = profile?.team || "";
-  const userId = user?.id      || "";
-  const board       = useRosterBoard(team);
+  const userId = user?.id || "";
+  const { isAdmin, activeTeam, selectedTeam, setSelectedTeam, allTeams } = useAdminTeam(profile);
+  const board  = useRosterBoard(activeTeam);
 
-  const [modal,        setModal]        = useState(null);
-  const [drawerOpen,   setDrawerOpen]   = useState(false);
-  const [activeRoster, setActiveRoster] = useState(null); // { id, name, players[] }
-  const [saveName,     setSaveName]     = useState("");
-  const [saving,       setSaving]       = useState(false);
+  const [modal,          setModal]          = useState(null);
+  const [drawerOpen,     setDrawerOpen]     = useState(false);
+  const [activeRoster,   setActiveRoster]   = useState(null);
+  const [saveName,       setSaveName]       = useState("");
+  const [saving,         setSaving]         = useState(false);
 
   // All saved rosters for this team, keyed by coach
-  const [myRosters,   setMyRosters]   = useState([]);
-  const [teamRosters, setTeamRosters] = useState([]); // other coaches
-  const [coaches,     setCoaches]     = useState({}); // user_id → display_name
+  const [myRosters,     setMyRosters]     = useState([]);
+  const [teamRosters,   setTeamRosters]   = useState([]);
+  const [coaches,       setCoaches]       = useState({});
   const [loadingDrawer, setLoadingDrawer] = useState(false);
 
   const [sortKey, setSortKey] = useState(null);
   const [sortDir, setSortDir] = useState("asc");
 
-  // Load portal board + returning roster on mount
+  // Load portal board + returning roster on mount / when active team changes
   useEffect(() => {
     board.loadPortalBoard();
-    if (team) board.loadReturningRoster(team);
-  }, [team]);
+    if (activeTeam) board.loadReturningRoster(activeTeam);
+  }, [activeTeam]);
 
   // Load saved rosters + coaches whenever drawer opens
   useEffect(() => {
-    if (!drawerOpen || !team) return;
+    if (!drawerOpen || !activeTeam) return;
     setLoadingDrawer(true);
 
     Promise.all([
-      supabase.from("saved_rosters").select("id, name, created_at, user_id").eq("team", team).order("created_at", { ascending: false }),
-      supabase.from("coaches").select("user_id, display_name").eq("team", team),
+      supabase.from("saved_rosters").select("id, name, created_at, user_id").eq("team", activeTeam).order("created_at", { ascending: false }),
+      supabase.from("coaches").select("user_id, display_name").eq("team", activeTeam),
     ]).then(([{ data: rosters }, { data: coachRows }]) => {
       const coachMap = {};
       (coachRows || []).forEach(c => { coachMap[c.user_id] = c.display_name || "Coach"; });
@@ -100,7 +102,7 @@ export function RosterSandboxPage() {
       setTeamRosters(all.filter(r => r.user_id !== userId));
       setLoadingDrawer(false);
     });
-  }, [drawerOpen, team, userId]);
+  }, [drawerOpen, activeTeam, userId]);
 
   // ── Combined live player list ───────────────────────────────────────────────
   const rosterPlayers = useMemo(() => {
@@ -157,7 +159,7 @@ export function RosterSandboxPage() {
     try {
       const { data: row, error: rErr } = await supabase
         .from("saved_rosters")
-        .insert({ name: saveName.trim(), team, user_id: userId })
+        .insert({ name: saveName.trim(), team: activeTeam, user_id: userId })
         .select("id")
         .single();
       if (rErr) throw rErr;
@@ -232,7 +234,15 @@ export function RosterSandboxPage() {
                   : `Live view · ${sorted.length} players`}
               </p>
             </div>
-            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+              {isAdmin && (
+                <TeamAutocomplete
+                  value={selectedTeam}
+                  onChange={setSelectedTeam}
+                  teams={allTeams}
+                  placeholder="Select team…"
+                />
+              )}
               {activeRoster && (
                 <button className="btn btn-ghost" onClick={() => setActiveRoster(null)}>
                   ← Back to Live
