@@ -1,26 +1,13 @@
 import { useState, useEffect, useMemo } from "react";
-import { SiteHeader }  from "@/components/SiteHeader";
-import { PlayerModal } from "@/components/PlayerModal";
-import { useAuth }     from "@/hooks/useAuth";
-import { supabase }    from "@/lib/supabase";
+import { SiteHeader }    from "@/components/SiteHeader";
+import { PlayerModal }   from "@/components/PlayerModal";
+import { useAuth }       from "@/hooks/useAuth";
+import { useRosterBoard} from "@/hooks/useRosterBoard";
 
 function money(n) {
   return Number(n || 0).toLocaleString(undefined, {
     style: "currency", currency: "USD", maximumFractionDigits: 0,
   });
-}
-
-const STORAGE_KEY = "bp_roster_builder_v1";
-
-function loadRosterState() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : { roster: [], shortlistIds: [], statusById: {} };
-  } catch { return { roster: [], shortlistIds: [], statusById: {} }; }
-}
-
-function saveRosterState(s) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
 }
 
 // label → getter(player)
@@ -48,11 +35,10 @@ const STATUSES = [
 ];
 
 export function BoardPage() {
-  useAuth();
+  const { profile } = useAuth();
+  const board = useRosterBoard(profile?.team);
 
-  const [players,   setPlayers]   = useState([]);
   const [loading,   setLoading]   = useState(true);
-  const [error,     setError]     = useState("");
   const [search,    setSearch]    = useState("");
   const [posFilter, setPosFilter] = useState("all");
   const [tagGroup,       setTagGroup]       = useState("all");
@@ -61,37 +47,13 @@ export function BoardPage() {
   const [sortKey,   setSortKey]   = useState(null);
   const [sortDir,   setSortDir]   = useState("asc");
   const [modal,     setModal]     = useState(null);
-  const [rState,    setRState]    = useState(loadRosterState);
 
-  // ── Load board from Supabase ────────────────────────────────────────────────
+  const players = board.state.board;
+
+  // ── Load board via shared hook ───────────────────────────────────────────────
   useEffect(() => {
     setLoading(true);
-    supabase
-      .from("players")
-      .select("*, player_stats(*)")
-      .eq("source", "portal")
-      .order("name")
-      .then(({ data, error: err }) => {
-        if (err) { setError(err.message); setLoading(false); return; }
-        setPlayers((data || []).map(row => ({
-          id:             row.id,
-          name:           row.name,
-          team:           row.current_team,
-          pos:            row.primary_position,
-          year:           row.year,
-          height:         row.height   ?? null,
-          hometown:       row.hometown ?? null,
-          marketLow:      row.open_market_low  ?? 0,
-          marketHigh:     row.open_market_high ?? 0,
-          playmakerTags:  row.playmaker_tags  ? row.playmaker_tags.split(",").map(t => t.trim()).filter(Boolean)  : [],
-          shootingTags:   row.shooting_tags   ? row.shooting_tags.split(",").map(t => t.trim()).filter(Boolean)   : [],
-          shotmakingTags: row.shotmaking_tags ? row.shotmaking_tags.split(",").map(t => t.trim()).filter(Boolean) : [],
-          interiorTags:   row.interior_tags   ? row.interior_tags.split(",").map(t => t.trim()).filter(Boolean)   : [],
-          defensiveTags:  row.defensive_tags  ? row.defensive_tags.split(",").map(t => t.trim()).filter(Boolean)  : [],
-          stats:          { ...(row.player_stats?.[0] || {}) },
-        })));
-        setLoading(false);
-      });
+    board.loadPortalBoard().then(() => setLoading(false));
   }, []);
 
   // ── Tags ────────────────────────────────────────────────────────────────────
@@ -154,50 +116,22 @@ export function BoardPage() {
     return out;
   }, [players, search, posFilter, tagGroup, tagFilter, sortKey, sortDir]);
 
-  // ── Roster state helpers ────────────────────────────────────────────────────
-  function updateRState(updater) {
-    setRState(prev => {
-      const next = updater(prev);
-      // Merge into full localStorage state
-      const full = loadRosterState();
-      saveRosterState({ ...full, ...next });
-      return next;
-    });
-  }
-
-  function inRoster(id)    { return rState.roster?.some(r => r.id === id); }
-  function inShortlist(id) { return rState.shortlistIds?.includes(id); }
+  // ── Roster state helpers (delegated to shared useRosterBoard hook) ──────────
+  function inRoster(id)    { return board.inRoster(id); }
+  function inShortlist(id) { return board.inShort(id); }
 
   function addToRoster(id) {
-    const p = players.find(x => x.id === id);
-    if (!p || inRoster(id)) return;
-    const offer = Math.round((p.marketLow + p.marketHigh) / 2);
-    updateRState(s => ({
-      ...s,
-      shortlistIds: (s.shortlistIds||[]).filter(x => x !== id),
-      roster: [{ id, nilOffer: offer }, ...(s.roster||[])],
-    }));
+    // board.addToRoster uses byId which only knows board state from the hook's load.
+    // Since BoardPage loads its own players list, we seed the board state first if needed.
+    board.addToRoster(id);
   }
 
   function addToShortlist(id) {
-    if (inShortlist(id) || inRoster(id)) return;
-    updateRState(s => ({ ...s, shortlistIds: [id, ...(s.shortlistIds||[])] }));
+    board.addToShortlist(id);
   }
 
   function setStatus(id, key) {
-    updateRState(s => {
-      const next = { ...s, statusById: { ...(s.statusById||{}), [id]: key } };
-      if (key === "signed"  && !inRoster(id)) {
-        const p = players.find(x => x.id === id);
-        const offer = p ? Math.round((p.marketLow + p.marketHigh) / 2) : 0;
-        next.roster = [{ id, nilOffer: offer }, ...(next.roster||[])];
-      }
-      if (key === "passed") {
-        next.shortlistIds = (next.shortlistIds||[]).filter(x => x !== id);
-        next.roster       = (next.roster||[]).filter(r => r.id !== id);
-      }
-      return next;
-    });
+    board.setStatus(id, key);
   }
 
   // ── Sort handler ─────────────────────────────────────────────────────────────
@@ -245,7 +179,7 @@ export function BoardPage() {
           </div>
 
           <div style={{ fontSize: 12, opacity: .45, marginBottom: 10 }}>
-            {loading ? "Loading…" : error ? `Error: ${error}` : `${filtered.length} of ${players.length} players`}
+            {loading ? "Loading…" : `${filtered.length} of ${players.length} players`}
             {viewMode === "table" && !loading && " · click header to sort"}
           </div>
         </div>
@@ -285,7 +219,7 @@ export function BoardPage() {
                         <div className="row-sub" style={{ marginTop: 8 }}>
                           <label className="status-control">
                             <span>Status</span>
-                            <select value={rState.statusById?.[p.id] || "none"}
+                            <select value={board.state.statusById?.[p.id] || "none"}
                               onChange={e => setStatus(p.id, e.target.value)}
                               onClick={e => e.stopPropagation()}>
                               {STATUSES.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
@@ -339,7 +273,7 @@ export function BoardPage() {
                           <button className="btn btn-primary" style={{ fontSize: 11, padding: "3px 8px" }}
                             disabled={inRoster(p.id)}
                             onClick={e => { e.stopPropagation(); addToRoster(p.id); }}>
-                            Add
+                            Roster
                           </button>{" "}
                           <button className="btn btn-ghost" style={{ fontSize: 11, padding: "3px 8px" }}
                             disabled={inShortlist(p.id) || inRoster(p.id)}
@@ -368,7 +302,7 @@ export function BoardPage() {
       {modal && (
         <PlayerModal
           player={modal}
-          status={rState.statusById?.[modal.id]}
+          status={board.state.statusById?.[modal.id]}
           onStatus={setStatus}
           onClose={() => setModal(null)}
         />

@@ -120,6 +120,12 @@ export function AppPage() {
     setSaving(false);
   }
 
+  async function handleDeleteRoster(rosterId) {
+    if (!confirm("Delete this saved roster?")) return;
+    await supabase.from("saved_rosters").delete().eq("id", rosterId);
+    setMyRosters(prev => prev.filter(r => r.id !== rosterId));
+  }
+
   async function handleLoadRoster(rosterId) {
     const { data, error } = await supabase
       .from("saved_roster_players")
@@ -582,9 +588,14 @@ export function AppPage() {
                                 <div style={{ fontWeight: 600, fontSize: 13 }}>{r.name}</div>
                                 <div style={{ fontSize: 11, opacity: .4, marginTop: 2 }}>{new Date(r.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}</div>
                               </div>
-                              <button className="btn btn-ghost" style={{ fontSize: 11, padding: "3px 10px" }} onClick={() => handleLoadRoster(r.id)}>
-                                Load
-                              </button>
+                              <div style={{ display: "flex", gap: 6 }}>
+                                <button className="btn btn-ghost" style={{ fontSize: 11, padding: "3px 10px" }} onClick={() => handleLoadRoster(r.id)}>
+                                  Load
+                                </button>
+                                <button className="btn btn-ghost" style={{ fontSize: 11, padding: "3px 10px", color: "#f77", borderColor: "rgba(220,70,70,.3)" }} onClick={() => handleDeleteRoster(r.id)}>
+                                  Delete
+                                </button>
+                              </div>
                             </div>
                           ))}
                         </div>
