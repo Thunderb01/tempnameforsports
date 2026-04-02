@@ -165,7 +165,7 @@ TEAMS = {
     "South Carolina": "south-carolina", "South Dakota": "south-dakota",
     "South Dakota State": "south-dakota-state", "South Florida": "south-florida",
     "Southern Illinois": "southern-illinois", "Southern Miss": "southern-miss",
-    "St. Bonaventure": "st-bonaventure", "St. John's": "st-johns",
+    "St. Bonaventure": "st-bonaventure", "St. John's": "st-johns-ny",
     "Stanford": "stanford", "Stetson": "stetson", "Stony Brook": "stony-brook",
     "Syracuse": "syracuse", "TCU": "texas-christian", "Temple": "temple",
     "Tennessee": "tennessee", "Tennessee State": "tennessee-state",

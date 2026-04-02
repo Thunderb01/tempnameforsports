@@ -1,0 +1,1 @@
+Set SUPABASE_URL and SUPABASE_SERVICE_KEY environment variables.

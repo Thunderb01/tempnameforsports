@@ -52,17 +52,17 @@ const PENTAGON_METRICS = [
 
 function letterGrade(val) {
   if (val === null || val === undefined) return "—";
-  if (val >= 165) return "A+";
-  if (val >= 150) return "A";
-  if (val >= 140) return "A-";
-  if (val >= 130) return "B+";
-  if (val >= 120) return "B";
-  if (val >= 110) return "B-";
-  if (val >= 105) return "C+";
-  if (val >= 95)  return "C";
-  if (val >= 88)  return "C-";
-  if (val >= 78)  return "D+";
-  if (val >= 65)  return "D";
+  if (val >= 83) return "A+";
+  if (val >= 75) return "A";
+  if (val >= 70) return "A-";
+  if (val >= 65) return "B+";
+  if (val >= 60) return "B";
+  if (val >= 55) return "B-";
+  if (val >= 53) return "C+";
+  if (val >= 48) return "C";
+  if (val >= 44) return "C-";
+  if (val >= 39) return "D+";
+  if (val >= 33) return "D";
   return "F";
 }
 
@@ -86,7 +86,7 @@ function SkillProfile({ stats }) {
 
   const playerPoints = angles.map((a, i) => {
     const val = stats?.[PENTAGON_METRICS[i].key];
-    const scale = val != null ? Math.min(Math.max(val / 200, 0), 1) : 0;
+    const scale = val != null ? Math.min(Math.max(val / 100, 0), 1) : 0;
     return `${cx + scale * r * Math.cos(a)},${cy + scale * r * Math.sin(a)}`;
   }).join(" ");
 
@@ -98,7 +98,7 @@ function SkillProfile({ stats }) {
         {[0.25, 0.5, 0.75, 1].map(s => (
           <polygon key={s} points={polygonPoints(s)} fill="none" stroke="rgba(255,255,255,.08)" strokeWidth="1" />
         ))}
-        {/* Mean ring (100/200 = 0.5) highlighted */}
+        {/* Mean ring (50/100 = 0.5) highlighted */}
         <polygon points={polygonPoints(0.5)} fill="none" stroke="rgba(255,255,255,.2)" strokeWidth="1" strokeDasharray="3 3" />
         {/* Axes */}
         {angles.map((a, i) => (
@@ -125,7 +125,7 @@ function SkillProfile({ stats }) {
         {PENTAGON_METRICS.map(({ key, label, desc }) => {
           const val = stats?.[key];
           const grade = letterGrade(val);
-          const pct = val != null ? Math.min(Math.max(val / 200, 0), 1) * 100 : 0;
+          const pct = val != null ? Math.min(Math.max(val / 100, 0), 1) * 100 : 0;
           const color = gradeColor(grade);
           return (
             <div key={key} style={{ display: "flex", alignItems: "center", gap: 10 }}>
