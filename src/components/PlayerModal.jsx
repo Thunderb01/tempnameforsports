@@ -43,9 +43,9 @@ const STAT_ROWS = [
 
 // Pentagon order (clockwise from top): Scoring Efficiency, ATH, Interior Impact, Defending, Playmaking
 const PENTAGON_METRICS = [
-  { key: "sei", label: "Scoring Efficiency"},
+  { key: "sei", label: "Scoring"},
   { key: "ath", label: "Athleticism"},
-  { key: "ris", label: "Interior Impact"},
+  { key: "ris", label: "Interior"},
   { key: "dds", label: "Defending"},
   { key: "cdi", label: "Playmaking"},
 ];

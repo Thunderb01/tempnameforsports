@@ -70,7 +70,9 @@ SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")
 def parse_args():
     p = argparse.ArgumentParser()
     p.add_argument("--csv",     default="data/trank_data.csv")
-    p.add_argument("--dry-run", action="store_true")
+    p.add_argument("--dry-run",      action="store_true")
+    p.add_argument("--skip-matched", action="store_true",
+                   help="Skip players that already have cdi written in player_stats")
     return p.parse_args()
 
 
@@ -92,6 +94,122 @@ def clamp(val, lo=0, hi=100):
     if val is None:
         return None
     return max(lo, min(hi, val))
+
+
+# ── TORVIK TEAM NAME ALIASES ───────────────────────────────────────────────────
+# Torvik CSV uses abbreviations/shortnames; map them to what the scraper stores.
+TORVIK_TEAM_ALIASES = {
+    # "St." → "State" (confirmed from unmatched list)
+    "alabama st.":              "alabama state",
+    "alcorn st.":               "alcorn state",
+    "appalachian st.":          "appalachian state",
+    "arkansas st.":             "arkansas state",
+    "arizona st.":              "arizona state",
+    "ball st.":                 "ball state",
+    "boise st.":                "boise state",
+    "chicago st.":              "chicago state",
+    "cleveland st.":            "cleveland state",
+    "colorado st.":             "colorado state",
+    "coppin st.":               "coppin state",
+    "east tennessee st.":       "east tennessee state",
+    "florida st.":              "florida state",
+    "fresno st.":               "fresno state",
+    "georgia st.":              "georgia state",
+    "grambling st.":            "grambling state",
+    "idaho st.":                "idaho state",
+    "illinois st.":             "illinois state",
+    "indiana st.":              "indiana state",
+    "iowa st.":                 "iowa state",
+    "jackson st.":              "jackson state",
+    "jacksonville st.":         "jacksonville state",
+    "kansas st.":               "kansas state",
+    "kennesaw st.":             "kennesaw state",
+    "kent st.":                 "kent state",
+    "long beach st.":           "long beach state",
+    "michigan st.":             "michigan state",
+    "mississippi st.":          "mississippi state",
+    "mississippi valley st.":   "mississippi valley state",
+    "missouri st.":             "missouri state",
+    "montana st.":              "montana state",
+    "morehead st.":             "morehead state",
+    "morgan st.":               "morgan state",
+    "murray st.":               "murray state",
+    "new mexico st.":           "new mexico state",
+    "nicholls st.":             "nicholls state",
+    "norfolk st.":              "norfolk state",
+    "north dakota st.":         "north dakota state",
+    "northwestern st.":         "northwestern state",
+    "ohio st.":                 "ohio state",
+    "oklahoma st.":             "oklahoma state",
+    "oregon st.":               "oregon state",
+    "penn st.":                 "penn state",
+    "portland st.":             "portland state",
+    "sacramento st.":           "sacramento state",
+    "sam houston st.":          "sam houston",
+    "san diego st.":            "san diego state",
+    "san jose st.":             "san jose state",
+    "south carolina st.":       "south carolina state",
+    "south dakota st.":         "south dakota state",
+    "southeast missouri st.":   "southeast missouri state",
+    "tarleton st.":             "tarleton state",
+    "tennessee st.":            "tennessee state",
+    "texas st.":                "texas state",
+    "utah st.":                 "utah state",
+    "washington st.":           "washington state",
+    "weber st.":                "weber state",
+    "wichita st.":              "wichita state",
+    "wright st.":               "wright state",
+    "youngstown st.":           "youngstown state",
+    # Other common renames
+    "n.c. state":               "nc state",
+    "mississippi":              "ole miss",
+    "illinois chicago":         "uic",
+    "mcneese st.":              "mcneese",
+    "texas a&m corpus chris":   "texas a&m corpus christi",
+    "louisiana monroe":         "louisiana monroe",
+    "little rock":              "little rock",
+    "mount st. mary's":         "mount st. mary's",
+    "cal st. fullerton":        "cal state fullerton",
+    "cal st. northridge":       "cal state northridge",
+    "cal st. bakersfield":      "cal state bakersfield",
+    "loyola md":                "loyola maryland",
+    "siue":                     "siu edwardsville",
+    "siu":                      "southern illinois",
+    "umkc":                     "kansas city",
+    "umass lowell":             "umass lowell",
+    "nebraska omaha":           "nebraska omaha",
+    "ut arlington":             "ut arlington",
+    "ut rio grande valley":     "utrgv",
+    "uconn":                    "connecticut",
+    "fgcu":                     "florida gulf coast",
+    "miami fl":                 "miami",
+    "miami oh":                 "miami (oh)",
+    "vmi":                      "vmi",
+    "unc":                      "north carolina",
+    "unc asheville":            "unc asheville",
+    "unc greensboro":           "unc greensboro",
+    "unc wilmington":           "unc wilmington",
+    "pitt":                     "pittsburgh",
+    "wku":                      "western kentucky",
+    "wvu":                      "west virginia",
+    "vcu":                      "vcu",
+    "tcu":                      "tcu",
+    "smu":                      "smu",
+    "byu":                      "byu",
+    "sfa":                      "stephen f. austin",
+    "texas a&m":                "texas a&m",
+    "uab":                      "uab",
+    "utsa":                     "utsa",
+    "utep":                     "utep",
+    "usc":                      "usc",
+    "ucf":                      "ucf",
+    "fiu":                      "fiu",
+    "lsu":                      "lsu",
+}
+
+def normalise_team(team_str):
+    n = normalise(team_str)
+    return TORVIK_TEAM_ALIASES.get(n, n)
 
 
 # ── POSITION NORMALISATION ─────────────────────────────────────────────────────
@@ -159,7 +277,8 @@ def compute_cdi(df):
     usg_mult = 1 + (df["usg"] / 100)
     tov_40   = (df["sb_tot_tov"] / df["sb_tot_mp"].replace(0, float("nan"))) * 40
     tov_mult = tov_40.fillna(1) + 1
-    ast_col  = df["sb_ast_40"] if "sb_ast_40" in df.columns else df["AST_per"]
+    ast_col  = (df["sb_tot_ast"] / df["sb_tot_mp"].replace(0, float("nan"))) * 40
+    ast_col  = ast_col.fillna(df["AST_per"])
 
     df["_cdi_raw"] = (ast_col * usg_mult * pos_mult) / tov_mult
  
@@ -221,10 +340,19 @@ def compute_ath(df):
     df["_raw_dunk_rate"] = df["dunksmade"] / df["rimmade"] if "rimmade" in df.columns else 0
     df["dunk_rate_per"] = percentrank_by_pos(df, "_raw_dunk_rate")
     df["atr_fin_per"] = percentrank_by_pos(df, "rimmade/(rimmade+rimmiss)")
-    df["_raw_atr_shr"] = df["rimmade+rimmiss"] / df["fga"] if "fga" in df.columns else 0
+    df["_raw_atr_shr"] = df["rimmade+rimmiss"] / df["sb_tot_fga"] if "sb_tot_fga" in df.columns else 0
     df["atr_shr_per"] = percentrank_by_pos(df, "_raw_atr_shr")
     df["orb_40_per"] = percentrank_by_pos(df, "sb_orb_40")
     df["rpg_per"] = percentrank_by_pos(df, "sb_rpg")
+    # print("DEBUG name:", df["player_name"][:10].tolist())
+    # print("DEBUG dunk_vol_per:", df["dunk_vol_per"][:10].tolist())
+    # print("DEBUG _raw_dunk_rate:", df["_raw_dunk_rate"][:10].tolist())                                                        
+    # print("DEBUG dunk_rate_per:", df["dunk_rate_per"][:10].tolist())
+    # print("DEBUG atr_fin_per:", df["atr_fin_per"][:10].tolist())
+    # print("DEBUG _raw_atr_shr:", df["_raw_atr_shr"][:10].tolist())
+    # print("DEBUG atr_shr_per:", df["atr_shr_per"][:10].tolist())
+    # print("DEBUG orb_40_per:", df["orb_40_per"][:10].tolist())
+    # print("DEBUG rpg_per:", df["rpg_per"][:10].tolist())
     POP_WEIGHTS = {
         "Guard": [0.05, 0.1, 0.25, 0.3, 0.05, 0.25],  
         "Wing":  [0.1, 0.2, 0.2, 0.15, 0.2, 0.15],  
@@ -236,6 +364,10 @@ def compute_ath(df):
     df["blk_per_per"] = percentrank_by_pos(df, "blk_per")
     df["foul_40_per"] = 1 - percentrank_by_pos(df, "pfr")
     df["drb_40_per"] = percentrank_by_pos(df, "sb_drb_40")
+    # print("DEBUG stl_per_per:", df["stl_per_per"][:10].tolist())
+    # print("DEBUG blk_per_per:", df["blk_per_per"][:10].tolist())
+    # print("DEBUG foul_40_per:", df["foul_40_per"][:10].tolist())
+    # print("DEBUG drb_40_per:", df["drb_40_per"][:10].tolist())
     LATERAL_WEIGHTS = {
         "Guard": [0.45, 0.05, 0.30, 0.20],
         "Wing":  [0.35, 0.20, 0.20, 0.25],
@@ -246,6 +378,7 @@ def compute_ath(df):
 
 
     df["ftr_per"] = percentrank_by_pos(df, "ftr")
+    print("DEBUG ftr_per:", df["ftr_per"][:5].tolist())
     
     CONTACT_WEIGHTS = {
         "Guard": [0.50, 0.30, 0.10, 0.10],
@@ -255,22 +388,34 @@ def compute_ath(df):
     CONTACT_COLS = ["ftr_per", "atr_fin_per", "orb_40_per", "drb_40_per"]
 
     # frame = position percentile of (weight * 1000) / height
-    df["_frame_raw"] = (df["sb_weight"] * 1000) / df["sb_height"].replace(0, float("nan"))
-    df["_frame_pct"] = percentrank_by_pos(df, "_frame_raw")
+    # df["_frame_raw"] = (df["sb_weight"] * 1000) / df["sb_height"].replace(0, float("nan"))
+    # df["_frame_pct"] = percentrank_by_pos(df, "_frame_raw")
+    # print("DEBUG sb_weight sample:", df["sb_weight"][:10].tolist() if "sb_weight" in df.columns else "MISSING")
+    # print("DEBUG sb_height sample:", df["sb_height"][:10].tolist() if "sb_height" in df.columns else "MISSING")
+    # print("DEBUG _frame_raw:", df["_frame_raw"][:10].tolist())
+    # print("DEBUG _frame_pct:", df["_frame_pct"][:10].tolist())
+    # print("DEBUG _height_pct:", df["_height_pct"][:10].tolist() if "_height_pct" in df.columns else "MISSING")
 
-    FRAME_WEIGHTS = {
-        "Guard": [0.4, 0.6],
-        "Wing":  [0.5, 0.5],
-        "Big":   [0.6, 0.4],
-    }
-    FRAME_COLS = ["_frame_pct", "_height_pct"]
+    # FRAME_WEIGHTS = {
+    #     "Guard": [0.4, 0.6],
+    #     "Wing":  [0.5, 0.5],
+    #     "Big":   [0.6, 0.4],
+    # }
+    # FRAME_COLS = ["_frame_pct", "_height_pct"]
 
     pop        = _apply_weights(df, POP_COLS,     POP_WEIGHTS)
     lateral    = _apply_weights(df, LATERAL_COLS, LATERAL_WEIGHTS)
     contact    = _apply_weights(df, CONTACT_COLS, CONTACT_WEIGHTS)
-    framescore = _apply_weights(df, FRAME_COLS,   FRAME_WEIGHTS)
-
-    df["_ath_raw"] = (pop + (lateral * 2) + contact + framescore) / 5
+    # framescore = _apply_weights(df, FRAME_COLS,   FRAME_WEIGHTS)
+    
+    #temporary formula: no framescore because weights are not scraper
+    df["_ath_raw"] = (pop + (lateral * 2) + contact) / 4
+    
+    # print("pop sample:", pop[:10].tolist())
+    # print("lateral sample:", lateral[:10].tolist())
+    # print("contact sample:", contact[:10].tolist())
+    # print("frame sample:", framescore[:10].tolist())
+    # print("_ath_raw sample:", df["_ath_raw"][:10].tolist())
     return percentrank_by_pos(df, "_ath_raw").apply(clamp)
 
 
@@ -444,9 +589,12 @@ def main():
         for r in _ps_rows:
             pl = _pl_map.get(r["player_id"], {})
             if pl:
+                # Use player_stats.school for team matching (consistent with scraper)
+                # Fall back to players.current_team if school is missing
+                school = r.get("school") or pl.get("current_team", "")
                 _sb_stats.append({
                     "_sb_name": normalise(pl["name"]),
-                    "_sb_team": normalise(pl.get("current_team", "")),
+                    "_sb_team": normalise(school),
                     "sb_height": pl.get("height"),
                     "sb_weight": pl.get("weight"),
                     **{f"sb_{k}": v for k, v in r.items() if k != "player_id"}
@@ -455,8 +603,17 @@ def main():
         if _sb_stats:
             _sb_df = pd.DataFrame(_sb_stats).drop_duplicates(subset=["_sb_name", "_sb_team"])
             df["_sb_name"] = df["player_name"].apply(normalise)
-            df["_sb_team"] = df["team"].apply(normalise)
+            df["_sb_team"] = df["team"].apply(normalise_team)
             df = df.merge(_sb_df, on=["_sb_name", "_sb_team"], how="left")
+            # Show teams from Supabase that don't appear in Torvik CSV after normalisation
+            sb_teams  = set(_sb_df["_sb_team"].unique())
+            csv_teams = set(df["_sb_team"].unique())
+            unmatched_sb  = sb_teams - csv_teams
+            unmatched_csv = csv_teams - sb_teams
+            if unmatched_sb:
+                print(f"  ⚠  Supabase teams with NO Torvik match: {sorted(unmatched_sb)}")
+            if unmatched_csv:
+                print(f"  ⚠  Torvik CSV teams with NO Supabase match: {sorted(unmatched_csv)}")
             df = df.drop(columns=["_sb_name", "_sb_team"])
             print(f"  Merged {_sb_df.shape[0]} player_stats rows into df")
         else:
@@ -504,15 +661,28 @@ def main():
             for p in players
         }
 
-        # Build stats lookup: player_id → stats_row_year_key
-        stats_res = db.table("player_stats").select("id, player_id, year").execute()
+        # Build stats lookup: player_id → stats_row_year_key (paginated)
+        _sr_rows, _page = [], 0
+        while True:
+            _sr = db.table("player_stats").select("id, player_id, year, cdi") \
+                    .range(_page * 1000, (_page + 1) * 1000 - 1).execute()
+            _sr_rows.extend(_sr.data or [])
+            if len(_sr.data or []) < 1000:
+                break
+            _page += 1
         stats_lookup = {
             (r["player_id"], r["year"]): r["id"]
-            for r in (stats_res.data or [])
+            for r in _sr_rows
+        }
+        already_matched = {
+            r["player_id"]
+            for r in _sr_rows
+            if r.get("cdi") is not None
         }
     else:
-        player_lookup = {}
-        stats_lookup  = {}
+        player_lookup   = {}
+        stats_lookup    = {}
+        already_matched = set()
 
     # ── Process each row ──────────────────────────────────────────────────────
     matched   = 0
@@ -571,11 +741,14 @@ def main():
             continue
 
         # ── Match to Supabase ─────────────────────────────────────────────────
-        key = (normalise(name), normalise(team))
+        key = (normalise(name), normalise_team(team))
         player_id = player_lookup.get(key)
 
         if not player_id:
             unmatched += 1
+            continue
+
+        if args.skip_matched and player_id in already_matched:
             continue
 
         # Update player row

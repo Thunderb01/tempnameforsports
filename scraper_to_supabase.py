@@ -120,7 +120,7 @@ TEAMS = {
     "Jacksonville State": "jacksonville-state", "James Madison": "james-madison",
     "Kansas": "kansas", "Kansas State": "kansas-state",
     "Kent State": "kent-state", "Kentucky": "kentucky", "La Salle": "la-salle",
-    "Lafayette": "lafayette", "Lehigh": "lehigh", "Liberty": "liberty",
+    "Lafayette": "lafayette", "Lamar": "lamar", "Lehigh": "lehigh", "Liberty": "liberty",
     "Lipscomb": "lipscomb", "Long Beach State": "long-beach-state",
     "Longwood": "longwood", "Louisiana": "louisiana-lafayette",
     "Louisiana Tech": "louisiana-tech", "Louisville": "louisville",
@@ -283,6 +283,7 @@ def scrape_player(url, team_name, year):
 
     # Bio
     pos, yr = "", ""
+    height, weight = None, None
     bio = soup.find("div", {"id": "info"})
     if bio:
         text = bio.get_text(" ", strip=True)
@@ -290,6 +291,12 @@ def scrape_player(url, team_name, year):
         if pm: pos = normalise_pos(pm.group(1))
         cm = re.search(r"\b(FR|SO|JR|SR|GR|Freshman|Sophomore|Junior|Senior|Graduate)\b", text, re.I)
         if cm: yr = normalise_class(cm.group(1))
+        # Height: e.g. "6-4" or "6 ft 4 in"
+        hm = re.search(r'\b(\d)-(\d{1,2})\b', text)
+        if hm: height = f"{hm.group(1)}-{hm.group(2)}"
+        # Weight: e.g. "210 lb"
+        wm = re.search(r'(\d{2,3})\s*(?:lb|lbs)', text, re.I)
+        if wm: weight = int(wm.group(1))
 
     pg  = parse_table(html, "players_per_game", year)
     adv = parse_table(html, "players_advanced", year)
@@ -356,6 +363,8 @@ def scrape_player(url, team_name, year):
         "source":           "program",
         "playmaker_tags":   auto_playmaker_tags(apg, ast_tov, usg or 0),
         "shooting_tags":    auto_shooting_tags(tp_v, ppg, fg_v, usg or 0),
+        "height":           height,
+        "weight":           weight,
     }
 
     # stats row (for `player_stats` table) — all numeric, pct as float
@@ -400,7 +409,7 @@ def scrape_player(url, team_name, year):
         "tot_pf":  tot_pf,
         "tot_pts": tot_pts,
         # school + conference from the stats table
-        "school":     str(pg.get("Team", team_name)).strip() if pg is not None else team_name,
+        "school":     team_name,
         "conference": str(pg.get("Conf", "")).strip() if pg is not None else "",
         # cdi, dds, sei, ath, ris left null — filled by torvik_metrics.py
     }
