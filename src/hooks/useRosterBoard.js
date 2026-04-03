@@ -241,12 +241,14 @@ export function useRosterBoard(team) {
 
   function calc() {
     const { settings, roster, retentionById, nilById } = state;
+    const GRADUATING = ["Senior", "Graduate", "SR", "GR"];
+    const isGraduating = p => GRADUATING.includes(p.year);
     const committedReturning = returningPlayers.filter(
-      p => (retentionById[p.id] || "returning") === "returning"
+      p => !isGraduating(p) && (retentionById[p.id] || "returning") === "returning"
     ).length;
     const totalRoster        = roster.length + committedReturning;
     const returningNil       = returningPlayers
-      .filter(p => (retentionById[p.id] || "returning") === "returning")
+      .filter(p => !isGraduating(p) && (retentionById[p.id] || "returning") === "returning")
       .reduce((sum, p) => sum + (nilById[p.id] || 0), 0);
     const nilCommitted       = roster.reduce((sum, r) => sum + (r.nilOffer || 0), 0) + returningNil;
     const nilRemaining       = settings.nilTotal - nilCommitted;

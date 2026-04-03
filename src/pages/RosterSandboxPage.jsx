@@ -60,7 +60,7 @@ function RosterCard({ r, canDelete, onLoad, onDelete }) {
 export function RosterSandboxPage() {
   const { profile, user } = useAuth();
   const userId = user?.id || "";
-  const { isAdmin, activeTeam, selectedTeam, setSelectedTeam, allTeams } = useAdminTeam(profile);
+  const { isAdmin, isNonAffiliate, activeTeam, selectedTeam, setSelectedTeam, allTeams } = useAdminTeam(profile);
   const board  = useRosterBoard(activeTeam);
 
   const [modal,          setModal]          = useState(null);
@@ -280,8 +280,8 @@ export function RosterSandboxPage() {
             );
           })()}
 
-          {/* Save bar — only when in live mode */}
-          {!activeRoster && (
+          {/* Save bar — only when in live mode and not a nonaffiliate */}
+          {!activeRoster && !isNonAffiliate && (
             <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
               <input className="input" placeholder="Name this roster…" style={{ flex: 1, maxWidth: 280 }}
                 value={saveName} onChange={e => setSaveName(e.target.value)}

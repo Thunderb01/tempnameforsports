@@ -3,7 +3,7 @@ torvik_metrics.py — Load Torvik CSV → compute BtPM metrics + NIL valuation �
 ================================================================================================
 Reads trank_data.csv, matches players to Supabase by (name, team), writes:
   - Raw Torvik inputs to player_stats (torvik_* columns)
-  - Computed BtPM metrics to player_stats (cdi, dds, sei, smi, ris)
+  - Computed BtPM metrics to player_stats (cdi, dds, sei, ath, ris)
   - NIL valuation to players (nil_valuation)
   - Birth year to players (birth_year)
 
@@ -38,7 +38,7 @@ Prerequisites — run once in Supabase SQL Editor:
     ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS cdi float;
     ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS dds float;
     ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS sei float;
-    ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS smi float;
+    ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS ath float;
     ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS ris float;
     ALTER TABLE players ADD COLUMN IF NOT EXISTS nil_valuation float;
     ALTER TABLE players ADD COLUMN IF NOT EXISTS birth_year int;
@@ -157,10 +157,11 @@ def compute_cdi(df):
 
     pos_mult = df["pos_bucket"].map({"Big": 1.15, "Wing": 1.08, "Guard": 1.0})
     usg_mult = 1 + (df["usg"] / 100)
-    tov_mult = df["TO_per"] + 1
+    tov_40   = (df["sb_tot_tov"] / df["sb_tot_mp"].replace(0, float("nan"))) * 40
+    tov_mult = tov_40.fillna(1) + 1
+    ast_col  = df["sb_ast_40"] if "sb_ast_40" in df.columns else df["AST_per"]
 
-    
-    df["_cdi_raw"] = (df["AST_per"] * usg_mult * pos_mult) / tov_mult
+    df["_cdi_raw"] = (ast_col * usg_mult * pos_mult) / tov_mult
  
 
 
@@ -180,7 +181,7 @@ def compute_dds(df):
     # MAX(0, BG2 + 0.75*BH2 + 0.5*BI2 - 0.5*N2),
     # 0
 
-    df["_dds_raw"] = (df["stl_per"] + 0.75 * df["blk_per"] + 0.5 * df["DRB_per"] - 0.5 * df["pfr"]).clip(lower=0)
+    df["_dds_raw"] = (df["sb_stl_40"] + 0.75 * df["sb_blk_40"] + 0.5 * df["sb_drb_40"] - 0.5 * df["pfr"]).clip(lower=0)
 
     return percentrank_by_pos(df, "_dds_raw").apply(clamp)
 
@@ -196,19 +197,81 @@ def compute_sei(df):
     #   AV2 * SQRT( AH2 / (AF2/40) )
 
 
+    df["_fga_40"] = (df["sb_tot_fga"] / df["sb_tot_mp"].replace(0, float("nan"))) * 40
 
-    df["_sei_raw"] = df["TS_per"] * (df["usg"]/100)**0.5
+    df["_sei_raw"] = df["TS_per"] * (df["_fga_40"])**0.5
     return percentrank_by_pos(df, "_sei_raw").apply(clamp)
 
 
-def compute_smi(df):
+def compute_ath(df):
     """
-    SMI — Shot Making Index
-    Measures shot quality and shot-making ability across zones.
+    ATH — Athleticism Index
+    Measures athleticism and physical impact.
     Inputs to consider: rimmade/(rimmade+rimmiss), midmade/(midmade+midmiss), TP_per, FT_per, eFG, TS_per, ftr
     """
-    # TODO: build composite + percentrank
-    return pd.Series(None, index=df.index, dtype=float)
+    def _apply_weights(df, cols, weights_dict):
+        def _row(row):
+            w = weights_dict.get(row["pos_bucket"], weights_dict["Wing"])
+            return sum(row[c] * w[i] for i, c in enumerate(cols))
+        return df.apply(_row, axis=1)
+    
+
+    
+    df["dunk_vol_per"] = percentrank_by_pos(df, "dunksmade")
+    df["_raw_dunk_rate"] = df["dunksmade"] / df["rimmade"] if "rimmade" in df.columns else 0
+    df["dunk_rate_per"] = percentrank_by_pos(df, "_raw_dunk_rate")
+    df["atr_fin_per"] = percentrank_by_pos(df, "rimmade/(rimmade+rimmiss)")
+    df["_raw_atr_shr"] = df["rimmade+rimmiss"] / df["fga"] if "fga" in df.columns else 0
+    df["atr_shr_per"] = percentrank_by_pos(df, "_raw_atr_shr")
+    df["orb_40_per"] = percentrank_by_pos(df, "sb_orb_40")
+    df["rpg_per"] = percentrank_by_pos(df, "sb_rpg")
+    POP_WEIGHTS = {
+        "Guard": [0.05, 0.1, 0.25, 0.3, 0.05, 0.25],  
+        "Wing":  [0.1, 0.2, 0.2, 0.15, 0.2, 0.15],  
+        "Big":   [0.2, 0.3, 0.1, 0.1, 0.25, 0.05],  
+    }
+    POP_COLS = ["dunk_vol_per", "dunk_rate_per", "atr_fin_per", "atr_shr_per", "orb_40_per", "rpg_per"]  
+    
+    df["stl_per_per"] = percentrank_by_pos(df, "stl_per")
+    df["blk_per_per"] = percentrank_by_pos(df, "blk_per")
+    df["foul_40_per"] = 1 - percentrank_by_pos(df, "pfr")
+    df["drb_40_per"] = percentrank_by_pos(df, "sb_drb_40")
+    LATERAL_WEIGHTS = {
+        "Guard": [0.45, 0.05, 0.30, 0.20],
+        "Wing":  [0.35, 0.20, 0.20, 0.25],
+        "Big":   [0.15, 0.50, 0.25, 0.10],
+    }
+    LATERAL_COLS = ["stl_per_per", "blk_per_per", "foul_40_per", "drb_40_per"]  
+    
+
+
+    df["ftr_per"] = percentrank_by_pos(df, "ftr")
+    
+    CONTACT_WEIGHTS = {
+        "Guard": [0.50, 0.30, 0.10, 0.10],
+        "Wing":  [0.35, 0.25, 0.20, 0.20],
+        "Big":   [0.15, 0.15, 0.35, 0.35],
+    }
+    CONTACT_COLS = ["ftr_per", "atr_fin_per", "orb_40_per", "drb_40_per"]
+
+    # frame = position percentile of (weight * 1000) / height
+    df["_frame_raw"] = (df["sb_weight"] * 1000) / df["sb_height"].replace(0, float("nan"))
+    df["_frame_pct"] = percentrank_by_pos(df, "_frame_raw")
+
+    FRAME_WEIGHTS = {
+        "Guard": [0.4, 0.6],
+        "Wing":  [0.5, 0.5],
+        "Big":   [0.6, 0.4],
+    }
+    FRAME_COLS = ["_frame_pct", "_height_pct"]
+
+    pop        = _apply_weights(df, POP_COLS,     POP_WEIGHTS)
+    lateral    = _apply_weights(df, LATERAL_COLS, LATERAL_WEIGHTS)
+    contact    = _apply_weights(df, CONTACT_COLS, CONTACT_WEIGHTS)
+    framescore = _apply_weights(df, FRAME_COLS,   FRAME_WEIGHTS)
+
+    df["_ath_raw"] = (pop + (lateral * 2) + contact + framescore) / 5
+    return percentrank_by_pos(df, "_ath_raw").apply(clamp)
 
 
 def compute_ris(df):
@@ -228,10 +291,10 @@ def compute_ris(df):
     #   ),
     # "")
     rimmade = df["rimmade"] * df["rimmade/(rimmade+rimmiss)"]**0.5
-    freethrow = 6 * (df["FT_per"])
-    orb = 1.2 * df["ORB_per"]
-    blk = 0.9 * df["blk_per"]
-    drb = 0.4 * df["DRB_per"]
+    freethrow = 6 * (df["sb_tot_fta"]/(df["sb_tot_fga"] + 1))
+    orb = 1.2 * df["sb_orb_40"]
+    blk = 0.9 * df["sb_blk_40"]
+    drb = 0.4 * df["sb_drb_40"]
     df["_ris_raw"] = rimmade + freethrow + orb + blk + drb
     return percentrank_by_pos(df, "_ris_raw").apply(clamp)
 
@@ -240,14 +303,86 @@ def compute_ris(df):
 
 def compute_nil_valuation(df):
     """
-    NIL Valuation — estimated market value in dollars.
-    Inputs: all BtPM metrics + raw Torvik stats.
-    Return a Series of dollar amounts.
+    NIL Valuation matching the Weighted_Performance_Score sheet formula.
+
+    Total Score = SUMPRODUCT of percentile-ranked stats × weights
+    Base NIL    = MIN(cap, cap × W² × (1 - (1 - V⁴)(1 - W)²)^1.2)
+    Final NIL   = Base NIL × Position Boost × Age Boost
     """
-    # TODO: define your formula, e.g.:
-    # composite = (df["_cdi"] + df["_dds"] + df["_sei"] + df["_smi"] + df["_ris"]) / 5
-    # return (composite - 80).clip(lower=0) * 5000
-    return pd.Series(None, index=df.index, dtype=float)
+    # ── Stat weights (from Weights sheet) ────────────────────────────────────
+    WEIGHTS = {
+        "ppg":     0.15,
+        "ts_pct":  0.12,
+        "3p_pct":  0.08,
+        "ast_pct": 0.02,  # AST% — Torvik AST_per
+        "ast_tov": 0.10,
+        "stl_40":  0.07,
+        "blk_40":  0.07,
+        "drb_40":  0.05,
+        "orb_40":  0.04,
+        # MPG weight = 0 (excluded)
+        # Scout scores (BtPM metrics scaled to 0–1)
+        "ath":     0.07,
+        "dds":     0.08,
+        "sei":     0.05,  # Versatility proxy
+        "ris":     0.04,  # Motor proxy
+        "cdi":     0.06,  # IQ proxy
+    }
+
+    # ── Percentile-rank each stat across full df (0–1 scale) ─────────────────
+    def prank(series):
+        return series.rank(pct=True, na_option="keep").fillna(0)
+
+    stat_scores = (
+        prank(df.get("sb_ppg",    df.get("ppg",    pd.Series(0, index=df.index)))) * WEIGHTS["ppg"]     +
+        prank(df.get("sb_fg_pct", df.get("TS_per", pd.Series(0, index=df.index)))) * WEIGHTS["ts_pct"]  +
+        prank(df.get("sb_3p_pct", df.get("TP_per", pd.Series(0, index=df.index)))) * WEIGHTS["3p_pct"]  +
+        prank(df.get("AST_per",   pd.Series(0, index=df.index)))                   * WEIGHTS["ast_pct"] +
+        prank(df.get("ast/tov",   pd.Series(0, index=df.index)))                   * WEIGHTS["ast_tov"] +
+        prank(df.get("stl_per",   pd.Series(0, index=df.index)))                   * WEIGHTS["stl_40"]  +
+        prank(df.get("blk_per",   pd.Series(0, index=df.index)))                   * WEIGHTS["blk_40"]  +
+        prank(df.get("DRB_per",   pd.Series(0, index=df.index)))                   * WEIGHTS["drb_40"]  +
+        prank(df.get("ORB_per",   pd.Series(0, index=df.index)))                   * WEIGHTS["orb_40"]
+    )
+
+    # BtPM metrics are 0–100; scale to 0–1 for consistency
+    scout_scores = (
+        (df["_ath"].fillna(0) / 100) * WEIGHTS["ath"] +
+        (df["_dds"].fillna(0) / 100) * WEIGHTS["dds"] +
+        (df["_sei"].fillna(0) / 100) * WEIGHTS["sei"] +
+        (df["_ris"].fillna(0) / 100) * WEIGHTS["ris"] +
+        (df["_cdi"].fillna(0) / 100) * WEIGHTS["cdi"]
+    )
+
+    total_score = (stat_scores + scout_scores).clip(0, 1)  # W
+
+    # ── Conference adjustment (V) ─────────────────────────────────────────────
+    CONF_WEIGHTS = {
+        "ACC": 1.0, "B10": 1.0, "B12": 1.0, "SEC": 1.0, "BE": 1.0,
+        "MWC": 0.9, "A10": 0.9, "WCC": 0.9, "AAC": 0.9,
+        "MVC": 0.8, "SoCon": 0.8, "MAC": 0.8, "CUSA": 0.8,
+    }
+    conf_col = df.get("sb_conference", pd.Series("", index=df.index))
+    conf_adj = conf_col.map(CONF_WEIGHTS).fillna(0.75)  # V
+
+    # ── NIL Cap ───────────────────────────────────────────────────────────────
+    nil_cap = 3_500_000  # matches sheet default
+
+    # ── Base NIL = MIN(cap, cap × W² × (1 - (1-V⁴)(1-W)²)^1.2) ─────────────
+    blend = (1 - (1 - conf_adj**4) * (1 - total_score)**2) ** 1.2
+    base_nil = (nil_cap * total_score**2 * blend).clip(upper=nil_cap)
+
+    # ── Position Boost ────────────────────────────────────────────────────────
+    pos_boost = df["pos_bucket"].map({"Big": 1.15, "Wing": 1.0, "Guard": 1.0}).fillna(1.0)
+
+    # ── Age/Year Boost ────────────────────────────────────────────────────────
+    yr_col = df.get("sb_year", pd.Series("", index=df.index))
+    yr_boost = yr_col.map(
+        {"Sophomore": 1.15, "Junior": 1.08, "Senior": 0.95, "Graduate": 0.95, "Freshman": 1.15}
+    ).fillna(1.0)
+
+    return (base_nil * pos_boost * yr_boost).clip(lower=0)
+
 
 
 # ── MAIN ───────────────────────────────────────────────────────────────────────
@@ -282,7 +417,12 @@ def main():
             _res = _db_tmp.table("player_stats") \
                           .select("player_id, ppg, apg, rpg, stl_40, blk_40, "
                                   "drb_40, orb_40, trb_40, ast_40, ast_tov, usg, "
-                                  "fg_pct, ft_pct, 3p_pct") \
+                                  "fg_pct, ft_pct, 3p_pct, "
+                                  "tot_g, tot_gs, tot_mp, tot_fg, tot_fga, "
+                                  "tot_3p, tot_3pa, tot_2p, tot_2pa, "
+                                  "tot_ft, tot_fta, tot_orb, tot_drb, tot_trb, "
+                                  "tot_ast, tot_stl, tot_blk, tot_tov, tot_pf, tot_pts, "
+                                  "school, conference") \
                           .range(_page * _ps, (_page + 1) * _ps - 1).execute()
             _ps_rows.extend(_res.data or [])
             if len(_res.data or []) < _ps:
@@ -292,7 +432,7 @@ def main():
         # Also need player name+team to join
         _pl_rows, _page = [], 0
         while True:
-            _res = _db_tmp.table("players").select("id, name, current_team") \
+            _res = _db_tmp.table("players").select("id, name, current_team, height, weight") \
                           .range(_page * _ps, (_page + 1) * _ps - 1).execute()
             _pl_rows.extend(_res.data or [])
             if len(_res.data or []) < _ps:
@@ -307,6 +447,8 @@ def main():
                 _sb_stats.append({
                     "_sb_name": normalise(pl["name"]),
                     "_sb_team": normalise(pl.get("current_team", "")),
+                    "sb_height": pl.get("height"),
+                    "sb_weight": pl.get("weight"),
                     **{f"sb_{k}": v for k, v in r.items() if k != "player_id"}
                 })
 
@@ -320,15 +462,24 @@ def main():
         else:
             print("  No player_stats rows fetched — skipping merge")
     # In dry-run mode, sb_* columns won't exist; formulas should guard with .get or fillna
+    print([c for c in df.columns if c.startswith("sb_")])
+
+    print(df.columns.tolist())
 
     # ── Position buckets + pre-compute metrics over full df ───────────────────
     df = df.reset_index(drop=True)
     df["pos_bucket"] = df["role"].apply(normalise_pos) if "role" in df.columns else "Wing"
 
+    # Physical percentiles (position-relative) — used inside compute_ath
+    if "sb_height" in df.columns:
+        df["_height_pct"] = percentrank_by_pos(df, "sb_height")
+    if "sb_weight" in df.columns:
+        df["_weight_pct"] = percentrank_by_pos(df, "sb_weight")
+
     df["_cdi"] = compute_cdi(df)
     df["_dds"] = compute_dds(df)
     df["_sei"] = compute_sei(df)
-    df["_smi"] = compute_smi(df)
+    df["_ath"] = compute_ath(df)
     df["_ris"] = compute_ris(df)
     df["_nil"] = compute_nil_valuation(df)
 
@@ -401,7 +552,7 @@ def main():
         cdi = safe(df.at[idx, "_cdi"])
         dds = safe(df.at[idx, "_dds"])
         sei = safe(df.at[idx, "_sei"])
-        smi = safe(df.at[idx, "_smi"])
+        ath = safe(df.at[idx, "_ath"])
         ris = safe(df.at[idx, "_ris"])
         nil = safe(df.at[idx, "_nil"])
 
@@ -415,7 +566,7 @@ def main():
                 pass
 
         if args.dry_run:
-            print(f"  {name} ({team}) | cdi={cdi} dds={dds} sei={sei} smi={smi} ris={ris} | NIL={nil} | born={birth_year}")
+            print(f"  {name} ({team}) | cdi={cdi} dds={dds} sei={sei} ath={ath} ris={ris} | NIL={nil} | born={birth_year}")
             matched += 1
             continue
 
@@ -438,7 +589,7 @@ def main():
 
         # Update player_stats row
         stats_patch = {**torvik}
-        for key_m, val in [("cdi", cdi), ("dds", dds), ("sei", sei), ("smi", smi), ("ris", ris)]:
+        for key_m, val in [("cdi", cdi), ("dds", dds), ("sei", sei), ("ath", ath), ("ris", ris)]:
             if val is not None:
                 stats_patch[key_m] = val
 

@@ -293,6 +293,7 @@ def scrape_player(url, team_name, year):
 
     pg  = parse_table(html, "players_per_game", year)
     adv = parse_table(html, "players_advanced", year)
+    tot = parse_table(html, "players_totals",   year)
 
     if pg is None:
         print(f"      ⚠  No stats for {name} — skipping")
@@ -323,6 +324,29 @@ def scrape_player(url, team_name, year):
     if not pos and pg is not None: pos = normalise_pos(pg.get("Pos", "G"))
     if not yr  and pg is not None: yr  = normalise_class(pg.get("Class", ""))
 
+    # Totals (raw counting stats for the season)
+    t = tot if tot is not None else pg  # fall back to per-game row if totals missing
+    tot_g   = int(safe_float(t.get("G",   0)))
+    tot_gs  = int(safe_float(t.get("GS",  0)))
+    tot_mp  = int(safe_float(t.get("MP",  0)))
+    tot_fg  = int(safe_float(t.get("FG",  0)))
+    tot_fga = int(safe_float(t.get("FGA", 0)))
+    tot_3p  = int(safe_float(t.get("3P",  0)))
+    tot_3pa = int(safe_float(t.get("3PA", 0)))
+    tot_2p  = int(safe_float(t.get("2P",  0)))
+    tot_2pa = int(safe_float(t.get("2PA", 0)))
+    tot_ft  = int(safe_float(t.get("FT",  0)))
+    tot_fta = int(safe_float(t.get("FTA", 0)))
+    tot_orb = int(safe_float(t.get("ORB", 0)))
+    tot_drb = int(safe_float(t.get("DRB", 0)))
+    tot_trb = int(safe_float(t.get("TRB", 0)))
+    tot_ast = int(safe_float(t.get("AST", 0)))
+    tot_stl = int(safe_float(t.get("STL", 0)))
+    tot_blk = int(safe_float(t.get("BLK", 0)))
+    tot_tov = int(safe_float(t.get("TOV", 0)))
+    tot_pf  = int(safe_float(t.get("PF",  0)))
+    tot_pts = int(safe_float(t.get("PTS", 0)))
+
     # player row (for `players` table)
     player_row = {
         "name":             name,
@@ -338,6 +362,7 @@ def scrape_player(url, team_name, year):
     stats_row = {
         "year":    yr,
         "name":    name,
+        # per-game
         "ppg":     round(ppg,  1),
         "rpg":     round(rpg,  1),
         "apg":     round(apg,  1),
@@ -353,7 +378,31 @@ def scrape_player(url, team_name, year):
         "drb_40":  per40(drpg, mpg),
         "orb_40":  per40(orpg, mpg),
         "trb_40":  per40(rpg,  mpg),
-        # cdi, dds, sei, smi, ris left null — filled by model
+        # totals
+        "tot_g":   tot_g,
+        "tot_gs":  tot_gs,
+        "tot_mp":  tot_mp,
+        "tot_fg":  tot_fg,
+        "tot_fga": tot_fga,
+        "tot_3p":  tot_3p,
+        "tot_3pa": tot_3pa,
+        "tot_2p":  tot_2p,
+        "tot_2pa": tot_2pa,
+        "tot_ft":  tot_ft,
+        "tot_fta": tot_fta,
+        "tot_orb": tot_orb,
+        "tot_drb": tot_drb,
+        "tot_trb": tot_trb,
+        "tot_ast": tot_ast,
+        "tot_stl": tot_stl,
+        "tot_blk": tot_blk,
+        "tot_tov": tot_tov,
+        "tot_pf":  tot_pf,
+        "tot_pts": tot_pts,
+        # school + conference from the stats table
+        "school":     str(pg.get("Team", team_name)).strip() if pg is not None else team_name,
+        "conference": str(pg.get("Conf", "")).strip() if pg is not None else "",
+        # cdi, dds, sei, ath, ris left null — filled by torvik_metrics.py
     }
 
     print(f"      ✓ {name} | {pos} | {yr} | {ppg} PPG / {rpg} RPG")

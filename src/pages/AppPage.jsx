@@ -27,7 +27,7 @@ export function AppPage() {
   
   const { profile, user } = useAuth();
   const userId = user?.id || "";
-  const { isAdmin, activeTeam, selectedTeam, setSelectedTeam, allTeams } = useAdminTeam(profile);
+  const { isAdmin, isNonAffiliate, activeTeam, selectedTeam, setSelectedTeam, allTeams } = useAdminTeam(profile);
 
   const board = useRosterBoard(activeTeam);
   //some debug logs to help track down state loading issues
@@ -314,12 +314,14 @@ export function AppPage() {
             </div>
 
             <div className="setting setting-wide" style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
+              {!isNonAffiliate && (<>
               <input className="input" placeholder="Name this roster…" style={{ flex: 1, minWidth: 160 }}
                 value={saveName} onChange={e => setSaveName(e.target.value)}
                 onKeyDown={e => e.key === "Enter" && handleSaveRoster()} />
               <button className="btn btn-primary" disabled={!saveName.trim() || saving} onClick={handleSaveRoster}>
                 {saving ? "Saving…" : "Save Roster"}
               </button>
+              </>)}
               <button className="btn btn-ghost" onClick={() => {
                 const blob = new Blob([JSON.stringify(board.state, null, 2)], { type: "application/json" });
                 const a = Object.assign(document.createElement("a"), {

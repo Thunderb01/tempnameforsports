@@ -41,13 +41,13 @@ const STAT_ROWS = [
 //   { key: "ris", label: "RIS" },
 // ];
 
-// Pentagon order (clockwise from top): SEI, SMI, RIS, DDS, CDI
+// Pentagon order (clockwise from top): Scoring Efficiency, ATH, Interior Impact, Defending, Playmaking
 const PENTAGON_METRICS = [
-  { key: "sei", label: "SEI", desc: "Scoring Efficiency Index — lorem ipsum dolor sit amet, consectetur adipiscing elit." },
-  { key: "smi", label: "SMI", desc: "Shot Making Index — lorem ipsum dolor sit amet, consectetur adipiscing elit." },
-  { key: "ris", label: "RIS", desc: "Rebounding Impact Score — lorem ipsum dolor sit amet, consectetur adipiscing elit." },
-  { key: "dds", label: "DDS", desc: "Defensive Disruption Score — lorem ipsum dolor sit amet, consectetur adipiscing elit." },
-  { key: "cdi", label: "CDI", desc: "Creation & Distribution Index — lorem ipsum dolor sit amet, consectetur adipiscing elit." },
+  { key: "sei", label: "Scoring Efficiency"},
+  { key: "ath", label: "Athleticism"},
+  { key: "ris", label: "Interior Impact"},
+  { key: "dds", label: "Defending"},
+  { key: "cdi", label: "Playmaking"},
 ];
 
 function letterGrade(val) {
