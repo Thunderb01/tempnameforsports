@@ -76,7 +76,7 @@ function gradeColor(grade) {
 }
 
 function SkillProfile({ stats }) {
-  const cx = 120, cy = 115, r = 72;
+  const cx = 100, cy = 98, r = 58;
   const n = 5;
   const angles = Array.from({ length: n }, (_, i) => (i * 2 * Math.PI / n) - Math.PI / 2);
 
@@ -93,7 +93,7 @@ function SkillProfile({ stats }) {
   return (
     <div style={{ display: "flex", gap: 24, alignItems: "center", flexWrap: "wrap" }}>
       {/* Pentagon */}
-      <svg width="240" height="230" viewBox="0 0 240 230" style={{ flexShrink: 0 }}>
+      <svg width="200" height="196" viewBox="0 0 200 196" style={{ flexShrink: 0 }}>
         {/* Background rings */}
         {[0.25, 0.5, 0.75, 1].map(s => (
           <polygon key={s} points={polygonPoints(s)} fill="none" stroke="rgba(255,255,255,.08)" strokeWidth="1" />
@@ -108,12 +108,12 @@ function SkillProfile({ stats }) {
         <polygon points={playerPoints} fill="rgba(91,156,246,.25)" stroke="#5b9cf6" strokeWidth="2" />
         {/* Labels */}
         {angles.map((a, i) => {
-          const lr = r + 28;
+          const lr = r + 22;
           const x = cx + lr * Math.cos(a);
           const y = cy + lr * Math.sin(a);
           return (
             <text key={i} x={x} y={y} textAnchor="middle" dominantBaseline="middle"
-              fill="rgba(255,255,255,.5)" fontSize="11" fontWeight="500">
+              fill="rgba(255,255,255,.5)" fontSize="9" fontWeight="500">
               {PENTAGON_METRICS[i].label}
             </text>
           );

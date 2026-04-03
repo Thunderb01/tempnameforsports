@@ -257,35 +257,21 @@ def percentrank_by_pos(df, col, pos_col="pos_bucket", scale=100):
 #   ast/tov
 
 def compute_cdi(df):
-    """
-    CDI — Creation & Distribution Index
-    Measures playmaking, ball creation, and decision-making quality.
-    Inputs to consider: AST_per, TO_per, ast/tov, obpm, ogbpm, usg
-    """
-    
-    # Example formula (scale and weights are arbitrary starting points — adjust as needed):
-    # (
-    #     Ast/40
-    #     * (1 + (usage/100))
-    #     * position_multiplier  # e.g. 1.15 for Bigs, 1.08 for Wings, 1.0 for Guards
-    # )
-    # / ((AR5/(AF5/40)) + 1),
-    # Note I am using AST_per instead of ast/40, and TO_per instead of ast/tov, because AST_per and TO_per are already normalized for pace and opportunity, so they should be more stable inputs for a composite metric. But you could experiment with different combinations.
+    pos_mult = df["pos_bucket"].map({"Guard": 1.15, "Wing": 1.08, "Big": 1.0})
 
+    # AST_per: Torvik's pace-adjusted assist %, available for everyone
+    ast_score = df["AST_per"]
 
-    pos_mult = df["pos_bucket"].map({"Big": 1.15, "Wing": 1.08, "Guard": 1.0})
-    usg_mult = 1 + (df["usg"] / 100)
-    tov_40   = (df["sb_tot_tov"] / df["sb_tot_mp"].replace(0, float("nan"))) * 40
-    tov_mult = tov_40.fillna(1) + 1
-    ast_col  = (df["sb_tot_ast"] / df["sb_tot_mp"].replace(0, float("nan"))) * 40
-    ast_col  = ast_col.fillna(df["AST_per"])
+    # ast_tov from Torvik — direct measure of decision quality
+    # Use totals-derived when available, fall back to Torvik column
+    ast_40  = (df["sb_tot_ast"] / df["sb_tot_mp"].replace(0, float("nan"))) * 40
+    tov_40  = (df["sb_tot_tov"] / df["sb_tot_mp"].replace(0, float("nan"))) * 40
+    ast_tov = (ast_40 / tov_40.replace(0, float("nan"))).fillna(df["ast_tov"])
 
-    df["_cdi_raw"] = (ast_col * usg_mult * pos_mult) / tov_mult
- 
-
+    df["_cdi_raw"] = ast_score * (ast_tov ** 0.5) * pos_mult
 
     return percentrank_by_pos(df, "_cdi_raw").apply(clamp)
-    # return pd.Series(None, index=df.index, dtype=float)
+
 
 
 def compute_dds(df):
