@@ -386,7 +386,9 @@ def compute_ath(df, use_torvik=False):
               + mobility(row)  * w[1]
               + contact(row)   * w[2])
 
-    df["_ath_raw"] = df.apply(ath_raw, axis=1)
+    # Weight by minutes share so rate-stat flukes from small samples rank lower
+    min_weight = (df["Min_per"] / 100).clip(0.15, 1.0)
+    df["_ath_raw"] = df.apply(ath_raw, axis=1) * min_weight
     return percentrank_by_pos(df, "_ath_raw").apply(clamp)
 
 
@@ -488,7 +490,7 @@ def compute_nil_valuation(df):
     conf_adj = conf_col.map(CONF_WEIGHTS).fillna(0.75)  # V
 
     # ── NIL Cap ───────────────────────────────────────────────────────────────
-    nil_cap = 3_500_000  # matches sheet default
+    nil_cap = 2_000_000
 
     # ── Base NIL = MIN(cap, cap × W² × (1 - (1-V⁴)(1-W)²)^1.2) ─────────────
     blend = (1 - (1 - conf_adj**4) * (1 - total_score)**2) ** 1.2
@@ -774,6 +776,9 @@ def main():
         hometown = str(row.get("type", "")).strip()
         if hometown and hometown not in ("nan", ""):
             player_patch["hometown"] = hometown
+        pos = normalise_pos(row.get("role", ""))
+        if pos:
+            player_patch["primary_position"] = pos
         if player_patch:
             db.table("players").update(player_patch).eq("id", player_id).execute()
 

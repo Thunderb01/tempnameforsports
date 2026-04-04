@@ -347,7 +347,7 @@ export function AppPage() {
           <div className="panel">
             <div className="panel-head">
               <h2>Board</h2>
-              <p className="muted">Portal targets from your import board.</p>
+              <p className="muted">Portal targets from your import board. Player availability is subject to change — portal status is not guaranteed for all listed players.</p>
               <div className="panel-tools">
                 <input className="input" type="search" placeholder="Search…"
                   value={search} onChange={e => setSearch(e.target.value)} />

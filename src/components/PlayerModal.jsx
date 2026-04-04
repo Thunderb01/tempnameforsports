@@ -43,11 +43,11 @@ const STAT_ROWS = [
 
 // Pentagon order (clockwise from top): Scoring Efficiency, ATH, Interior Impact, Defending, Playmaking
 const PENTAGON_METRICS = [
-  { key: "sei", label: "Scoring Efficiency"},
-  { key: "ath", label: "Athleticism"},
-  { key: "ris", label: "Rim Impact"},
-  { key: "dds", label: "Defending"},
-  { key: "cdi", label: "Playmaking"},
+  { key: "sei", label: "Scoring Efficiency", desc: "Powered by TS% and FGA for volume." },
+  { key: "ath", label: "Athleticism",        desc: "Advanced metrics across lateral, vertical, and contact — including dunk volume, ATR share, FTR, and more." },
+  { key: "ris", label: "Rim Impact",         desc: "Driven by BLK%, DRB%, ORB%, and rim FG%." },
+  { key: "dds", label: "Defending",          desc: "Driven by BLK%, STL%, DRB%, and FC/40." },
+  { key: "cdi", label: "Playmaking",         desc: "Driven by AST%, TO%, and positional weighting." },
 ];
 
 function letterGrade(val) {
