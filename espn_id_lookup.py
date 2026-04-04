@@ -230,7 +230,7 @@ def main():
         return
 
     print("Fetching players from Supabase…")
-    players = fetch_all_supabase_players(sb, skip_existing=False)
+    players = fetch_all_supabase_players(sb, skip_existing=args.skip_existing)
     print(f"  {len(players)} players to process")
 
     # Group players by team so we only fetch each ESPN roster once

@@ -105,7 +105,7 @@ export function AppPage() {
       const nilById       = board.state.nilById       || {};
       const returning = board.returningPlayers
         .map(p => ({ roster_id: row.id, player_id: p.id, player_type: retentionById[p.id] || "returning", nil_offer: nilById[p.id] || 0 }))
-        .filter(p => p.player_type !== "entering_portal");
+        .filter(p => p.player_type !== "entering_portal" && p.player_type !== "graduating");
       const transfers = board.state.roster
         .map(e => ({ roster_id: row.id, player_id: e.id, player_type: "transfer", nil_offer: e.nilOffer || 0 }));
 
@@ -199,7 +199,7 @@ export function AppPage() {
 
   // ── Returning roster grouped by retention status ────────────────────────────
   const returningByStatus = useMemo(() => {
-    const groups = { returning: [], undecided: [], entering_portal: [] };
+    const groups = { returning: [], undecided: [], graduating: [], entering_portal: [] };
     board.returningPlayers.forEach(p => {
       const status = board.state.retentionById?.[p.id] || "returning";
       groups[status].push(p);
@@ -450,6 +450,7 @@ export function AppPage() {
                         onClick={e => e.stopPropagation()}>
                         <option value="returning">Returning</option>
                         <option value="undecided">Undecided</option>
+                        <option value="graduating">Graduating</option>
                         <option value="entering_portal">Entering Portal</option>
                       </select>
                     </div>
@@ -482,6 +483,7 @@ export function AppPage() {
                         onClick={e => e.stopPropagation()}>
                         <option value="returning">Returning</option>
                         <option value="undecided">Undecided</option>
+                        <option value="graduating">Graduating</option>
                         <option value="entering_portal">Entering Portal</option>
                       </select>
                     </div>
@@ -506,6 +508,32 @@ export function AppPage() {
                         onClick={e => e.stopPropagation()}>
                         <option value="returning">Returning</option>
                         <option value="undecided">Undecided</option>
+                        <option value="graduating">Graduating</option>
+                        <option value="entering_portal">Entering Portal</option>
+                      </select>
+                    </div>
+                  ))}
+                </>
+              )}
+
+              {/* Graduating */}
+              {returningByStatus.graduating.length > 0 && (
+                <>
+                  <div className="sub-label" style={{ color: "var(--muted, rgba(255,255,255,.4))" }}>Graduating ({returningByStatus.graduating.length})</div>
+                  {returningByStatus.graduating.map((p, i) => (
+                    <div key={i} className="row row-click" style={{ opacity: .4 }}
+                      onClick={e => { if (!e.target.closest("select")) setModal(p); }}>
+                      <div className="row-main">
+                        <div className="row-title" style={{ fontSize: 13 }}>{p.name}</div>
+                        <div className="row-sub" style={{ fontSize: 11 }}>{p.primary_position || p.pos} · {p.year}</div>
+                      </div>
+                      <select className="input" style={{ fontSize: 11, padding: "3px 6px", width: "auto" }}
+                        value="graduating"
+                        onChange={e => { e.stopPropagation(); board.setRetention(p.id, e.target.value); }}
+                        onClick={e => e.stopPropagation()}>
+                        <option value="returning">Returning</option>
+                        <option value="undecided">Undecided</option>
+                        <option value="graduating">Graduating</option>
                         <option value="entering_portal">Entering Portal</option>
                       </select>
                     </div>

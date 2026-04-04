@@ -144,6 +144,20 @@ export function useRosterBoard(team) {
       .sort((a, b) => a.name.localeCompare(b.name));
 
     setReturningPlayers(returning);
+
+    // Auto-set graduating for seniors/graduates that haven't been manually overridden
+    const GRADUATING_YEARS = ["Senior", "Graduate", "SR", "GR"];
+    setState(s => {
+      const auto = {};
+      returning.forEach(p => {
+        if (GRADUATING_YEARS.includes(p.year) && !s.retentionById[p.id]) {
+          auto[p.id] = "graduating";
+        }
+      });
+      return Object.keys(auto).length
+        ? { ...s, retentionById: { ...auto, ...s.retentionById } }
+        : s;
+    });
   }, []);
 
   // ── Board actions ───────────────────────────────────────────────────────────
@@ -241,8 +255,7 @@ export function useRosterBoard(team) {
 
   function calc() {
     const { settings, roster, retentionById, nilById } = state;
-    const GRADUATING = ["Senior", "Graduate", "SR", "GR"];
-    const isGraduating = p => GRADUATING.includes(p.year);
+    const isGraduating = p => retentionById[p.id] === "graduating";
     const committedReturning = returningPlayers.filter(
       p => !isGraduating(p) && (retentionById[p.id] || "returning") === "returning"
     ).length;

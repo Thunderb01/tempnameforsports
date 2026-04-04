@@ -70,9 +70,13 @@ SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")
 def parse_args():
     p = argparse.ArgumentParser()
     p.add_argument("--csv",     default="data/trank_data.csv")
-    p.add_argument("--dry-run",      action="store_true")
-    p.add_argument("--skip-matched", action="store_true",
+    p.add_argument("--dry-run",        action="store_true")
+    p.add_argument("--skip-matched",   action="store_true",
                    help="Skip players that already have cdi written in player_stats")
+    p.add_argument("--use-torvik-data", action="store_true",
+                   help="Use Torvik CSV columns for all metrics instead of scraped Supabase totals")
+    p.add_argument("--skip-nil",        action="store_true",
+                   help="Do not overwrite nil_valuation on the players table")
     return p.parse_args()
 
 
@@ -266,7 +270,7 @@ def compute_cdi(df):
     # Use totals-derived when available, fall back to Torvik column
     ast_40  = (df["sb_tot_ast"] / df["sb_tot_mp"].replace(0, float("nan"))) * 40
     tov_40  = (df["sb_tot_tov"] / df["sb_tot_mp"].replace(0, float("nan"))) * 40
-    ast_tov = (ast_40 / tov_40.replace(0, float("nan"))).fillna(df["ast_tov"])
+    ast_tov = (ast_40 / tov_40.replace(0, float("nan"))).fillna(df["ast/tov"])
 
     df["_cdi_raw"] = ast_score * (ast_tov ** 0.5) * pos_mult
 
@@ -274,138 +278,119 @@ def compute_cdi(df):
 
 
 
-def compute_dds(df):
+def compute_dds(df, use_torvik=False):
     """
     DDS — Defensive Disruption Score
     Measures defensive impact and disruption ability.
-    Inputs to consider: dbpm, dgbpm, stops, stl_per, blk_per, DRB_per, adrtg
-    Note: lower drtg/adrtg = better defense, so negate when using percentrank.
     """
-    # TODO: build composite + percentrank
-    
-    # MAX(0, BG2 + 0.75*BH2 + 0.5*BI2 - 0.5*N2),
-    # 0
-
-    df["_dds_raw"] = (df["sb_stl_40"] + 0.75 * df["sb_blk_40"] + 0.5 * df["sb_drb_40"] - 0.5 * df["pfr"]).clip(lower=0)
+    if use_torvik:
+        df["_dds_raw"] = (df["stl_per"] + 0.75 * df["blk_per"] + 0.5 * df["DRB_per"] - 0.5 * df["pfr"]).clip(lower=0)
+    else:
+        df["_dds_raw"] = (df["sb_stl_40"] + 0.75 * df["sb_blk_40"] + 0.5 * df["sb_drb_40"] - 0.5 * df["pfr"]).clip(lower=0)
 
     return percentrank_by_pos(df, "_dds_raw").apply(clamp)
 
 
-def compute_sei(df):
+def compute_sei(df, use_torvik=False):
     """
     SEI — Scoring Efficiency Index
     Measures how efficiently a player scores relative to usage.
-    Inputs to consider: ORtg, TS_per, eFG, obpm, usg, adjoe, ogbpm
     """
-    # TODO: build composite + percentrank
-    #     
-    #   AV2 * SQRT( AH2 / (AF2/40) )
+    if use_torvik:
+        # usg already represents shot volume, TS_per is efficiency
+        df["_sei_raw"] = df["TS_per"] * (df["usg"] ** 0.5)
+    else:
+        df["_fga_40"] = (df["sb_tot_fga"] / df["sb_tot_mp"].replace(0, float("nan"))) * 40
+        df["_sei_raw"] = df["TS_per"] * (df["_fga_40"]) ** 0.5
 
-
-    df["_fga_40"] = (df["sb_tot_fga"] / df["sb_tot_mp"].replace(0, float("nan"))) * 40
-
-    df["_sei_raw"] = df["TS_per"] * (df["_fga_40"])**0.5
     return percentrank_by_pos(df, "_sei_raw").apply(clamp)
 
 
-def compute_ath(df):
+def compute_ath(df, use_torvik=False):
     """
     ATH — Athleticism Index
     Measures athleticism and physical impact.
-    Inputs to consider: rimmade/(rimmade+rimmiss), midmade/(midmade+midmiss), TP_per, FT_per, eFG, TS_per, ftr
+
+    When use_torvik=True: pure Barttorvik columns, works for all ~3000 players.
+    When use_torvik=False: uses scraped Supabase totals for per-40 stats.
+
+    Three components:
+      EXPLOSION  — finishing at the rim, dunking ability
+      MOBILITY   — lateral quickness, steals, blocks, rebounding
+      CONTACT    — drawing fouls, winning 50/50s at the rim
+
+    Position weights shift emphasis:
+      Guard  → mobility-heavy
+      Wing   → balanced
+      Big    → explosion + contact
     """
-    def _apply_weights(df, cols, weights_dict):
-        def _row(row):
-            w = weights_dict.get(row["pos_bucket"], weights_dict["Wing"])
-            return sum(row[c] * w[i] for i, c in enumerate(cols))
-        return df.apply(_row, axis=1)
-    
+    # ── Shared Torvik columns (available regardless of flag) ──────────────────
+    df["_dunk_vol_per"]  = percentrank_by_pos(df, "dunksmade")
+    df["_dunk_rate_per"] = percentrank_by_pos(df, "dunksmade/(dunksmiss+dunksmade)")
+    df["_rim_fin_per"]   = percentrank_by_pos(df, "rimmade/(rimmade+rimmiss)")
+    df["_ftr_per"]       = percentrank_by_pos(df, "ftr")
+    df["_stl_per_per"]   = percentrank_by_pos(df, "stl_per")
+    df["_blk_per_per"]   = percentrank_by_pos(df, "blk_per")
+    df["_orb_per_per"]   = percentrank_by_pos(df, "ORB_per")
 
-    
-    df["dunk_vol_per"] = percentrank_by_pos(df, "dunksmade")
-    df["_raw_dunk_rate"] = df["dunksmade"] / df["rimmade"] if "rimmade" in df.columns else 0
-    df["dunk_rate_per"] = percentrank_by_pos(df, "_raw_dunk_rate")
-    df["atr_fin_per"] = percentrank_by_pos(df, "rimmade/(rimmade+rimmiss)")
-    df["_raw_atr_shr"] = df["rimmade+rimmiss"] / df["sb_tot_fga"] if "sb_tot_fga" in df.columns else 0
-    df["atr_shr_per"] = percentrank_by_pos(df, "_raw_atr_shr")
-    df["orb_40_per"] = percentrank_by_pos(df, "sb_orb_40")
-    df["rpg_per"] = percentrank_by_pos(df, "sb_rpg")
-    # print("DEBUG name:", df["player_name"][:10].tolist())
-    # print("DEBUG dunk_vol_per:", df["dunk_vol_per"][:10].tolist())
-    # print("DEBUG _raw_dunk_rate:", df["_raw_dunk_rate"][:10].tolist())                                                        
-    # print("DEBUG dunk_rate_per:", df["dunk_rate_per"][:10].tolist())
-    # print("DEBUG atr_fin_per:", df["atr_fin_per"][:10].tolist())
-    # print("DEBUG _raw_atr_shr:", df["_raw_atr_shr"][:10].tolist())
-    # print("DEBUG atr_shr_per:", df["atr_shr_per"][:10].tolist())
-    # print("DEBUG orb_40_per:", df["orb_40_per"][:10].tolist())
-    # print("DEBUG rpg_per:", df["rpg_per"][:10].tolist())
-    POP_WEIGHTS = {
-        "Guard": [0.05, 0.1, 0.25, 0.3, 0.05, 0.25],  
-        "Wing":  [0.1, 0.2, 0.2, 0.15, 0.2, 0.15],  
-        "Big":   [0.2, 0.3, 0.1, 0.1, 0.25, 0.05],  
+    if use_torvik:
+        df["_drb_per_per"] = percentrank_by_pos(df, "DRB_per")
+    else:
+        df["_drb_per_per"] = percentrank_by_pos(df, "sb_drb_40")
+
+    # ── Component scores ──────────────────────────────────────────────────────
+    # EXPLOSION: finishing through/above defenders
+    EXPLOSION_W = {
+        "Guard": (0.30, 0.20, 0.50),  # rim finish matters most for guards
+        "Wing":  (0.35, 0.30, 0.35),
+        "Big":   (0.40, 0.35, 0.25),  # dunks + rim finish dominate for bigs
     }
-    POP_COLS = ["dunk_vol_per", "dunk_rate_per", "atr_fin_per", "atr_shr_per", "orb_40_per", "rpg_per"]  
-    
-    df["stl_per_per"] = percentrank_by_pos(df, "stl_per")
-    df["blk_per_per"] = percentrank_by_pos(df, "blk_per")
-    df["foul_40_per"] = 1 - percentrank_by_pos(df, "pfr")
-    df["drb_40_per"] = percentrank_by_pos(df, "sb_drb_40")
-    # print("DEBUG stl_per_per:", df["stl_per_per"][:10].tolist())
-    # print("DEBUG blk_per_per:", df["blk_per_per"][:10].tolist())
-    # print("DEBUG foul_40_per:", df["foul_40_per"][:10].tolist())
-    # print("DEBUG drb_40_per:", df["drb_40_per"][:10].tolist())
-    LATERAL_WEIGHTS = {
-        "Guard": [0.45, 0.05, 0.30, 0.20],
-        "Wing":  [0.35, 0.20, 0.20, 0.25],
-        "Big":   [0.15, 0.50, 0.25, 0.10],
+    def explosion(row):
+        w = EXPLOSION_W.get(row["pos_bucket"], EXPLOSION_W["Wing"])
+        return (row["_dunk_vol_per"] * w[0]
+              + row["_dunk_rate_per"] * w[1]
+              + row["_rim_fin_per"]   * w[2])
+
+    # MOBILITY: lateral quickness, shot-blocking, rebounding
+    MOBILITY_W = {
+        "Guard": (0.55, 0.20, 0.25),  # steals dominate for guards
+        "Wing":  (0.40, 0.30, 0.30),
+        "Big":   (0.20, 0.45, 0.35),  # blocks + drb for bigs
     }
-    LATERAL_COLS = ["stl_per_per", "blk_per_per", "foul_40_per", "drb_40_per"]  
-    
+    def mobility(row):
+        w = MOBILITY_W.get(row["pos_bucket"], MOBILITY_W["Wing"])
+        return (row["_stl_per_per"] * w[0]
+              + row["_blk_per_per"] * w[1]
+              + row["_drb_per_per"] * w[2])
 
-
-    df["ftr_per"] = percentrank_by_pos(df, "ftr")
-    print("DEBUG ftr_per:", df["ftr_per"][:5].tolist())
-    
-    CONTACT_WEIGHTS = {
-        "Guard": [0.50, 0.30, 0.10, 0.10],
-        "Wing":  [0.35, 0.25, 0.20, 0.20],
-        "Big":   [0.15, 0.15, 0.35, 0.35],
+    # CONTACT: drawing fouls, offensive rebounding, winning 50/50s
+    CONTACT_W = {
+        "Guard": (0.60, 0.40),
+        "Wing":  (0.50, 0.50),
+        "Big":   (0.40, 0.60),
     }
-    CONTACT_COLS = ["ftr_per", "atr_fin_per", "orb_40_per", "drb_40_per"]
+    def contact(row):
+        w = CONTACT_W.get(row["pos_bucket"], CONTACT_W["Wing"])
+        return (row["_ftr_per"]     * w[0]
+              + row["_orb_per_per"] * w[1])
 
-    # frame = position percentile of (weight * 1000) / height
-    # df["_frame_raw"] = (df["sb_weight"] * 1000) / df["sb_height"].replace(0, float("nan"))
-    # df["_frame_pct"] = percentrank_by_pos(df, "_frame_raw")
-    # print("DEBUG sb_weight sample:", df["sb_weight"][:10].tolist() if "sb_weight" in df.columns else "MISSING")
-    # print("DEBUG sb_height sample:", df["sb_height"][:10].tolist() if "sb_height" in df.columns else "MISSING")
-    # print("DEBUG _frame_raw:", df["_frame_raw"][:10].tolist())
-    # print("DEBUG _frame_pct:", df["_frame_pct"][:10].tolist())
-    # print("DEBUG _height_pct:", df["_height_pct"][:10].tolist() if "_height_pct" in df.columns else "MISSING")
+    # ── Final ATH composite ───────────────────────────────────────────────────
+    COMPONENT_W = {
+        "Guard": (0.30, 0.45, 0.25),  # mobility-heavy
+        "Wing":  (0.35, 0.35, 0.30),
+        "Big":   (0.40, 0.25, 0.35),  # explosion + contact
+    }
+    def ath_raw(row):
+        w = COMPONENT_W.get(row["pos_bucket"], COMPONENT_W["Wing"])
+        return (explosion(row) * w[0]
+              + mobility(row)  * w[1]
+              + contact(row)   * w[2])
 
-    # FRAME_WEIGHTS = {
-    #     "Guard": [0.4, 0.6],
-    #     "Wing":  [0.5, 0.5],
-    #     "Big":   [0.6, 0.4],
-    # }
-    # FRAME_COLS = ["_frame_pct", "_height_pct"]
-
-    pop        = _apply_weights(df, POP_COLS,     POP_WEIGHTS)
-    lateral    = _apply_weights(df, LATERAL_COLS, LATERAL_WEIGHTS)
-    contact    = _apply_weights(df, CONTACT_COLS, CONTACT_WEIGHTS)
-    # framescore = _apply_weights(df, FRAME_COLS,   FRAME_WEIGHTS)
-    
-    #temporary formula: no framescore because weights are not scraper
-    df["_ath_raw"] = (pop + (lateral * 2) + contact) / 4
-    
-    # print("pop sample:", pop[:10].tolist())
-    # print("lateral sample:", lateral[:10].tolist())
-    # print("contact sample:", contact[:10].tolist())
-    # print("frame sample:", framescore[:10].tolist())
-    # print("_ath_raw sample:", df["_ath_raw"][:10].tolist())
+    df["_ath_raw"] = df.apply(ath_raw, axis=1)
     return percentrank_by_pos(df, "_ath_raw").apply(clamp)
 
 
-def compute_ris(df):
+def compute_ris(df, use_torvik=False):
     """
     RIS — Rebounding Impact Score
     Measures rebounding contribution and impact.
@@ -422,10 +407,16 @@ def compute_ris(df):
     #   ),
     # "")
     rimmade = df["rimmade"] * df["rimmade/(rimmade+rimmiss)"]**0.5
-    freethrow = 6 * (df["sb_tot_fta"]/(df["sb_tot_fga"] + 1))
-    orb = 1.2 * df["sb_orb_40"]
-    blk = 0.9 * df["sb_blk_40"]
-    drb = 0.4 * df["sb_drb_40"]
+    if use_torvik:
+        freethrow = 6 * df["FT_per"] / 100
+        orb = 1.2 * df["ORB_per"]
+        blk = 0.9 * df["blk_per"]
+        drb = 0.4 * df["DRB_per"]
+    else:
+        freethrow = 6 * (df["sb_tot_fta"] / (df["sb_tot_fga"] + 1))
+        orb = 1.2 * df["sb_orb_40"]
+        blk = 0.9 * df["sb_blk_40"]
+        drb = 0.4 * df["sb_drb_40"]
     df["_ris_raw"] = rimmade + freethrow + orb + blk + drb
     return percentrank_by_pos(df, "_ris_raw").apply(clamp)
 
@@ -465,15 +456,15 @@ def compute_nil_valuation(df):
         return series.rank(pct=True, na_option="keep").fillna(0)
 
     stat_scores = (
-        prank(df.get("sb_ppg",    df.get("ppg",    pd.Series(0, index=df.index)))) * WEIGHTS["ppg"]     +
-        prank(df.get("sb_fg_pct", df.get("TS_per", pd.Series(0, index=df.index)))) * WEIGHTS["ts_pct"]  +
-        prank(df.get("sb_3p_pct", df.get("TP_per", pd.Series(0, index=df.index)))) * WEIGHTS["3p_pct"]  +
-        prank(df.get("AST_per",   pd.Series(0, index=df.index)))                   * WEIGHTS["ast_pct"] +
-        prank(df.get("ast/tov",   pd.Series(0, index=df.index)))                   * WEIGHTS["ast_tov"] +
-        prank(df.get("stl_per",   pd.Series(0, index=df.index)))                   * WEIGHTS["stl_40"]  +
-        prank(df.get("blk_per",   pd.Series(0, index=df.index)))                   * WEIGHTS["blk_40"]  +
-        prank(df.get("DRB_per",   pd.Series(0, index=df.index)))                   * WEIGHTS["drb_40"]  +
-        prank(df.get("ORB_per",   pd.Series(0, index=df.index)))                   * WEIGHTS["orb_40"]
+        prank(df["ORtg"])    * WEIGHTS["ppg"]     +  # ORtg as scoring proxy (pace-adjusted)
+        prank(df["TS_per"])  * WEIGHTS["ts_pct"]  +  # issue 1 fix: always use TS_per
+        prank(df["TP_per"])  * WEIGHTS["3p_pct"]  +
+        prank(df["AST_per"]) * WEIGHTS["ast_pct"] +
+        prank(df["ast/tov"]) * WEIGHTS["ast_tov"] +
+        prank(df["stl_per"]) * WEIGHTS["stl_40"]  +
+        prank(df["blk_per"]) * WEIGHTS["blk_40"]  +
+        prank(df["DRB_per"]) * WEIGHTS["drb_40"]  +
+        prank(df["ORB_per"]) * WEIGHTS["orb_40"]
     )
 
     # BtPM metrics are 0–100; scale to 0–1 for consistency
@@ -493,7 +484,7 @@ def compute_nil_valuation(df):
         "MWC": 0.9, "A10": 0.9, "WCC": 0.9, "AAC": 0.9,
         "MVC": 0.8, "SoCon": 0.8, "MAC": 0.8, "CUSA": 0.8,
     }
-    conf_col = df.get("sb_conference", pd.Series("", index=df.index))
+    conf_col = df["conf"]  # issue 4 fix: always use Torvik conf column
     conf_adj = conf_col.map(CONF_WEIGHTS).fillna(0.75)  # V
 
     # ── NIL Cap ───────────────────────────────────────────────────────────────
@@ -507,12 +498,30 @@ def compute_nil_valuation(df):
     pos_boost = df["pos_bucket"].map({"Big": 1.15, "Wing": 1.0, "Guard": 1.0}).fillna(1.0)
 
     # ── Age/Year Boost ────────────────────────────────────────────────────────
-    yr_col = df.get("sb_year", pd.Series("", index=df.index))
+    yr_col = df["yr"]  # issue 3 fix: always use Torvik yr column (Fr, So, Jr, Sr, Gr)
     yr_boost = yr_col.map(
-        {"Sophomore": 1.15, "Junior": 1.08, "Senior": 0.95, "Graduate": 0.95, "Freshman": 1.15}
+        {"So": 1.15, "Jr": 1.08, "Sr": 0.95, "Gr": 0.95, "Fr": 1.15}
     ).fillna(1.0)
 
-    return (base_nil * pos_boost * yr_boost).clip(lower=0)
+    base_nil_final = (base_nil * pos_boost * yr_boost).clip(lower=0)
+
+    # ── Minutes Volatility → Market Range ────────────────────────────────────
+    # min_rate = tot_mp / (GP * 40); lower rate = higher volatility = wider range
+    min_rate = df["mp"] / (df["GP"].replace(0, float("nan")) * 40)
+    min_volatility = min_rate.apply(lambda p:
+        0.7  if p >= 0.6 else
+        0.8  if p >= 0.5 else
+        0.95 if p >= 0.4 else
+        1.1  if p >= 0.3 else
+        1.3  if p >= 0.2 else
+        1.55
+    )
+    nil_interval_pct = min_volatility / 4
+
+    market_low  = (base_nil_final * (1 - nil_interval_pct)).clip(lower=base_nil_final * 0.9)
+    market_high = base_nil_final * (1 + nil_interval_pct)
+
+    return base_nil_final, market_low, market_high
 
 
 
@@ -537,6 +546,18 @@ def main():
         )
 
     print(f"  {len(df)} rows after dedup")
+
+    # Filter out players with too little playing time to produce meaningful metrics
+    low_minutes_keys = set()
+    if "Min_per" in df.columns:
+        before = len(df)
+        low = df[df["Min_per"] < 10]
+        low_minutes_keys = {
+            (normalise(row["player_name"]), normalise_team(str(row["team"])))
+            for _, row in low.iterrows()
+        }
+        df = df[df["Min_per"] >= 10].reset_index(drop=True)
+        print(f"  {len(df)} rows after filtering Min_per < 10% ({before - len(df)} removed)")
 
     # ── Merge Supabase player_stats into df ───────────────────────────────────
     # Gives access to ppg, apg, rpg, stl_40, blk_40, ast/40, etc. in formulas.
@@ -619,12 +640,13 @@ def main():
     if "sb_weight" in df.columns:
         df["_weight_pct"] = percentrank_by_pos(df, "sb_weight")
 
+    use_torvik = args.use_torvik_data
     df["_cdi"] = compute_cdi(df)
-    df["_dds"] = compute_dds(df)
-    df["_sei"] = compute_sei(df)
-    df["_ath"] = compute_ath(df)
-    df["_ris"] = compute_ris(df)
-    df["_nil"] = compute_nil_valuation(df)
+    df["_dds"] = compute_dds(df, use_torvik=use_torvik)
+    df["_sei"] = compute_sei(df, use_torvik=use_torvik)
+    df["_ath"] = compute_ath(df, use_torvik=use_torvik)
+    df["_ris"] = compute_ris(df, use_torvik=use_torvik)
+    df["_nil"], df["_nil_low"], df["_nil_high"] = compute_nil_valuation(df)
 
     # ── Load players + stats from Supabase ────────────────────────────────────
     if not args.dry_run:
@@ -705,12 +727,14 @@ def main():
 
         # ── Pull pre-computed metrics ─────────────────────────────────────────
         idx = row.name  # DataFrame index after reset_index
-        cdi = safe(df.at[idx, "_cdi"])
-        dds = safe(df.at[idx, "_dds"])
-        sei = safe(df.at[idx, "_sei"])
-        ath = safe(df.at[idx, "_ath"])
-        ris = safe(df.at[idx, "_ris"])
-        nil = safe(df.at[idx, "_nil"])
+        cdi      = safe(df.at[idx, "_cdi"])
+        dds      = safe(df.at[idx, "_dds"])
+        sei      = safe(df.at[idx, "_sei"])
+        ath      = safe(df.at[idx, "_ath"])
+        ris      = safe(df.at[idx, "_ris"])
+        nil      = safe(df.at[idx, "_nil"])
+        nil_low  = safe(df.at[idx, "_nil_low"])
+        nil_high = safe(df.at[idx, "_nil_high"])
 
         # ── Parse birth year ──────────────────────────────────────────────────
         birth_year = None
@@ -741,8 +765,15 @@ def main():
         player_patch = {}
         if birth_year:
             player_patch["birth_year"] = birth_year
-        if nil is not None:
+        if nil is not None and not args.skip_nil:
             player_patch["nil_valuation"] = nil
+        if nil_low is not None and not args.skip_nil:
+            player_patch["open_market_low"] = nil_low
+        if nil_high is not None and not args.skip_nil:
+            player_patch["open_market_high"] = nil_high
+        hometown = str(row.get("type", "")).strip()
+        if hometown and hometown not in ("nan", ""):
+            player_patch["hometown"] = hometown
         if player_patch:
             db.table("players").update(player_patch).eq("id", player_id).execute()
 
@@ -764,6 +795,23 @@ def main():
         print(f"  ✓ {name} ({team})")
 
     print(f"\nDone. Matched: {matched} | Unmatched: {unmatched}")
+
+    # ── Null out metrics + zero NIL for low-minutes players ───────────────────
+    if low_minutes_keys and not args.dry_run:
+        zeroed = 0
+        for key in low_minutes_keys:
+            pid = player_lookup.get(key)
+            if not pid:
+                continue
+            # Null all metrics so the modal shows "insufficient playing time"
+            stats_patch = {"cdi": None, "dds": None, "sei": None, "ath": None, "ris": None}
+            stats_id = stats_lookup.get((pid, ""))  # best effort
+            db.table("player_stats").update(stats_patch).eq("player_id", pid).execute()
+            if not args.skip_nil:
+                db.table("players").update({"nil_valuation": 0}).eq("id", pid).execute()
+            zeroed += 1
+        print(f"  Cleared metrics/NIL for {zeroed} low-minutes players")
+
     if args.dry_run:
         print("(dry-run — nothing written)")
 

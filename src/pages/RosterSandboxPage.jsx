@@ -110,7 +110,10 @@ export function RosterSandboxPage() {
     const nilById       = board.state.nilById       || {};
 
     const returning = board.returningPlayers
-      .filter(p => (retentionById[p.id] || "returning") !== "entering_portal")
+      .filter(p => {
+        const s = retentionById[p.id] || "returning";
+        return s !== "entering_portal" && s !== "graduating";
+      })
       .map(p => ({
         ...p,
         _type:    retentionById[p.id] === "undecided" ? "Undecided" : "Returning",

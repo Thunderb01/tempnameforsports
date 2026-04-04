@@ -43,26 +43,26 @@ const STAT_ROWS = [
 
 // Pentagon order (clockwise from top): Scoring Efficiency, ATH, Interior Impact, Defending, Playmaking
 const PENTAGON_METRICS = [
-  { key: "sei", label: "Scoring"},
+  { key: "sei", label: "Scoring Efficiency"},
   { key: "ath", label: "Athleticism"},
-  { key: "ris", label: "Interior"},
+  { key: "ris", label: "Rim Impact"},
   { key: "dds", label: "Defending"},
   { key: "cdi", label: "Playmaking"},
 ];
 
 function letterGrade(val) {
   if (val === null || val === undefined) return "—";
-  if (val >= 83) return "A+";
-  if (val >= 75) return "A";
-  if (val >= 70) return "A-";
-  if (val >= 65) return "B+";
-  if (val >= 60) return "B";
-  if (val >= 55) return "B-";
-  if (val >= 53) return "C+";
-  if (val >= 48) return "C";
-  if (val >= 44) return "C-";
-  if (val >= 39) return "D+";
-  if (val >= 33) return "D";
+  if (val >= 96) return "A+";
+  if (val >= 93) return "A";
+  if (val >= 90) return "A-";
+  if (val >= 87) return "B+";
+  if (val >= 83) return "B";
+  if (val >= 75) return "B-";
+  if (val >= 70) return "C+";
+  if (val >= 65) return "C";
+  if (val >= 60) return "C-";
+  if (val >= 55) return "D+";
+  if (val >= 50) return "D";
   return "F";
 }
 
@@ -288,6 +288,10 @@ export function PlayerModal({ player, onClose }) {
               <div style={{ opacity: .4, fontSize: 13 }}>Loading…</div>
             ) : !stats ? (
               <div style={{ opacity: .4, fontSize: 13 }}>No metrics on file.</div>
+            ) : PENTAGON_METRICS.every(m => stats[m.key] == null) ? (
+              <div style={{ opacity: .4, fontSize: 13, fontStyle: "italic" }}>
+                Insufficient playing time to generate a skill profile.
+              </div>
             ) : (
               <SkillProfile stats={stats} />
             )}
