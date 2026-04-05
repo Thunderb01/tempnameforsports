@@ -38,16 +38,16 @@ export function BoardPage() {
   const { profile } = useAuth();
   const board = useRosterBoard(profile?.team);
 
-  const [loading,   setLoading]   = useState(true);
-  const [search,    setSearch]    = useState("");
-  const [posFilter, setPosFilter] = useState("all");
-  const [tagGroup,       setTagGroup]       = useState("all");
-  const [tagFilter,      setTagFilter]      = useState("all");
-  const [viewMode,  setViewMode]  = useState("table"); // "cards" | "table"
+  const [loading,      setLoading]     = useState(true);
+  const [search,       setSearch]      = useState("");
+  const [posFilter,    setPosFilter]   = useState("all");
+  const [stateFilter,  setStateFilter] = useState("all");
+  const [viewMode,     setViewMode]    = useState("table"); // "cards" | "table"
   const [sortKey,   setSortKey]   = useState("Mkt High");
   const [sortDir,   setSortDir]   = useState("desc");
   const [modal,     setModal]     = useState(null);
   const [page,      setPage]      = useState(0);
+  const [hideNoNil, setHideNoNil] = useState(true);
 
   const PAGE_SIZE = 50;
 
@@ -60,46 +60,101 @@ export function BoardPage() {
   }, []);
 
   // ── Tags ────────────────────────────────────────────────────────────────────
-  function getTagPool(p, group) {
-    if (group === "playmaker")  return p.playmakerTags  || [];
-    if (group === "shooting")   return p.shootingTags   || [];
-    if (group === "shotmaking") return p.shotmakingTags || [];
-    if (group === "interior")   return p.interiorTags   || [];
-    if (group === "defensive")  return p.defensiveTags  || [];
-    return [
-      ...(p.playmakerTags  || []),
-      ...(p.shootingTags   || []),
-      ...(p.shotmakingTags || []),
-      ...(p.interiorTags   || []),
-      ...(p.defensiveTags  || []),
-    ];
+  // ── State/region → search terms ─────────────────────────────────────────────
+  const STATE_OPTIONS = [
+    { label: "Alabama",        terms: ["AL", "Alabama"] },
+    { label: "Alaska",         terms: ["AK", "Alaska"] },
+    { label: "Arizona",        terms: ["AZ", "Arizona"] },
+    { label: "Arkansas",       terms: ["AR", "Arkansas"] },
+    { label: "California",     terms: ["CA", "California"] },
+    { label: "Colorado",       terms: ["CO", "Colorado"] },
+    { label: "Connecticut",    terms: ["CT", "Connecticut"] },
+    { label: "Delaware",       terms: ["DE", "Delaware"] },
+    { label: "Florida",        terms: ["FL", "Florida"] },
+    { label: "Georgia",        terms: ["GA", "Georgia"] },
+    { label: "Hawaii",         terms: ["HI", "Hawaii"] },
+    { label: "Idaho",          terms: ["ID", "Idaho"] },
+    { label: "Illinois",       terms: ["IL", "Illinois"] },
+    { label: "Indiana",        terms: ["IN", "Indiana"] },
+    { label: "Iowa",           terms: ["IA", "Iowa"] },
+    { label: "Kansas",         terms: ["KS", "Kansas"] },
+    { label: "Kentucky",       terms: ["KY", "Kentucky"] },
+    { label: "Louisiana",      terms: ["LA", "Louisiana"] },
+    { label: "Maine",          terms: ["ME", "Maine"] },
+    { label: "Maryland",       terms: ["MD", "Maryland"] },
+    { label: "Massachusetts",  terms: ["MA", "Massachusetts"] },
+    { label: "Michigan",       terms: ["MI", "Michigan"] },
+    { label: "Minnesota",      terms: ["MN", "Minnesota"] },
+    { label: "Mississippi",    terms: ["MS", "Mississippi"] },
+    { label: "Missouri",       terms: ["MO", "Missouri"] },
+    { label: "Montana",        terms: ["MT", "Montana"] },
+    { label: "Nebraska",       terms: ["NE", "Nebraska"] },
+    { label: "Nevada",         terms: ["NV", "Nevada"] },
+    { label: "New Hampshire",  terms: ["NH", "New Hampshire"] },
+    { label: "New Jersey",     terms: ["NJ", "New Jersey"] },
+    { label: "New Mexico",     terms: ["NM", "New Mexico"] },
+    { label: "New York",       terms: ["NY", "New York"] },
+    { label: "North Carolina", terms: ["NC", "North Carolina"] },
+    { label: "North Dakota",   terms: ["ND", "North Dakota"] },
+    { label: "Ohio",           terms: ["OH", "Ohio"] },
+    { label: "Oklahoma",       terms: ["OK", "Oklahoma"] },
+    { label: "Oregon",         terms: ["OR", "Oregon"] },
+    { label: "Pennsylvania",   terms: ["PA", "Pennsylvania"] },
+    { label: "Rhode Island",   terms: ["RI", "Rhode Island"] },
+    { label: "South Carolina", terms: ["SC", "South Carolina"] },
+    { label: "South Dakota",   terms: ["SD", "South Dakota"] },
+    { label: "Tennessee",      terms: ["TN", "Tennessee"] },
+    { label: "Texas",          terms: ["TX", "Texas"] },
+    { label: "Utah",           terms: ["UT", "Utah"] },
+    { label: "Vermont",        terms: ["VT", "Vermont"] },
+    { label: "Virginia",       terms: ["VA", "Virginia"] },
+    { label: "Washington",     terms: ["WA", "Washington"] },
+    { label: "West Virginia",  terms: ["WV", "West Virginia"] },
+    { label: "Wisconsin",      terms: ["WI", "Wisconsin"] },
+    { label: "Wyoming",        terms: ["WY", "Wyoming"] },
+    { label: "Washington D.C.",terms: ["D.C.", "Washington DC", "Washington, DC"] },
+    // International
+    { label: "Australia",      terms: ["Australia"] },
+    { label: "Bahamas",        terms: ["Bahamas"] },
+    { label: "Cameroon",       terms: ["Cameroon"] },
+    { label: "Canada",         terms: ["Canada"] },
+    { label: "Congo / DRC",    terms: ["Congo", "Kinshasa"] },
+    { label: "France",         terms: ["France"] },
+    { label: "Germany",        terms: ["Germany"] },
+    { label: "Ghana",          terms: ["Ghana"] },
+    { label: "Guinea",         terms: ["Guinea"] },
+    { label: "Lithuania",      terms: ["Lithuania"] },
+    { label: "Mali",           terms: ["Mali"] },
+    { label: "Nigeria",        terms: ["Nigeria"] },
+    { label: "Senegal",        terms: ["Senegal"] },
+    { label: "Serbia",         terms: ["Serbia"] },
+    { label: "South Sudan",    terms: ["South Sudan"] },
+    { label: "Spain",          terms: ["Spain"] },
+    { label: "United Kingdom", terms: ["England", "United Kingdom", "UK"] },
+  ];
+
+  function matchesState(hometown, terms) {
+    if (!hometown) return false;
+    return terms.some(t => hometown.includes(t));
   }
 
-  const allTags = useMemo(() => {
-    const set = new Map();
-    players.forEach(p => {
-      getTagPool(p, tagGroup).forEach(t => {
-        if (t && !set.has(t.toLowerCase())) set.set(t.toLowerCase(), t);
-      });
-    });
-    return Array.from(set.values()).sort();
-  }, [players, tagGroup]);
-
-  // Reset tag filter when tag group changes
-  useEffect(() => setTagFilter("all"), [tagGroup]);
-
   // Reset to page 0 whenever filters or sort change
-  useEffect(() => setPage(0), [search, posFilter, tagGroup, tagFilter, sortKey, sortDir]);
+  useEffect(() => setPage(0), [search, posFilter, stateFilter, sortKey, sortDir, hideNoNil]);
 
   // ── Filter + sort ───────────────────────────────────────────────────────────
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
+    const stateTerms = stateFilter !== "all"
+      ? STATE_OPTIONS.find(o => o.label === stateFilter)?.terms ?? []
+      : null;
+
     let out = players.filter(p => {
       if (q && !p.name.toLowerCase().includes(q) &&
                !(p.team||"").toLowerCase().includes(q) &&
                !(p.hometown||"").toLowerCase().includes(q)) return false;
       if (posFilter !== "all" && p.pos !== posFilter) return false;
-      if (tagFilter !== "all" && !getTagPool(p, tagGroup).includes(tagFilter)) return false;
+      if (stateTerms && !matchesState(p.hometown || "", stateTerms)) return false;
+      if (hideNoNil && !(p.marketHigh > 0)) return false;
       return true;
     });
 
@@ -120,7 +175,7 @@ export function BoardPage() {
     }
 
     return out;
-  }, [players, search, posFilter, tagGroup, tagFilter, sortKey, sortDir]);
+  }, [players, search, posFilter, stateFilter, sortKey, sortDir, hideNoNil]);
 
   // ── Roster state helpers (delegated to shared useRosterBoard hook) ──────────
   function inRoster(id)    { return board.inRoster(id); }
@@ -170,18 +225,14 @@ export function BoardPage() {
               <option value="Wing">Wing</option>
               <option value="Big">Big</option>
             </select>
-            <select className="input" style={{ width: 160 }} value={tagGroup} onChange={e => setTagGroup(e.target.value)}>
-              <option value="all">All tag types</option>
-              <option value="playmaker">Play Maker</option>
-              <option value="shooting">Shooting &amp; Scoring</option>
-              <option value="shotmaking">Shotmaking</option>
-              <option value="interior">Interior</option>
-              <option value="defensive">Defense</option>
+            <select className="input" style={{ width: 180 }} value={stateFilter} onChange={e => setStateFilter(e.target.value)}>
+              <option value="all">All locations</option>
+              {STATE_OPTIONS.map(o => <option key={o.label} value={o.label}>{o.label}</option>)}
             </select>
-            <select className="input" style={{ width: 180 }} value={tagFilter} onChange={e => setTagFilter(e.target.value)}>
-              <option value="all">All tags</option>
-              {allTags.map(t => <option key={t} value={t}>{t}</option>)}
-            </select>
+            <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, opacity: .7, cursor: "pointer", userSelect: "none" }}>
+              <input type="checkbox" checked={hideNoNil} onChange={e => setHideNoNil(e.target.checked)} />
+              Evaluated players only
+            </label>
           </div>
 
           <div style={{ fontSize: 12, opacity: .45, marginBottom: 10 }}>

@@ -446,11 +446,11 @@ def compute_nil_valuation(df):
         "3p_pct":  0.08,
         "ast_pct": 0.02,  # AST% — Torvik AST_per
         "ast_tov": 0.10,
-        "stl_40":  0.07,
-        "blk_40":  0.07,
+        "stl_40":  0.05,
+        "blk_40":  0.05,
         "drb_40":  0.05,
         "orb_40":  0.04,
-        # MPG weight = 0 (excluded)
+        "mpg":     0.04,  # Min_per — usage/playing-time signal
         # Scout scores (BtPM metrics scaled to 0–1)
         "ath":     0.07,
         "dds":     0.08,
@@ -472,7 +472,8 @@ def compute_nil_valuation(df):
         prank(df["stl_per"]) * WEIGHTS["stl_40"]  +
         prank(df["blk_per"]) * WEIGHTS["blk_40"]  +
         prank(df["DRB_per"]) * WEIGHTS["drb_40"]  +
-        prank(df["ORB_per"]) * WEIGHTS["orb_40"]
+        prank(df["ORB_per"]) * WEIGHTS["orb_40"]  +
+        prank(df["Min_per"]) * WEIGHTS["mpg"]
     )
 
     # BtPM metrics are 0–100; scale to 0–1 for consistency
@@ -489,14 +490,14 @@ def compute_nil_valuation(df):
     # ── Conference adjustment (V) ─────────────────────────────────────────────
     CONF_WEIGHTS = {
         "ACC": 1.0, "B10": 1.0, "B12": 1.0, "SEC": 1.0, "BE": 1.0,
-        "MWC": 0.9, "A10": 0.9, "WCC": 0.9, "AAC": 0.9,
-        "MVC": 0.8, "SoCon": 0.8, "MAC": 0.8, "CUSA": 0.8,
+        "MWC": 0.8, "A10": 0.8, "WCC": 0.8, "AAC": 0.8,
+        "MVC": 0.6, "SoCon": 0.6, "MAC": 0.6, "CUSA": 0.6,
     }
     conf_col = df["conf"]  # issue 4 fix: always use Torvik conf column
     conf_adj = conf_col.map(CONF_WEIGHTS).fillna(0.75)  # V
 
     # ── NIL Cap ───────────────────────────────────────────────────────────────
-    nil_cap = 2_000_000
+    nil_cap = 3_000_000
 
     # ── Base NIL = MIN(cap, cap × W² × (1 - (1-V⁴)(1-W)²)^1.2) ─────────────
     blend = (1 - (1 - conf_adj**4) * (1 - total_score)**2) ** 1.2

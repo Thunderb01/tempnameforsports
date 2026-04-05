@@ -17,21 +17,15 @@ function fmt(val, key) {
 }
 
 const STAT_ROWS = [
+  { key: "usg",           label: "USG" },
   { key: "ppg",           label: "PPG" },
   { key: "rpg",           label: "RPG" },
   { key: "apg",           label: "APG" },
-  { key: "3pg",           label: "3PG" },
-  { key: "usg",           label: "USG%" },
   { key: "ast_tov",       label: "AST/TOV" },
   { key: "fg_pct",        label: "FG%" },
-  { key: "ft_pct",        label: "FT%" },
   { key: "3p_pct",        label: "3P%" },
-  { key: "torvik_rim_pct",label: "RIM FG%" },
-  { key: "stl_40",        label: "STL/40" },
-  { key: "blk_40",        label: "BLK/40" },
-  { key: "drb_40",        label: "DRB/40" },
-  { key: "orb_40",        label: "ORB/40" },
-  { key: "trb_40",        label: "TRB/40" },
+  { key: "ft_pct",        label: "FT%" }
+
 ];
 
 // const ADV_ROWS = [
