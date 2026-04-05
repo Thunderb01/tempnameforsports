@@ -44,8 +44,8 @@ export function BoardPage() {
   const [tagGroup,       setTagGroup]       = useState("all");
   const [tagFilter,      setTagFilter]      = useState("all");
   const [viewMode,  setViewMode]  = useState("table"); // "cards" | "table"
-  const [sortKey,   setSortKey]   = useState(null);
-  const [sortDir,   setSortDir]   = useState("asc");
+  const [sortKey,   setSortKey]   = useState("Mkt High");
+  const [sortDir,   setSortDir]   = useState("desc");
   const [modal,     setModal]     = useState(null);
   const [page,      setPage]      = useState(0);
 

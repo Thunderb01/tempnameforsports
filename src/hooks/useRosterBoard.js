@@ -78,15 +78,23 @@ export function useRosterBoard(team) {
   // ── Portal board ────────────────────────────────────────────────────────────
 
   const loadPortalBoard = useCallback(async () => {
-    const { data, error } = await supabase
-      .from("players")
-      .select("*, player_stats(*)")
-      .eq("source", "portal")
-      .order("name");
+    const all = [];
+    const PAGE = 1000;
+    let page = 0;
+    while (true) {
+      const { data, error } = await supabase
+        .from("players")
+        .select("*, player_stats(*)")
+        .eq("source", "portal")
+        .order("name")
+        .range(page * PAGE, (page + 1) * PAGE - 1);
+      if (error) { console.error("players fetch:", error); return; }
+      all.push(...(data || []));
+      if ((data || []).length < PAGE) break;
+      page++;
+    }
 
-    if (error) { console.error("players fetch:", error); return; }
-
-    const players = (data || []).map(row => ({
+    const players = all.map(row => ({
       id:             row.id,
       name:           row.name,
       team:           row.current_team,
