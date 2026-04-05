@@ -9,7 +9,7 @@ function money(n) {
 }
 
 function fmt(val, key) {
-  if (val === null || val === undefined || val === "") return "—";
+  if (val === null || val === undefined || val === "" || (typeof val === "number" && isNaN(val)) || val === "NaN") return "—";
   const pct = ["fg_pct","ft_pct","3p_pct"];
   if (pct.includes(key)) return `${Number(val).toFixed(1)}%`;
   if (key === "torvik_rim_pct") return `${(Number(val) * 100).toFixed(1)}%`;
@@ -17,7 +17,7 @@ function fmt(val, key) {
 }
 
 const STAT_ROWS = [
-  { key: "year",          label: "Season" },
+  { key: "calendar_year", label: "Season" },
   { key: "usg",           label: "USG" },
   { key: "ppg",           label: "PPG" },
   { key: "rpg",           label: "RPG" },
@@ -177,6 +177,7 @@ export function PlayerModal({ player, onClose }) {
       .eq("player_id", player.id)
       .maybeSingle()
       .then(({ data }) => {
+        console.log("player_stats row:", data);
         setStats(data ?? null);
         setLoadingStats(false);
       });
