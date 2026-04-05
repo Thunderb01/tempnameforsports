@@ -47,6 +47,9 @@ export function BoardPage() {
   const [sortKey,   setSortKey]   = useState(null);
   const [sortDir,   setSortDir]   = useState("asc");
   const [modal,     setModal]     = useState(null);
+  const [page,      setPage]      = useState(0);
+
+  const PAGE_SIZE = 50;
 
   const players = board.state.board;
 
@@ -84,6 +87,9 @@ export function BoardPage() {
 
   // Reset tag filter when tag group changes
   useEffect(() => setTagFilter("all"), [tagGroup]);
+
+  // Reset to page 0 whenever filters or sort change
+  useEffect(() => setPage(0), [search, posFilter, tagGroup, tagFilter, sortKey, sortDir]);
 
   // ── Filter + sort ───────────────────────────────────────────────────────────
   const filtered = useMemo(() => {
@@ -182,6 +188,7 @@ export function BoardPage() {
             {loading ? "Loading…" : `${filtered.length} of ${players.length} players`}
             {viewMode === "table" && !loading && " · click header to sort"}
           </div>
+
         </div>
 
         {/* Card view */}
@@ -189,7 +196,7 @@ export function BoardPage() {
           <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
             {filtered.length === 0
               ? <div className="empty">No players match your filters.</div>
-              : filtered.map(p => {
+              : filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE).map(p => {
                   return (
                     <div key={p.id} className="row row-click"
                       style={{ background: "var(--panel)", borderRadius: 8, marginBottom: 2 }}
@@ -268,7 +275,7 @@ export function BoardPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filtered.map(p => (
+                    {filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE).map(p => (
                       <tr key={p.id} className="row-click"
                         onClick={e => { if (!e.target.closest("button,select")) setModal(p); }}
                         style={{ borderBottom: "1px solid var(--border)" }}>
@@ -293,6 +300,21 @@ export function BoardPage() {
                 </table>
               )
             }
+          </div>
+        )}
+
+        {/* ── Pagination ── */}
+        {!loading && filtered.length > PAGE_SIZE && (
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12, marginTop: 20 }}>
+            <button className="btn btn-ghost" disabled={page === 0} onClick={() => setPage(p => p - 1)}>
+              ← Prev
+            </button>
+            <span style={{ fontSize: 13, opacity: .55 }}>
+              Page {page + 1} of {Math.ceil(filtered.length / PAGE_SIZE)}
+            </span>
+            <button className="btn btn-ghost" disabled={(page + 1) * PAGE_SIZE >= filtered.length} onClick={() => setPage(p => p + 1)}>
+              Next →
+            </button>
           </div>
         )}
 
