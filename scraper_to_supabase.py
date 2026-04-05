@@ -168,7 +168,7 @@ TEAMS = {
     "Southern Illinois": "southern-illinois", "Southern Miss": "southern-miss",
     "St. Bonaventure": "st-bonaventure", "St. John's": "st-johns-ny",
     "Stanford": "stanford", "Stetson": "stetson", "Stony Brook": "stony-brook",
-    "Syracuse": "syracuse", "TCU": "texas-christian", "Temple": "temple",
+    "Syracuse": "syracuse", "Tarleton State": "tarleton-state", "TCU": "texas-christian", "Temple": "temple",
     "Tennessee": "tennessee", "Tennessee State": "tennessee-state",
     "Tennessee Tech": "tennessee-tech", "Texas": "texas",
     "Texas A&M": "texas-am", "Texas Southern": "texas-southern",

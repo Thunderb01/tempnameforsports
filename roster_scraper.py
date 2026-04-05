@@ -331,6 +331,7 @@ TEAMS = {
     "Stetson":                "stetson",
     "Stony Brook":            "stony-brook",
     "Syracuse":               "syracuse",
+    "Tarleton State":               "tarleton-state",
     "TCU":                    "texas-christian",
     "Temple":                 "temple",
     "Tennessee":              "tennessee",
