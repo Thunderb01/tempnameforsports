@@ -662,7 +662,7 @@ def main():
         players = []
         page, page_size = 0, 1000
         while True:
-            res = db.table("players").select("id, name, current_team") \
+            res = db.table("players").select("id, name, current_team, height") \
                     .range(page * page_size, (page + 1) * page_size - 1).execute()
             players.extend(res.data)
             if len(res.data) < page_size:
@@ -674,6 +674,11 @@ def main():
         # Build lookup: (norm_name, norm_team) → player_id
         player_lookup = {
             (normalise(p["name"]), normalise(p["current_team"])): p["id"]
+            for p in players
+        }
+        # Track existing heights so we only backfill blanks
+        player_height_lookup = {
+            p["id"]: p.get("height")
             for p in players
         }
 
@@ -696,9 +701,10 @@ def main():
             if r.get("cdi") is not None
         }
     else:
-        player_lookup   = {}
-        stats_lookup    = {}
-        already_matched = set()
+        player_lookup          = {}
+        player_height_lookup   = {}
+        stats_lookup           = {}
+        already_matched        = set()
 
     # ── Process each row ──────────────────────────────────────────────────────
     matched   = 0
@@ -785,6 +791,9 @@ def main():
         pos = normalise_pos(row.get("role", ""))
         if pos:
             player_patch["primary_position"] = pos
+        ht = str(row.get("ht", "")).strip()
+        if ht and ht not in ("nan", "") and not player_height_lookup.get(player_id):
+            player_patch["height"] = ht
         if player_patch:
             db.table("players").update(player_patch).eq("id", player_id).execute()
 

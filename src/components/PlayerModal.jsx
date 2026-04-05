@@ -10,27 +10,28 @@ function money(n) {
 
 function fmt(val, key) {
   if (val === null || val === undefined || val === "") return "—";
-  const pct = ["fg_pct","ft_pct","3p_pct","atr_pct"];
+  const pct = ["fg_pct","ft_pct","3p_pct"];
   if (pct.includes(key)) return `${Number(val).toFixed(1)}%`;
+  if (key === "torvik_rim_pct") return `${(Number(val) * 100).toFixed(1)}%`;
   return Number(val) % 1 === 0 ? Number(val).toFixed(0) : Number(val).toFixed(1);
 }
 
 const STAT_ROWS = [
-  { key: "ppg",    label: "PPG" },
-  { key: "rpg",    label: "RPG" },
-  { key: "apg",    label: "APG" },
-  { key: "3pg",    label: "3PG" },
-  { key: "usg",    label: "USG%" },
-  { key: "ast_tov",label: "AST/TOV" },
-  { key: "fg_pct", label: "FG%" },
-  { key: "ft_pct", label: "FT%" },
-  { key: "3p_pct", label: "3P%" },
-  { key: "atr_pct",label: "ATR%" },
-  { key: "stl_40", label: "STL/40" },
-  { key: "blk_40", label: "BLK/40" },
-  { key: "drb_40", label: "DRB/40" },
-  { key: "orb_40", label: "ORB/40" },
-  { key: "trb_40", label: "TRB/40" },
+  { key: "ppg",           label: "PPG" },
+  { key: "rpg",           label: "RPG" },
+  { key: "apg",           label: "APG" },
+  { key: "3pg",           label: "3PG" },
+  { key: "usg",           label: "USG%" },
+  { key: "ast_tov",       label: "AST/TOV" },
+  { key: "fg_pct",        label: "FG%" },
+  { key: "ft_pct",        label: "FT%" },
+  { key: "3p_pct",        label: "3P%" },
+  { key: "torvik_rim_pct",label: "RIM FG%" },
+  { key: "stl_40",        label: "STL/40" },
+  { key: "blk_40",        label: "BLK/40" },
+  { key: "drb_40",        label: "DRB/40" },
+  { key: "orb_40",        label: "ORB/40" },
+  { key: "trb_40",        label: "TRB/40" },
 ];
 
 // const ADV_ROWS = [
@@ -44,7 +45,7 @@ const STAT_ROWS = [
 // Pentagon order (clockwise from top): Scoring Efficiency, ATH, Interior Impact, Defending, Playmaking
 const PENTAGON_METRICS = [
   { key: "sei", label: "Scoring Efficiency", desc: "Powered by TS% and FGA for volume." },
-  { key: "ath", label: "Athleticism",        desc: "Advanced metrics across lateral, vertical, and contact — including dunk volume, ATR share, FTR, and more." },
+  { key: "ath", label: "Athleticism",        desc: "Advanced metrics across lateral, vertical, and contact." },
   { key: "ris", label: "Rim Impact",         desc: "Driven by BLK%, DRB%, ORB%, and rim FG%." },
   { key: "dds", label: "Defending",          desc: "Driven by BLK%, STL%, DRB%, and FC/40." },
   { key: "cdi", label: "Playmaking",         desc: "Driven by AST%, TO%, and positional weighting." },
@@ -52,17 +53,17 @@ const PENTAGON_METRICS = [
 
 function letterGrade(val) {
   if (val === null || val === undefined) return "—";
-  if (val >= 96) return "A+";
-  if (val >= 93) return "A";
-  if (val >= 90) return "A-";
-  if (val >= 87) return "B+";
-  if (val >= 83) return "B";
-  if (val >= 75) return "B-";
-  if (val >= 70) return "C+";
-  if (val >= 65) return "C";
-  if (val >= 60) return "C-";
-  if (val >= 55) return "D+";
-  if (val >= 50) return "D";
+  if (val >= 95) return "A+";
+  if (val >= 90) return "A";
+  if (val >= 85) return "A-";
+  if (val >= 80) return "B+";
+  if (val >= 75) return "B";
+  if (val >= 70) return "B-";
+  if (val >= 60) return "C+";
+  if (val >= 50) return "C";
+  if (val >= 40) return "C-";
+  if (val >= 30) return "D+";
+  if (val >= 20) return "D";
   return "F";
 }
 
@@ -284,6 +285,9 @@ export function PlayerModal({ player, onClose }) {
 
           <div className="modal-section">
             <h4>Beyond the Portal Skill Profile</h4>
+            <div style={{ fontSize: 11, opacity: .4, marginBottom: 10 }}>
+              Grades reflect percentile rank within position group (Guard, Wing, or Big).
+            </div>
             {loadingStats ? (
               <div style={{ opacity: .4, fontSize: 13 }}>Loading…</div>
             ) : !stats ? (
