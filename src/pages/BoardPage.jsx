@@ -259,7 +259,10 @@ export function BoardPage() {
                       {COLS.map(col => (
                         <th key={col.label} style={{ ...thStyle, cursor: "pointer", userSelect: "none" }}
                           onClick={() => handleSort(col.label)}>
-                          {col.label}{sortKey === col.label ? (sortDir === "asc" ? " ▲" : " ▼") : ""}
+                          {col.label}{" "}
+                          <span style={{ opacity: sortKey === col.label ? 1 : 0.25 }}>
+                            {sortKey === col.label && sortDir === "desc" ? "▼" : "▲"}
+                          </span>
                         </th>
                       ))}
                     </tr>

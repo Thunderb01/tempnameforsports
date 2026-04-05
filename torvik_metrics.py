@@ -338,6 +338,12 @@ def compute_ath(df, use_torvik=False):
     else:
         df["_drb_per_per"] = percentrank_by_pos(df, "sb_drb_40")
 
+    # Fill NaN percentiles with 0 so players with no data (e.g. 0 dunks → 0/0 = NaN)
+    # don't propagate NaN into component sums and inflate scores for others.
+    for _col in ["_dunk_vol_per", "_dunk_rate_per", "_rim_fin_per", "_ftr_per",
+                 "_stl_per_per", "_blk_per_per", "_orb_per_per", "_drb_per_per"]:
+        df[_col] = df[_col].fillna(0)
+
     # ── Component scores ──────────────────────────────────────────────────────
     # EXPLOSION: finishing through/above defenders
     EXPLOSION_W = {
