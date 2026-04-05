@@ -17,6 +17,7 @@ function fmt(val, key) {
 }
 
 const STAT_ROWS = [
+  { key: "year",          label: "Season" },
   { key: "usg",           label: "USG" },
   { key: "ppg",           label: "PPG" },
   { key: "rpg",           label: "RPG" },
@@ -24,8 +25,7 @@ const STAT_ROWS = [
   { key: "ast_tov",       label: "AST/TOV" },
   { key: "fg_pct",        label: "FG%" },
   { key: "3p_pct",        label: "3P%" },
-  { key: "ft_pct",        label: "FT%" }
-
+  { key: "ft_pct",        label: "FT%" },
 ];
 
 // const ADV_ROWS = [
