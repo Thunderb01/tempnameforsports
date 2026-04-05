@@ -84,6 +84,7 @@ TEAMS = {
     "Bryant": "bryant", "Bucknell": "bucknell", "Buffalo": "buffalo",
     "Butler": "butler", "BYU": "brigham-young", "California": "california",
     "Campbell": "campbell", "Central Arkansas": "central-arkansas",
+    "Central Connecticut St.": "central-connecticut-state",
     "Central Michigan": "central-michigan", "Charleston": "charleston",
     "Charlotte": "charlotte", "Chattanooga": "chattanooga",
     "Chicago State": "chicago-state", "Cincinnati": "cincinnati",

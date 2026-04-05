@@ -77,6 +77,8 @@ def parse_args():
                    help="Use Torvik CSV columns for all metrics instead of scraped Supabase totals")
     p.add_argument("--skip-nil",        action="store_true",
                    help="Do not overwrite nil_valuation on the players table")
+    p.add_argument("--teams", nargs="+", metavar="TEAM",
+                   help="Only process players from these teams (exact Torvik team name)")
     return p.parse_args()
 
 
@@ -111,6 +113,7 @@ TORVIK_TEAM_ALIASES = {
     "arizona st.":              "arizona state",
     "ball st.":                 "ball state",
     "boise st.":                "boise state",
+    "central connecticut":  "central connecticut st.",
     "chicago st.":              "chicago state",
     "cleveland st.":            "cleveland state",
     "colorado st.":             "colorado state",
@@ -548,6 +551,11 @@ def main():
     print(f"Reading {args.csv} …")
     df = pd.read_csv(args.csv)
 
+    # ── Optional team filter ──────────────────────────────────────────────────
+    if args.teams:
+        df = df[df["team"].isin(args.teams)].copy()
+        print(f"  Filtered to {len(df)} rows for teams: {args.teams}")
+
     # Deduplicate: keep latest season per player+team
     if "year" in df.columns:
         df = df.sort_values("year", ascending=False).drop_duplicates(
@@ -792,6 +800,11 @@ def main():
         pos = normalise_pos(row.get("role", ""))
         if pos:
             player_patch["primary_position"] = pos
+        YR_MAP = {"Fr": "Freshman", "So": "Sophomore", "Jr": "Junior", "Sr": "Senior", "Gr": "Graduate"}
+        yr_raw = str(row.get("yr", "")).strip()
+        yr_mapped = YR_MAP.get(yr_raw)
+        if yr_mapped:
+            player_patch["year"] = yr_mapped
         ht = str(row.get("ht", "")).strip()
         if ht and ht not in ("nan", "") and not player_height_lookup.get(player_id):
             player_patch["height"] = ht

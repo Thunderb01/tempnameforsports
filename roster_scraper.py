@@ -100,7 +100,7 @@ TEAMS = {
     "Campbell":               "campbell",
     "Canisius":               "canisius",
     "Central Arkansas":       "central-arkansas",
-    "Central Connecticut":    "central-connecticut",
+    "Central Connecticut St.":    "central-connecticut-state",
     "Central Michigan":       "central-michigan",
     "Charleston":             "charleston",
     "Charlotte":              "charlotte",
