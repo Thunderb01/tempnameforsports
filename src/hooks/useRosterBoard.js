@@ -85,7 +85,6 @@ export function useRosterBoard(team) {
       const { data, error } = await supabase
         .from("players")
         .select("*, player_stats(*)")
-        .eq("source", "portal")
         .order("name")
         .range(page * PAGE, (page + 1) * PAGE - 1);
       if (error) { console.error("players fetch:", error); return; }
@@ -96,6 +95,7 @@ export function useRosterBoard(team) {
 
     const players = all.map(row => ({
       id:             row.id,
+      source:         row.source ?? "program",
       name:           row.name,
       team:           row.current_team,
       pos:            row.primary_position,

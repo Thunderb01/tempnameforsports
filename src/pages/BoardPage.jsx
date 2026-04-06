@@ -46,8 +46,9 @@ export function BoardPage() {
   const [sortKey,   setSortKey]   = useState("Mkt High");
   const [sortDir,   setSortDir]   = useState("desc");
   const [modal,     setModal]     = useState(null);
-  const [page,      setPage]      = useState(0);
-  const [hideNoNil, setHideNoNil] = useState(true);
+  const [page,        setPage]        = useState(0);
+  const [hideNoNil,   setHideNoNil]   = useState(true);
+  const [showProgram, setShowProgram] = useState(false);
 
   const PAGE_SIZE = 50;
 
@@ -139,7 +140,7 @@ export function BoardPage() {
   }
 
   // Reset to page 0 whenever filters or sort change
-  useEffect(() => setPage(0), [search, posFilter, stateFilter, sortKey, sortDir, hideNoNil]);
+  useEffect(() => setPage(0), [search, posFilter, stateFilter, sortKey, sortDir, hideNoNil, showProgram]);
 
   // ── Filter + sort ───────────────────────────────────────────────────────────
   const filtered = useMemo(() => {
@@ -155,6 +156,7 @@ export function BoardPage() {
       if (posFilter !== "all" && p.pos !== posFilter) return false;
       if (stateTerms && !matchesState(p.hometown || "", stateTerms)) return false;
       if (hideNoNil && !(p.marketHigh > 0)) return false;
+      if (!showProgram && p.source !== "portal") return false;
       return true;
     });
 
@@ -175,7 +177,7 @@ export function BoardPage() {
     }
 
     return out;
-  }, [players, search, posFilter, stateFilter, sortKey, sortDir, hideNoNil]);
+  }, [players, search, posFilter, stateFilter, sortKey, sortDir, hideNoNil, showProgram]);
 
   // ── Roster state helpers (delegated to shared useRosterBoard hook) ──────────
   function inRoster(id)    { return board.inRoster(id); }
@@ -232,6 +234,10 @@ export function BoardPage() {
             <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, opacity: .7, cursor: "pointer", userSelect: "none" }}>
               <input type="checkbox" checked={hideNoNil} onChange={e => setHideNoNil(e.target.checked)} />
               Evaluated players only
+            </label>
+            <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, opacity: .7, cursor: "pointer", userSelect: "none" }}>
+              <input type="checkbox" checked={showProgram} onChange={e => setShowProgram(e.target.checked)} />
+              Include program players
             </label>
           </div>
 
