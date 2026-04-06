@@ -718,8 +718,9 @@ def main():
         already_matched        = set()
 
     # ── Process each row ──────────────────────────────────────────────────────
-    matched   = 0
-    unmatched = 0
+    matched        = 0
+    unmatched      = 0
+    unmatched_rows = []
 
     for _, row in df.iterrows():
         name = str(row.get("player_name", "")).strip()
@@ -787,6 +788,8 @@ def main():
 
         if not player_id:
             unmatched += 1
+            print(f"  ✗ NO MATCH: {name} ({team})")
+            unmatched_rows.append({"name": name, "team": team, "yr": yr})
             continue
 
         if args.skip_matched and player_id in already_matched:
@@ -837,6 +840,14 @@ def main():
         print(f"  ✓ {name} ({team})")
 
     print(f"\nDone. Matched: {matched} | Unmatched: {unmatched}")
+    if unmatched_rows:
+        import csv
+        out_path = "unmatched_players.csv"
+        with open(out_path, "w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=["name", "team", "yr"])
+            writer.writeheader()
+            writer.writerows(unmatched_rows)
+        print(f"  → Unmatched players written to {out_path}")
 
     # ── Null out metrics + zero NIL for low-minutes players ───────────────────
     if low_minutes_keys and not args.dry_run:

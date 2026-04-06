@@ -237,7 +237,7 @@ export function BoardPage() {
             </label>
             <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, opacity: .7, cursor: "pointer", userSelect: "none" }}>
               <input type="checkbox" checked={showProgram} onChange={e => setShowProgram(e.target.checked)} />
-              Include program players
+              Include all players
             </label>
           </div>
 

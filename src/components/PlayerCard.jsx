@@ -5,31 +5,25 @@ function money(n) {
   });
 }
 
-const TAG_GROUPS = [
-  { key: "playmakerTags",  label: "Play Maker" },
-  { key: "shootingTags",   label: "Shooting & Scoring" },
-  { key: "shotmakingTags", label: "Shotmaking" },
-  { key: "interiorTags",   label: "Interior" },
-  { key: "defensiveTags",  label: "Defense" },
-];
-
 export function PlayerCard({ player, inRoster, inShortlist, onRoster, onShortlist, onClick }) {
+  const s = player.stats || {};
+  const stat = (val, label) => val != null && val !== "" && String(val) !== "NaN"
+    ? `${label} ${Number(val).toFixed(1)}`
+    : null;
+  const statLine = [
+    stat(s.usg,  "USG"),
+    stat(s.ppg,  "PPG"),
+    stat(s.rpg,  "RPG"),
+    stat(s.apg,  "APG"),
+  ].filter(Boolean).join("  ·  ");
+
   return (
     <div className="row row-click" onClick={e => { if (!e.target.closest("button,select")) onClick?.(player); }}>
       <div className="row-main">
         <div className="row-title">{player.name}</div>
         <div className="row-sub">{player.team} · {player.pos} · {player.year}</div>
         <div className="row-sub">Market: {money(player.marketLow)} – {money(player.marketHigh)}</div>
-        {TAG_GROUPS.map(({ key, label }) => {
-          const tags = (player[key] || []).slice(0, 5);
-          if (!tags.length) return null;
-          return (
-            <div key={key} className="row-sub tag-row">
-              <span className="muted" style={{ marginRight: 4 }}>{label}:</span>
-              {tags.map(t => <span key={t} className="tag-chip">{t}</span>)}
-            </div>
-          );
-        })}
+        {statLine && <div className="row-sub" style={{ opacity: .75 }}>{statLine}</div>}
       </div>
 
       <div className="row-actions">
