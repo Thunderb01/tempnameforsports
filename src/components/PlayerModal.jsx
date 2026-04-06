@@ -205,7 +205,7 @@ export function PlayerModal({ player, onClose }) {
                 <div className="modal-kicker">Player Card</div>
                 <h3 className="modal-title" id="modal-title">{player.name}</h3>
                 <div className="modal-sub">
-                  {[player.team, player.pos, player.year, player.height, player.hometown]
+                  {[player.team, player.conf, player.pos, player.year, player.height, player.hometown]
                     .filter(Boolean).join(" · ")}
                 </div>
               </div>

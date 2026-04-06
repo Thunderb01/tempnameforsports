@@ -98,6 +98,7 @@ export function useRosterBoard(team) {
       source:         row.source ?? "program",
       name:           row.name,
       team:           row.current_team,
+      conf:           row.player_stats?.[0]?.conference ?? null,
       pos:            row.primary_position,
       year:           row.year,
       height:         row.height   ?? null,

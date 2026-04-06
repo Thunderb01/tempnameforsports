@@ -288,10 +288,17 @@ def compute_dds(df, use_torvik=False):
     DDS — Defensive Disruption Score
     Measures defensive impact and disruption ability.
     """
+    pfr = df["pfr"].fillna(0)
     if use_torvik:
-        df["_dds_raw"] = (df["stl_per"] + 0.75 * df["blk_per"] + 0.5 * df["DRB_per"] - 0.5 * df["pfr"]).clip(lower=0)
+        stl = df["stl_per"].fillna(0)
+        blk = df["blk_per"].fillna(0)
+        drb = df["DRB_per"].fillna(0)
+        df["_dds_raw"] = (stl + 0.75 * blk + 0.5 * drb - 0.5 * pfr).clip(lower=0)
     else:
-        df["_dds_raw"] = (df["sb_stl_40"] + 0.75 * df["sb_blk_40"] + 0.5 * df["sb_drb_40"] - 0.5 * df["pfr"]).clip(lower=0)
+        stl = df["sb_stl_40"].fillna(0)
+        blk = df["sb_blk_40"].fillna(0)
+        drb = df["sb_drb_40"].fillna(0)
+        df["_dds_raw"] = (stl + 0.75 * blk + 0.5 * drb - 0.5 * pfr).clip(lower=0)
 
     return percentrank_by_pos(df, "_dds_raw").apply(clamp)
 
@@ -301,12 +308,15 @@ def compute_sei(df, use_torvik=False):
     SEI — Scoring Efficiency Index
     Measures how efficiently a player scores relative to usage.
     """
+    ts = df["TS_per"].fillna(0)
     if use_torvik:
-        # usg already represents shot volume, TS_per is efficiency
-        df["_sei_raw"] = df["TS_per"] * (df["usg"] ** 0.5)
+        usg = df["usg"].fillna(0)
+        df["_sei_raw"] = ts * (usg ** 0.5)
     else:
-        df["_fga_40"] = (df["sb_tot_fga"] / df["sb_tot_mp"].replace(0, float("nan"))) * 40
-        df["_sei_raw"] = df["TS_per"] * (df["_fga_40"]) ** 0.5
+        fga = df["sb_tot_fga"].fillna(0)
+        mp  = df["sb_tot_mp"].replace(0, float("nan")).fillna(0)
+        fga_40 = (fga / mp.replace(0, float("nan"))) * 40
+        df["_sei_raw"] = ts * fga_40.fillna(0) ** 0.5
 
     return percentrank_by_pos(df, "_sei_raw").apply(clamp)
 
@@ -419,7 +429,8 @@ def compute_ris(df, use_torvik=False):
     #       + 0.4*BI4
     #   ),
     # "")
-    rimmade = df["rimmade"] * df["rimmade/(rimmade+rimmiss)"]**0.5
+    rim_pct = df["rimmade/(rimmade+rimmiss)"].fillna(0)
+    rimmade = df["rimmade"].fillna(0) * rim_pct**0.5
     if use_torvik:
         freethrow = 6 * df["FT_per"] / 100
         orb = 1.2 * df["ORB_per"]
@@ -514,7 +525,7 @@ def compute_nil_valuation(df):
     # ── Age/Year Boost ────────────────────────────────────────────────────────
     yr_col = df["yr"]  # issue 3 fix: always use Torvik yr column (Fr, So, Jr, Sr, Gr)
     yr_boost = yr_col.map(
-        {"So": 1.15, "Jr": 1.08, "Sr": 0.95, "Gr": 0.95, "Fr": 1.15}
+        {"So": 1.05, "Jr": .95, "Sr": 0.95, "Gr": 0.95, "Fr": 1.1}
     ).fillna(1.0)
 
     base_nil_final = (base_nil * pos_boost * yr_boost).clip(lower=0)

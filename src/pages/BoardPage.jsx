@@ -50,6 +50,7 @@ export function BoardPage() {
   const [hideNoNil,   setHideNoNil]   = useState(true);
   const [showProgram, setShowProgram] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [confFilter,  setConfFilter]  = useState("all");
 
   const ADVC_FIELDS = [
     { key: "sei", label: "Scoring Efficiency (SEI)", src: "metric" },
@@ -159,8 +160,12 @@ export function BoardPage() {
     return terms.some(t => hometown.includes(t));
   }
 
+  const conferences = useMemo(() =>
+    [...new Set(players.map(p => p.conf).filter(Boolean))].sort()
+  , [players]);
+
   // Reset to page 0 whenever filters or sort change
-  useEffect(() => setPage(0), [search, posFilter, stateFilter, sortKey, sortDir, hideNoNil, showProgram, advcFilters]);
+  useEffect(() => setPage(0), [search, posFilter, stateFilter, confFilter, sortKey, sortDir, hideNoNil, showProgram, advcFilters]);
 
   // ── Filter + sort ───────────────────────────────────────────────────────────
   const filtered = useMemo(() => {
@@ -174,6 +179,7 @@ export function BoardPage() {
                !(p.team||"").toLowerCase().includes(q) &&
                !(p.hometown||"").toLowerCase().includes(q)) return false;
       if (posFilter !== "all" && p.pos !== posFilter) return false;
+      if (confFilter !== "all" && p.conf !== confFilter) return false;
       if (stateTerms && !matchesState(p.hometown || "", stateTerms)) return false;
       if (hideNoNil && !(p.marketHigh > 0)) return false;
       if (!showProgram && p.source !== "portal") return false;
@@ -203,7 +209,7 @@ export function BoardPage() {
     }
 
     return out;
-  }, [players, search, posFilter, stateFilter, sortKey, sortDir, hideNoNil, showProgram, advcFilters]);
+  }, [players, search, posFilter, confFilter, stateFilter, sortKey, sortDir, hideNoNil, showProgram, advcFilters]);
 
   // ── Roster state helpers (delegated to shared useRosterBoard hook) ──────────
   function inRoster(id)    { return board.inRoster(id); }
@@ -259,6 +265,10 @@ export function BoardPage() {
               <option value="Guard">Guard</option>
               <option value="Wing">Wing</option>
               <option value="Big">Big</option>
+            </select>
+            <select className="input" style={{ width: 150 }} value={confFilter} onChange={e => setConfFilter(e.target.value)}>
+              <option value="all">All conferences</option>
+              {conferences.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
             <select className="input" style={{ width: 180 }} value={stateFilter} onChange={e => setStateFilter(e.target.value)}>
               <option value="all">All locations</option>
