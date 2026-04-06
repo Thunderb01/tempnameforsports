@@ -49,6 +49,26 @@ export function BoardPage() {
   const [page,        setPage]        = useState(0);
   const [hideNoNil,   setHideNoNil]   = useState(true);
   const [showProgram, setShowProgram] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+
+  const ADVC_FIELDS = [
+    { key: "sei", label: "Scoring Efficiency (SEI)", src: "metric" },
+    { key: "ath", label: "Athleticism (ATH)",        src: "metric" },
+    { key: "ris", label: "Rim Impact (RIS)",          src: "metric" },
+    { key: "dds", label: "Defending (DDS)",           src: "metric" },
+    { key: "cdi", label: "Playmaking (CDI)",          src: "metric" },
+    { key: "usg", label: "USG%",                      src: "stat"   },
+    { key: "ppg", label: "PPG",                       src: "stat"   },
+    { key: "rpg", label: "RPG",                       src: "stat"   },
+    { key: "apg", label: "APG",                       src: "stat"   },
+  ];
+  const emptyAdvc = () => Object.fromEntries(ADVC_FIELDS.map(f => [f.key, { min: "", max: "" }]));
+  const [advcFilters, setAdvcFilters] = useState(emptyAdvc);
+
+  function setAdvc(key, side, val) {
+    setAdvcFilters(prev => ({ ...prev, [key]: { ...prev[key], [side]: val } }));
+  }
+  const advcActive = Object.values(advcFilters).some(f => f.min !== "" || f.max !== "");
 
   const PAGE_SIZE = 50;
 
@@ -140,7 +160,7 @@ export function BoardPage() {
   }
 
   // Reset to page 0 whenever filters or sort change
-  useEffect(() => setPage(0), [search, posFilter, stateFilter, sortKey, sortDir, hideNoNil, showProgram]);
+  useEffect(() => setPage(0), [search, posFilter, stateFilter, sortKey, sortDir, hideNoNil, showProgram, advcFilters]);
 
   // ── Filter + sort ───────────────────────────────────────────────────────────
   const filtered = useMemo(() => {
@@ -157,6 +177,12 @@ export function BoardPage() {
       if (stateTerms && !matchesState(p.hometown || "", stateTerms)) return false;
       if (hideNoNil && !(p.marketHigh > 0)) return false;
       if (!showProgram && p.source !== "portal") return false;
+      for (const f of ADVC_FIELDS) {
+        const val = f.src === "metric" ? p.stats?.[f.key] : p.stats?.[f.key];
+        const { min, max } = advcFilters[f.key];
+        if (min !== "" && (val == null || Number(val) < Number(min))) return false;
+        if (max !== "" && (val == null || Number(val) > Number(max))) return false;
+      }
       return true;
     });
 
@@ -177,7 +203,7 @@ export function BoardPage() {
     }
 
     return out;
-  }, [players, search, posFilter, stateFilter, sortKey, sortDir, hideNoNil, showProgram]);
+  }, [players, search, posFilter, stateFilter, sortKey, sortDir, hideNoNil, showProgram, advcFilters]);
 
   // ── Roster state helpers (delegated to shared useRosterBoard hook) ──────────
   function inRoster(id)    { return board.inRoster(id); }
@@ -211,9 +237,16 @@ export function BoardPage() {
         <div className="app-top">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
             <h1 style={{ margin: 0 }}>Full Board</h1>
-            <button className="btn btn-ghost" onClick={() => setViewMode(v => v === "cards" ? "table" : "cards")}>
-              {viewMode === "cards" ? "Table View" : "Card View"}
-            </button>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button className="btn btn-ghost" style={{ position: "relative" }}
+                onClick={() => setShowAdvanced(v => !v)}>
+                Advanced Filters
+                {advcActive && <span style={{ position: "absolute", top: 4, right: 4, width: 7, height: 7, borderRadius: "50%", background: "var(--accent, #6c8ebf)" }} />}
+              </button>
+              <button className="btn btn-ghost" onClick={() => setViewMode(v => v === "cards" ? "table" : "cards")}>
+                {viewMode === "cards" ? "Table View" : "Card View"}
+              </button>
+            </div>
           </div>
 
           {/* Filters */}
@@ -241,6 +274,39 @@ export function BoardPage() {
             </label>
           </div>
 
+          {/* Advanced filter panel */}
+          {showAdvanced && (
+            <div style={{
+              background: "var(--panel)", border: "1px solid var(--border)",
+              borderRadius: 10, padding: "16px 20px", marginBottom: 14,
+            }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                <span style={{ fontWeight: 600, fontSize: 14 }}>Advanced Filters</span>
+                <button className="btn btn-ghost" style={{ fontSize: 12, padding: "2px 10px" }}
+                  onClick={() => setAdvcFilters(emptyAdvc())}>
+                  Clear all
+                </button>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px 32px" }}>
+                {ADVC_FIELDS.map(f => (
+                  <div key={f.key}>
+                    <div style={{ fontSize: 12, opacity: .6, marginBottom: 4 }}>{f.label}</div>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <input className="input" type="number" placeholder="Min"
+                        style={{ width: "50%", fontSize: 13 }}
+                        value={advcFilters[f.key].min}
+                        onChange={e => setAdvc(f.key, "min", e.target.value)} />
+                      <input className="input" type="number" placeholder="Max"
+                        style={{ width: "50%", fontSize: 13 }}
+                        value={advcFilters[f.key].max}
+                        onChange={e => setAdvc(f.key, "max", e.target.value)} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div style={{ fontSize: 12, opacity: .45, marginBottom: 10 }}>
             {loading ? "Loading…" : `${filtered.length} of ${players.length} players`}
             {viewMode === "table" && !loading && " · click header to sort"}
@@ -264,22 +330,17 @@ export function BoardPage() {
                           {[p.team, p.pos, p.year, p.height, p.hometown].filter(Boolean).join(" · ")}
                         </div>
                         <div className="row-sub">Market: {money(p.marketLow)} – {money(p.marketHigh)}</div>
-                        {[
-                          { tags: p.playmakerTags,  label: "Play Maker" },
-                          { tags: p.shootingTags,   label: "Shooting & Scoring" },
-                          { tags: p.shotmakingTags, label: "Shotmaking" },
-                          { tags: p.interiorTags,   label: "Interior" },
-                          { tags: p.defensiveTags,  label: "Defense" },
-                        ].map(({ tags, label }) => {
-                          const t = (tags || []).slice(0, 5);
-                          if (!t.length) return null;
-                          return (
-                            <div key={label} className="row-sub tag-row">
-                              <span className="muted" style={{ marginRight: 4 }}>{label}:</span>
-                              {t.map(tag => <span key={tag} className="tag-chip">{tag}</span>)}
-                            </div>
-                          );
-                        })}
+                        {(() => {
+                          const s = p.stats || {};
+                          const st = v => v != null && String(v) !== "NaN" ? Number(v).toFixed(1) : null;
+                          const line = [
+                            st(s.usg)  && `USG ${st(s.usg)}`,
+                            st(s.ppg)  && `PPG ${st(s.ppg)}`,
+                            st(s.rpg)  && `RPG ${st(s.rpg)}`,
+                            st(s.apg)  && `APG ${st(s.apg)}`,
+                          ].filter(Boolean).join("  ·  ");
+                          return line ? <div className="row-sub" style={{ opacity: .75 }}>{line}</div> : null;
+                        })()}
                         <div className="row-sub" style={{ marginTop: 8 }}>
                           <label className="status-control">
                             <span>Status</span>
