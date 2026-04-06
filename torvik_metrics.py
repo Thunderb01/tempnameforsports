@@ -79,6 +79,8 @@ def parse_args():
                    help="Do not overwrite nil_valuation on the players table")
     p.add_argument("--teams", nargs="+", metavar="TEAM",
                    help="Only process players from these teams (exact Torvik team name)")
+    p.add_argument("--players", nargs="+", metavar="PLAYER",
+                   help="Only process these players by name (exact Torvik player_name)")
     return p.parse_args()
 
 
@@ -551,10 +553,10 @@ def main():
     print(f"Reading {args.csv} …")
     df = pd.read_csv(args.csv)
 
-    # ── Optional team filter ──────────────────────────────────────────────────
-    if args.teams:
-        df = df[df["team"].isin(args.teams)].copy()
-        print(f"  Filtered to {len(df)} rows for teams: {args.teams}")
+    # ── Optional filters (applied AFTER metrics so percentiles use full population) ──
+    # Store filter sets here; actual slicing happens in the write loop below.
+    _team_filter   = set(args.teams)   if args.teams   else None
+    _player_filter = set(args.players) if args.players else None
 
     # Deduplicate: keep latest season per player+team
     if "year" in df.columns:
@@ -634,18 +636,18 @@ def main():
             csv_teams = set(df["_sb_team"].unique())
             unmatched_sb  = sb_teams - csv_teams
             unmatched_csv = csv_teams - sb_teams
-            if unmatched_sb:
-                print(f"  ⚠  Supabase teams with NO Torvik match: {sorted(unmatched_sb)}")
-            if unmatched_csv:
-                print(f"  ⚠  Torvik CSV teams with NO Supabase match: {sorted(unmatched_csv)}")
+            # if unmatched_sb:
+            #     print(f"  ⚠  Supabase teams with NO Torvik match: {sorted(unmatched_sb)}")
+            # if unmatched_csv:
+            #     print(f"  ⚠  Torvik CSV teams with NO Supabase match: {sorted(unmatched_csv)}")
             df = df.drop(columns=["_sb_name", "_sb_team"])
             print(f"  Merged {_sb_df.shape[0]} player_stats rows into df")
         else:
             print("  No player_stats rows fetched — skipping merge")
     # In dry-run mode, sb_* columns won't exist; formulas should guard with .get or fillna
-    print([c for c in df.columns if c.startswith("sb_")])
+    # print([c for c in df.columns if c.startswith("sb_")])
 
-    print(df.columns.tolist())
+    # print(df.columns.tolist())
 
     # ── Position buckets + pre-compute metrics over full df ───────────────────
     df = df.reset_index(drop=True)
@@ -723,6 +725,12 @@ def main():
         name = str(row.get("player_name", "")).strip()
         team = str(row.get("team", "")).strip()
         yr   = str(row.get("yr", "")).strip()
+
+        # Apply team/player filters here so percentiles use full population
+        if _team_filter and team not in _team_filter:
+            continue
+        if _player_filter and name not in _player_filter:
+            continue
 
         # ── Extract raw Torvik inputs ─────────────────────────────────────────
         torvik = {

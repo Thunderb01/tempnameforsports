@@ -49,8 +49,6 @@ export function AppPage() {
 
   const [search,   setSearch]   = useState("");
   const [posFilter,setPosFilter]= useState("all");
-  const [tagGroup, setTagGroup] = useState("all");
-  const [tagFilter,setTagFilter]= useState("all");
   const [modal,         setModal]         = useState(null);
   const [settings,      setSettings]      = useState(null);
   const [drawerOpen,    setDrawerOpen]    = useState(false);
@@ -151,43 +149,18 @@ export function AppPage() {
     setDrawerOpen(false);
   }
 
-  function getTagPool(p, group) {
-    if (group === "playmaker")  return p.playmakerTags  || [];
-    if (group === "shooting")   return p.shootingTags   || [];
-    if (group === "shotmaking") return p.shotmakingTags || [];
-    if (group === "interior")   return p.interiorTags   || [];
-    if (group === "defensive")  return p.defensiveTags  || [];
-    return [
-      ...(p.playmakerTags  || []),
-      ...(p.shootingTags   || []),
-      ...(p.shotmakingTags || []),
-      ...(p.interiorTags   || []),
-      ...(p.defensiveTags  || []),
-    ];
-  }
-
-  // ── Derived tag list ────────────────────────────────────────────────────────
-  const allTags = useMemo(() => {
-    const set = new Map();
-    board.state.board.forEach(p => {
-      getTagPool(p, tagGroup).forEach(t => {
-        if (t && !set.has(t.toLowerCase())) set.set(t.toLowerCase(), t);
-      });
-    });
-    return Array.from(set.values()).sort();
-  }, [board.state.board, tagGroup]);
-
-  // ── Filtered board ──────────────────────────────────────────────────────────
+  // ── Filtered + sorted board ─────────────────────────────────────────────────
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return board.state.board.filter(p => {
-      if (q && !p.name.toLowerCase().includes(q) &&
-               !(p.team||"").toLowerCase().includes(q)) return false;
-      if (posFilter !== "all" && p.pos !== posFilter) return false;
-      if (tagFilter !== "all" && !getTagPool(p, tagGroup).includes(tagFilter)) return false;
-      return true;
-    });
-  }, [board.state.board, search, posFilter, tagGroup, tagFilter]);
+    return board.state.board
+      .filter(p => {
+        if (q && !p.name.toLowerCase().includes(q) &&
+                 !(p.team||"").toLowerCase().includes(q)) return false;
+        if (posFilter !== "all" && p.pos !== posFilter) return false;
+        return true;
+      })
+      .sort((a, b) => (b.marketHigh || 0) - (a.marketHigh || 0));
+  }, [board.state.board, search, posFilter]);
 
   const calc = board.calc();
 
@@ -356,18 +329,6 @@ export function AppPage() {
                   <option value="Guard">Guard</option>
                   <option value="Wing">Wing</option>
                   <option value="Big">Big</option>
-                </select>
-                <select className="input" value={tagGroup} onChange={e => { setTagGroup(e.target.value); setTagFilter("all"); }}>
-                  <option value="all">All tag types</option>
-                  <option value="playmaker">Play Maker</option>
-                  <option value="shooting">Shooting &amp; Scoring</option>
-                  <option value="shotmaking">Shotmaking</option>
-                  <option value="interior">Interior</option>
-                  <option value="defensive">Defense</option>
-                </select>
-                <select className="input" value={tagFilter} onChange={e => setTagFilter(e.target.value)}>
-                  <option value="all">All tags</option>
-                  {allTags.map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
               </div>
             </div>
