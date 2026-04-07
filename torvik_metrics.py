@@ -635,15 +635,23 @@ def compute_nil_valuation(df):
 
     # ── Conference adjustment (V) ─────────────────────────────────────────────
     CONF_WEIGHTS = {
+        # High Major
         "ACC": 1.0, "B10": 1.0, "B12": 1.0, "SEC": 1.0, "BE": 1.0,
-        "MWC": 0.8, "A10": 0.8, "WCC": 0.8, "AAC": 0.8,
-        "MVC": 0.6, "SoCon": 0.6, "MAC": 0.6, "CUSA": 0.6,
+        # Mid Major
+        "MWC": 0.8, "A10": 0.8, "WCC": 0.8, "Amer": 0.8,
+        # Low Major
+        "MVC": 0.6, "SC": 0.6, "MAC": 0.6, "CUSA": 0.6,
+        "SB": 0.6, "MAAC": 0.6, "CAA": 0.6, "ASun": 0.6,
+        "Horz": 0.6, "BW": 0.6, "WAC": 0.6, "BSky": 0.6,
+        "Slnd": 0.6, "OVC": 0.6, "Pat": 0.6, "NEC": 0.6,
+        "AE": 0.6, "Ivy": 0.6, "BSth": 0.6, "Sum": 0.6,
+        "MEAC": 0.6, "SWAC": 0.6,
     }
     conf_col = df["conf"]  # issue 4 fix: always use Torvik conf column
     conf_adj = conf_col.map(CONF_WEIGHTS).fillna(0.75)  # V
 
     # ── NIL Cap ───────────────────────────────────────────────────────────────
-    nil_cap = 3_000_000
+    nil_cap = 2_500_000
 
     # ── Base NIL = MIN(cap, cap × W² × (1 - (1-V⁴)(1-W)²)^1.2) ─────────────
     blend = (1 - (1 - conf_adj**4) * (1 - total_score)**2) ** 1.2

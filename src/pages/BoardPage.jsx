@@ -3,6 +3,7 @@ import { SiteHeader }    from "@/components/SiteHeader";
 import { PlayerModal }   from "@/components/PlayerModal";
 import { useAuth }       from "@/hooks/useAuth";
 import { useRosterBoard} from "@/hooks/useRosterBoard";
+import { supabase }      from "@/lib/supabase";
 
 function heightToInches(h) {
   if (!h || h === "—") return -1;
@@ -57,6 +58,7 @@ export function BoardPage() {
   const [showProgram, setShowProgram] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [confFilter,  setConfFilter]  = useState("all");
+  const [conferences, setConferences] = useState([]);
 
   const ADVC_FIELDS = [
     { key: "sei", label: "Scoring Efficiency (SEI)", src: "metric" },
@@ -166,9 +168,12 @@ export function BoardPage() {
     return terms.some(t => hometown.includes(t));
   }
 
-  const conferences = useMemo(() =>
-    [...new Set(players.map(p => p.conf).filter(Boolean))].sort()
-  , [players]);
+  useEffect(() => {
+    supabase.from("teams").select("conference").then(({ data }) => {
+      const confs = [...new Set((data || []).map(t => t.conference).filter(Boolean))].sort();
+      setConferences(confs);
+    });
+  }, []);
 
   // Reset to page 0 whenever filters or sort change
   useEffect(() => setPage(0), [search, posFilter, stateFilter, confFilter, sortKey, sortDir, hideNoNil, showProgram, advcFilters]);
