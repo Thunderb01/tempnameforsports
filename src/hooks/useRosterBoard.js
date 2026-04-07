@@ -154,12 +154,15 @@ export function useRosterBoard(team) {
 
     setReturningPlayers(returning);
 
-    // Auto-set graduating for seniors/graduates that haven't been manually overridden
+    // Auto-set retention for seniors/graduates and portal players
     const GRADUATING_YEARS = ["Senior", "Graduate", "SR", "GR"];
     setState(s => {
       const auto = {};
       returning.forEach(p => {
-        if (GRADUATING_YEARS.includes(p.year) && !s.retentionById[p.id]) {
+        if (s.retentionById[p.id]) return; // don't override manual selections
+        if (p.source === "portal") {
+          auto[p.id] = "entering_portal";
+        } else if (GRADUATING_YEARS.includes(p.year)) {
           auto[p.id] = "graduating";
         }
       });
