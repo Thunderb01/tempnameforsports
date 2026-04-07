@@ -164,8 +164,24 @@ export function AppPage() {
 
   const calc = board.calc();
 
-  function handleSettingChange(key, value) {
-    const next = { ...board.state.settings, [key]: key === "program" ? value : Number(value) };
+  const NIL_BY_LEVEL = {
+    "High Major": 10_000_000,
+    "Mid Major":   3_000_000,
+    "Low Major":   1_500_000,
+  };
+
+  async function handleSettingChange(key, value) {
+    let next = { ...board.state.settings, [key]: key === "program" ? value : Number(value) };
+    if (key === "program" && value) {
+      const { data } = await supabase
+        .from("teams")
+        .select("level")
+        .eq("name", value)
+        .maybeSingle();
+      if (data?.level && NIL_BY_LEVEL[data.level]) {
+        next = { ...next, nilTotal: NIL_BY_LEVEL[data.level] };
+      }
+    }
     board.commitSettings(next);
     setSettings(next);
   }
