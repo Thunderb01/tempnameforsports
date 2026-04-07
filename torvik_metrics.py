@@ -129,15 +129,15 @@ TORVIK_TEAM_ALIASES = {
     "illinois st.":             "illinois state",
     "indiana st.":              "indiana state",
     "iowa st.":                 "iowa state",
-    "jackson st.":              "jackson state",
+    "jackson state":              "jackson st.",
     "jacksonville st.":         "jacksonville state",
     "kansas st.":               "kansas state",
-    "kennesaw st.":             "kennesaw state",
+    "kennesaw state":             "kennesaw st.",
     "kent st.":                 "kent state",
     "long beach st.":           "long beach state",
     "michigan st.":             "michigan state",
     "mississippi st.":          "mississippi state",
-    "mississippi valley st.":   "mississippi valley state",
+    "mississippi valley state":   "mississippi valley st.",
     "missouri st.":             "missouri state",
     "montana st.":              "montana state",
     "morehead st.":             "morehead state",
@@ -178,10 +178,10 @@ TORVIK_TEAM_ALIASES = {
     "louisiana monroe":         "louisiana monroe",
     "little rock":              "little rock",
     "mount st. mary's":         "mount st. mary's",
-    "cal st. fullerton":        "cal state fullerton",
-    "cal st. northridge":       "cal state northridge",
-    "cal st. bakersfield":      "cal state bakersfield",
-    "loyola md":                "loyola maryland",
+    "cal state fullerton":        "cal st. fullerton",
+    "cal state northridge":       "cal st. northridge",
+    "cal state bakersfield":      "cal st. bakersfield",
+   
     "siue":                     "siu edwardsville",
     "siu":                      "southern illinois",
     "umkc":                     "kansas city",
@@ -457,22 +457,30 @@ def compute_nil_valuation(df):
     """
     # ── Stat weights (from Weights sheet) ────────────────────────────────────
     WEIGHTS = {
-        "ppg":     0.15,
-        "ts_pct":  0.12,
-        "3p_pct":  0.08,
-        "ast_pct": 0.02,  # AST% — Torvik AST_per
-        "ast_tov": 0.10,
-        "stl_40":  0.05,
-        "blk_40":  0.05,
-        "drb_40":  0.05,
-        "orb_40":  0.04,
+        "ppg":     0.10,
+        # "ts_pct":  0.12,
+        # "3p_pct":  0.08,
+        # "ast_pct": 0.02,  # AST% — Torvik AST_per
+        # "ast_tov": 0.10,
+        # "stl_40":  0.05,
+        # "blk_40":  0.05,
+        # "drb_40":  0.05,
+        # "orb_40":  0.04,
         "mpg":     0.04,  # Min_per — usage/playing-time signal
+        
         # Scout scores (BtPM metrics scaled to 0–1)
-        "ath":     0.07,
-        "dds":     0.08,
-        "sei":     0.05,  # Versatility proxy
-        "ris":     0.04,  # Motor proxy
-        "cdi":     0.06,  # IQ proxy
+        
+        "nil_def_score":     0.08,  
+        "nil_versatility_score":     0.05,  # Versatility proxy
+        "nil_motor_score":     0.04,  # Motor proxy
+        "nil_iq_score":     0.06,  # IQ proxy
+
+        # Beyond the Portal Metrics
+        "sei":     0.20,  # Scoring Efficiency Index
+        "dds":     0.16,  # Defensive Disruption Score
+        "cdi":     0.15,  # Court Vision / Decision-Making Index
+        "ris":     0.07,  # Rebounding Impact Score
+        "ath":     0.07,  # Athleticism Index
     }
 
     # ── Percentile-rank each stat across full df (0–1 scale) ─────────────────
@@ -481,27 +489,149 @@ def compute_nil_valuation(df):
 
     stat_scores = (
         prank(df["ORtg"])    * WEIGHTS["ppg"]     +  # ORtg as scoring proxy (pace-adjusted)
-        prank(df["TS_per"])  * WEIGHTS["ts_pct"]  +  # issue 1 fix: always use TS_per
-        prank(df["TP_per"])  * WEIGHTS["3p_pct"]  +
-        prank(df["AST_per"]) * WEIGHTS["ast_pct"] +
-        prank(df["ast/tov"]) * WEIGHTS["ast_tov"] +
-        prank(df["stl_per"]) * WEIGHTS["stl_40"]  +
-        prank(df["blk_per"]) * WEIGHTS["blk_40"]  +
-        prank(df["DRB_per"]) * WEIGHTS["drb_40"]  +
-        prank(df["ORB_per"]) * WEIGHTS["orb_40"]  +
+        # prank(df["TS_per"])  * WEIGHTS["ts_pct"]  +  # issue 1 fix: always use TS_per
+        # prank(df["TP_per"])  * WEIGHTS["3p_pct"]  +
+        # prank(df["AST_per"]) * WEIGHTS["ast_pct"] +
+        # prank(df["ast/tov"]) * WEIGHTS["ast_tov"] +
+        # prank(df["stl_per"]) * WEIGHTS["stl_40"]  +
+        # prank(df["blk_per"]) * WEIGHTS["blk_40"]  +
+        # prank(df["DRB_per"]) * WEIGHTS["drb_40"]  +
+        # prank(df["ORB_per"]) * WEIGHTS["orb_40"]  +
         prank(df["Min_per"]) * WEIGHTS["mpg"]
     )
 
-    # BtPM metrics are 0–100; scale to 0–1 for consistency
+    # ── NIL Defensive metric  (position-specific, matches BtP sheet) ────────────
+    # Components: DBPM, D-PRPG (dporpag), STL%, BLK%, DRB%, FC/40 (inverted)
+    # All percentile-ranked across full population (0–1), then weighted by position.
+    def pr(series):
+        return series.fillna(0).rank(pct=True, na_option="bottom")
+    def pr_inv(series):
+        return 1 - series.fillna(series.max()).rank(pct=True, na_option="bottom")
+
+    _dbpm  = pr(df["dbpm"])
+    _dprpg = pr(df["dporpag"])
+    _stl   = pr(df["stl_per"])
+    _blk   = pr(df["blk_per"])
+    _drb   = pr(df["DRB_per"])
+    _fc    = pr_inv(df["pfr"])
+    _pos   = df["pos_bucket"]
+
+    df["_nil_def_raw"] = (
+        (_pos == "Guard") * (_dbpm*0.30 + _dprpg*0.20 + _stl*0.25 + _drb*0.10 + _fc*0.15) +
+        (_pos == "Wing")  * (_dbpm*0.25 + _dprpg*0.25 + _stl*0.15 + _blk*0.10 + _drb*0.15 + _fc*0.10) +
+        (_pos == "Big")   * (_dbpm*0.30 + _dprpg*0.20 + _blk*0.30 + _drb*0.15 + _fc*0.05)
+    )
+    # Re-rank within position groups (0–1) so Guards compete vs Guards, etc.
+    nil_def_score = percentrank_by_pos(df, "_nil_def_raw", scale=1)
+
+    # ── IQ/Playmaking metric  (position-specific, matches BtP sheet) ────────
+    # Components: eFG%, ORtg, AST%, TO% (inverted), A/TO
+    _efg   = pr(df["eFG"])
+    _ortg  = pr(df["ORtg"])
+    _ast   = pr(df["AST_per"])
+    _to    = pr_inv(df["TO_per"])   # lower turnovers = better
+    _ato   = pr(df["ast/tov"].fillna(0))
+
+    df["_nil_iq_raw"] = (
+        (_pos == "Guard") * (_efg*0.20 + _ortg*0.20 + _ast*0.25 + _to*0.20 + _ato*0.15) +
+        (_pos == "Wing")  * (_efg*0.35 + _ortg*0.25 + _ast*0.15 + _to*0.15 + _ato*0.10) +
+        (_pos == "Big")   * (_efg*0.40 + _ortg*0.30 + _ast*0.05 + _to*0.20 + _ato*0.05)
+    )
+    nil_iq_score = percentrank_by_pos(df, "_nil_iq_raw", scale=1)
+
+    # ── Motor/Hustle metric (position-specific, matches BtP sheet) ─────────
+    # Components: ORB/40, DRB/40, BLK/40, STL/40
+    _orb40 = pr(df["ORB_per"])
+    _drb40 = pr(df["DRB_per"])
+    _blk40 = pr(df["blk_per"])
+    _stl40 = pr(df["stl_per"])
+
+    df["_nil_motor_raw"] = (
+        (_pos == "Guard") * (_orb40*0.35 + _drb40*0.15 + _blk40*0.10 + _stl40*0.40) +
+        (_pos == "Wing")  * (_orb40*0.25 + _drb40*0.25 + _blk40*0.25 + _stl40*0.25) +
+        (_pos == "Big")   * (_orb40*0.25 + _drb40*0.30 + _blk40*0.35 + _stl40*0.10)
+    )
+    nil_motor_score = percentrank_by_pos(df, "_nil_motor_raw", scale=1)
+
+    # ── Versatility Score (position-specific, matches BtP sheet) ─────────────────
+    # --- Positional Size: pos-height percentile + overall height percentile ---
+    # (frame excluded for now)
+    # Guard: pos_h×0.75 + overall_h×0.25  (0.6 + 0.2 renorm without frame 0.2)
+    # Wing:  pos_h×0.571 + overall_h×0.429 (0.4 + 0.3 renorm without frame 0.3)
+    # Big:   pos_h×0.333 + overall_h×0.667 (0.2 + 0.4 renorm without frame 0.4)
+    def height_to_inches(h):
+        try:
+            parts = str(h).split("-")
+            return int(parts[0]) * 12 + int(parts[1])
+        except Exception:
+            return None
+    if "sb_height" in df.columns:
+        df["_height_in"] = df["sb_height"].apply(height_to_inches).astype(float)
+        _h_pos = percentrank_by_pos(df, "_height_in", scale=1)
+        _h_all = pr(df["_height_in"])
+    else:
+        _h_pos = pd.Series(0.5, index=df.index)
+        _h_all = pd.Series(0.5, index=df.index)
+
+    df["_nil_size_raw"] = (
+        (_pos == "Guard") * (_h_pos*0.75  + _h_all*0.25) +
+        (_pos == "Wing")  * (_h_pos*0.571 + _h_all*0.429) +
+        (_pos == "Big")   * (_h_pos*0.333 + _h_all*0.667)
+    )
+    nil_size_score = percentrank_by_pos(df, "_nil_size_raw", scale=1)
+
+    # --- Defensive Versatility: DBPM, D-PRPG, DRB%, STL%, BLK%, FC(inv) ---
+    # Guard: DBPM×0.30 + DPRPG×0.15 + DRB×0.10 + STL×0.25 + BLK×0.05 + FC×0.15
+    # Wing:  DBPM×0.25 + DPRPG×0.20 + DRB×0.15 + STL×0.15 + BLK×0.15 + FC×0.10
+    # Big:   DBPM×0.25 + DPRPG×0.15 + DRB×0.20 + STL×0.15 + BLK×0.25 + FC×0.10
+    df["_nil_defv_raw"] = (
+        (_pos == "Guard") * (_dbpm*0.30 + _dprpg*0.15 + _drb*0.10 + _stl*0.25 + _blk*0.05 + _fc*0.15) +
+        (_pos == "Wing")  * (_dbpm*0.25 + _dprpg*0.20 + _drb*0.15 + _stl*0.15 + _blk*0.15 + _fc*0.10) +
+        (_pos == "Big")   * (_dbpm*0.25 + _dprpg*0.15 + _drb*0.20 + _stl*0.15 + _blk*0.25 + _fc*0.10)
+    )
+    nil_defv_score = percentrank_by_pos(df, "_nil_defv_raw", scale=1)
+
+    # --- Lateral: same as mobility() in compute_ath ---
+    # Guard: STL×0.55 + BLK×0.20 + DRB×0.25
+    # Wing:  STL×0.40 + BLK×0.30 + DRB×0.30
+    # Big:   STL×0.20 + BLK×0.45 + DRB×0.35
+    # Uses already-computed per-position percentiles from compute_ath
+    _s = df.get("_stl_per_per", pr(df["stl_per"]))
+    _b = df.get("_blk_per_per", pr(df["blk_per"]))
+    _d = df.get("_drb_per_per", pr(df["DRB_per"]))
+    df["_nil_lateral_raw"] = (
+        (_pos == "Guard") * (_s*0.55 + _b*0.20 + _d*0.25) +
+        (_pos == "Wing")  * (_s*0.40 + _b*0.30 + _d*0.30) +
+        (_pos == "Big")   * (_s*0.20 + _b*0.45 + _d*0.35)
+    )
+    nil_lateral_score = percentrank_by_pos(df, "_nil_lateral_raw", scale=1)
+
+    # --- Versatility Score = Size×0.40 + DefVersatility×0.35 + Lateral×0.25 ---
+    df["_nil_vers_raw"] = (
+        nil_size_score  * 0.40 +
+        nil_defv_score  * 0.35 +
+        nil_lateral_score * 0.25
+    )
+    nil_versatility_score = percentrank_by_pos(df, "_nil_vers_raw", scale=1)
+
+    # Scout scores — keyed to match WEIGHTS dict above
     scout_scores = (
         (df["_ath"].fillna(0) / 100) * WEIGHTS["ath"] +
-        (df["_dds"].fillna(0) / 100) * WEIGHTS["dds"] +
-        (df["_sei"].fillna(0) / 100) * WEIGHTS["sei"] +
-        (df["_ris"].fillna(0) / 100) * WEIGHTS["ris"] +
-        (df["_cdi"].fillna(0) / 100) * WEIGHTS["cdi"]
+        nil_def_score                * WEIGHTS["nil_def_score"] +
+        nil_versatility_score        * WEIGHTS["nil_versatility_score"] +
+        nil_motor_score              * WEIGHTS["nil_motor_score"] +
+        nil_iq_score                 * WEIGHTS["nil_iq_score"]
     )
 
-    total_score = (stat_scores + scout_scores).clip(0, 1)  # W
+    # Beyond the Portal metrics — keyed to match WEIGHTS dict above
+    btp_scores = (
+        (df["_sei"].fillna(0) / 100) * WEIGHTS["sei"] +
+        (df["_dds"].fillna(0) / 100) * WEIGHTS["dds"] +
+        (df["_cdi"].fillna(0) / 100 ) * WEIGHTS["cdi"] +
+        (df["_ris"].fillna(0) / 100) * WEIGHTS["ris"]
+    )
+
+    total_score = (stat_scores + scout_scores + btp_scores).clip(0, 1)  # W
 
     # ── Conference adjustment (V) ─────────────────────────────────────────────
     CONF_WEIGHTS = {

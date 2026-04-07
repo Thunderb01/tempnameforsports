@@ -4,6 +4,12 @@ import { PlayerModal }   from "@/components/PlayerModal";
 import { useAuth }       from "@/hooks/useAuth";
 import { useRosterBoard} from "@/hooks/useRosterBoard";
 
+function heightToInches(h) {
+  if (!h || h === "—") return -1;
+  const m = String(h).match(/^(\d+)-(\d+)$/);
+  return m ? parseInt(m[1]) * 12 + parseInt(m[2]) : -1;
+}
+
 function money(n) {
   return Number(n || 0).toLocaleString(undefined, {
     style: "currency", currency: "USD", maximumFractionDigits: 0,
@@ -198,11 +204,16 @@ export function BoardPage() {
         out = [...out].sort((a, b) => {
           const av = col.get(a);
           const bv = col.get(b);
-          const an = parseFloat(String(av).replace(/[%,$,—]/g, ""));
-          const bn = parseFloat(String(bv).replace(/[%,$,—]/g, ""));
-          const cmp = !isNaN(an) && !isNaN(bn)
-            ? an - bn
-            : String(av).localeCompare(String(bv));
+          let cmp;
+          if (sortKey === "Ht") {
+            cmp = heightToInches(av) - heightToInches(bv);
+          } else {
+            const an = parseFloat(String(av).replace(/[%,$,—]/g, ""));
+            const bn = parseFloat(String(bv).replace(/[%,$,—]/g, ""));
+            cmp = !isNaN(an) && !isNaN(bn)
+              ? an - bn
+              : String(av).localeCompare(String(bv));
+          }
           return sortDir === "asc" ? cmp : -cmp;
         });
       }
