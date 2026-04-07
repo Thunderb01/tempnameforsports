@@ -129,7 +129,7 @@ export function RosterSandboxPage() {
       .filter(Boolean);
 
     return [...returning, ...transfers];
-  }, [board.returningPlayers, board.state.roster, board.state.retentionById, board.state.nilById]);
+  }, [board.returningPlayers, board.state.board, board.state.roster, board.state.retentionById, board.state.nilById]);
 
   const displayPlayers = activeRoster ? activeRoster.players : rosterPlayers;
 
