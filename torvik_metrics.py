@@ -488,7 +488,7 @@ def compute_nil_valuation(df):
         return series.rank(pct=True, na_option="keep").fillna(0)
 
     stat_scores = (
-        prank(df["ORtg"])    * WEIGHTS["ppg"]     +  # ORtg as scoring proxy (pace-adjusted)
+        prank(df["pts"])     * WEIGHTS["ppg"]     +  # pts per game
         # prank(df["TS_per"])  * WEIGHTS["ts_pct"]  +  # issue 1 fix: always use TS_per
         # prank(df["TP_per"])  * WEIGHTS["3p_pct"]  +
         # prank(df["AST_per"]) * WEIGHTS["ast_pct"] +
@@ -633,29 +633,34 @@ def compute_nil_valuation(df):
 
     total_score = (stat_scores + scout_scores + btp_scores).clip(0, 1)  # W
 
-    # ── Conference adjustment (V) ─────────────────────────────────────────────
-    CONF_WEIGHTS = {
+    # ── Conference tier → per-tier percentile + cap ──────────────────────────
+    CONF_TO_TIER = {
         # High Major
-        "ACC": 1.0, "B10": 1.0, "B12": 1.0, "SEC": 1.0, "BE": 1.0,
+        **{c: "High Major" for c in ["ACC", "B10", "B12", "SEC", "BE"]},
         # Mid Major
-        "MWC": 0.8, "A10": 0.8, "WCC": 0.8, "Amer": 0.8,
+        **{c: "Mid Major"  for c in ["MWC", "A10", "WCC", "Amer"]},
         # Low Major
-        "MVC": 0.6, "SC": 0.6, "MAC": 0.6, "CUSA": 0.6,
-        "SB": 0.6, "MAAC": 0.6, "CAA": 0.6, "ASun": 0.6,
-        "Horz": 0.6, "BW": 0.6, "WAC": 0.6, "BSky": 0.6,
-        "Slnd": 0.6, "OVC": 0.6, "Pat": 0.6, "NEC": 0.6,
-        "AE": 0.6, "Ivy": 0.6, "BSth": 0.6, "Sum": 0.6,
-        "MEAC": 0.6, "SWAC": 0.6,
+        **{c: "Low Major"  for c in [
+            "MVC", "SC", "MAC", "CUSA", "SB", "MAAC", "CAA", "ASun",
+            "Horz", "BW", "WAC", "BSky", "Slnd", "OVC", "Pat", "NEC",
+            "AE", "Ivy", "BSth", "Sum", "MEAC", "SWAC",
+        ]},
     }
-    conf_col = df["conf"]  # issue 4 fix: always use Torvik conf column
-    conf_adj = conf_col.map(CONF_WEIGHTS).fillna(0.75)  # V
+    TIER_CAPS = {
+        "High Major": 3_000_000,
+        "Mid Major":  2_000_000,
+        "Low Major":  1_500_000,
+    }
 
-    # ── NIL Cap ───────────────────────────────────────────────────────────────
-    nil_cap = 2_500_000
+    df["_conf_tier"]   = df["conf"].map(CONF_TO_TIER).fillna("Low Major")
+    df["_total_score"] = total_score
 
-    # ── Base NIL = MIN(cap, cap × W² × (1 - (1-V⁴)(1-W)²)^1.2) ─────────────
-    blend = (1 - (1 - conf_adj**4) * (1 - total_score)**2) ** 1.2
-    base_nil = (nil_cap * total_score**2 * blend).clip(upper=nil_cap)
+    # Within each tier, percentile-rank total_score (0–1)
+    tier_pctile = df.groupby("_conf_tier")["_total_score"].rank(pct=True)
+    tier_cap    = df["_conf_tier"].map(TIER_CAPS)
+
+    # base_nil: top of tier → tier cap; curve with ^2 so median ≈ 25% of cap
+    base_nil = (tier_cap * tier_pctile ** 2).clip(lower=0)
 
     # ── Position Boost ────────────────────────────────────────────────────────
     pos_boost = df["pos_bucket"].map({"Big": 1.15, "Wing": 1.0, "Guard": 1.0}).fillna(1.0)
@@ -666,7 +671,7 @@ def compute_nil_valuation(df):
         {"So": 1.05, "Jr": .95, "Sr": 0.95, "Gr": 0.95, "Fr": 1.1}
     ).fillna(1.0)
 
-    base_nil_final = (base_nil * pos_boost * yr_boost).clip(lower=0)
+    base_nil_final = (base_nil * pos_boost * yr_boost).clip(lower=0, upper=tier_cap)
 
     # ── Minutes Volatility → Market Range ────────────────────────────────────
     # min_rate = tot_mp / (GP * 40); lower rate = higher volatility = wider range
@@ -681,7 +686,7 @@ def compute_nil_valuation(df):
     )
     nil_interval_pct = min_volatility / 4
 
-    market_low  = (base_nil_final * (1 - nil_interval_pct)).clip(lower=base_nil_final * 0.9)
+    market_low  = (base_nil_final * (1 - nil_interval_pct)).clip(lower=0)
     market_high = base_nil_final * (1 + nil_interval_pct)
 
     return base_nil_final, market_low, market_high

@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { SiteHeader }    from "@/components/SiteHeader";
 import { PlayerModal }   from "@/components/PlayerModal";
 import { useAuth }       from "@/hooks/useAuth";
+import { useAdminTeam }  from "@/hooks/useAdminTeam";
 import { useRosterBoard} from "@/hooks/useRosterBoard";
 import { supabase }      from "@/lib/supabase";
 
@@ -43,7 +44,8 @@ const STATUSES = [
 
 export function BoardPage() {
   const { profile } = useAuth();
-  const board = useRosterBoard(profile?.team);
+  const { activeTeam } = useAdminTeam(profile);
+  const board = useRosterBoard(activeTeam);
 
   const [loading,      setLoading]     = useState(true);
   const [search,       setSearch]      = useState("");
