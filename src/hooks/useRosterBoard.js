@@ -58,9 +58,13 @@ export function useRosterBoard(team) {
     return saved ?? defaultState(team);
   });
 
-  // Sync program name from auth if blank or mismatched team
+  // When team resolves (e.g. coach auth finishes), reload from localStorage
   useEffect(() => {
-    if (team && !state.settings.program) {
+    if (!team) return;
+    const saved = loadLocal(team);
+    if (saved) {
+      _setState(prev => ({ ...saved, board: prev.board }));
+    } else if (!state.settings.program) {
       setState(s => ({ ...s, settings: { ...s.settings, program: team } }));
     }
   }, [team]);

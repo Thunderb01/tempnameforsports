@@ -476,7 +476,7 @@ def compute_nil_valuation(df):
         "nil_iq_score":     0.06,  # IQ proxy
 
         # Beyond the Portal Metrics
-        "sei":     0.20,  # Scoring Efficiency Index
+        "sei":     0.18,  # Scoring Efficiency Index
         "dds":     0.16,  # Defensive Disruption Score
         "cdi":     0.15,  # Court Vision / Decision-Making Index
         "ris":     0.07,  # Rebounding Impact Score
@@ -487,8 +487,29 @@ def compute_nil_valuation(df):
     def prank(series):
         return series.rank(pct=True, na_option="keep").fillna(0)
 
+    # ── Position-specific stat bounds (clip before ranking) ──────────────────
+    # Stat       Guard_Low  Guard_High  Wing_Low  Wing_High  Big_Low  Big_High
+    # PPG         4.89       19.60       3.25      15.63      2.80     13.98
+    # TS%         0.48        0.64       0.47       0.65      0.51      0.71
+    # 3P%         0.25        0.44       0.21       0.43      0.00      0.71
+    # 3PA/G       1.34        6.90       0.79       6.07      0.00      3.88
+    # AST/G       0.92        5.28       0.30       2.55      0.27      2.07
+    # TOV/G       0.73        3.11       0.35       2.49      0.44      2.06
+    # AST/TOV     0.80        2.96       0.54       2.20      0.32      1.60
+    # STL/40      0.80        2.79       0.49       2.11      0.48      1.89
+    # BLK/40      0.00        0.84       0.04       1.57      0.36      3.70
+    # DRB/40      2.09        5.91       2.58       7.46      4.07      8.92
+    # ORB/40      0.31        2.46       0.69       3.18      1.69      5.45
+    # MPG         0.80        2.79       0.49       2.11      0.48      0.71
+
+    _pos = df["pos_bucket"]
+    pts_clipped = df["pts"].copy()
+    pts_clipped = pts_clipped.where(_pos != "Guard", pts_clipped.clip(4.89, 19.60))
+    pts_clipped = pts_clipped.where(_pos != "Wing",  pts_clipped.clip(3.25, 15.63))
+    pts_clipped = pts_clipped.where(_pos != "Big",   pts_clipped.clip(2.80, 13.98))
+
     stat_scores = (
-        prank(df["pts"])     * WEIGHTS["ppg"]     +  # pts per game
+        prank(pts_clipped)   * WEIGHTS["ppg"]     +  # pts per game (position-bounded)
         # prank(df["TS_per"])  * WEIGHTS["ts_pct"]  +  # issue 1 fix: always use TS_per
         # prank(df["TP_per"])  * WEIGHTS["3p_pct"]  +
         # prank(df["AST_per"]) * WEIGHTS["ast_pct"] +
@@ -514,7 +535,6 @@ def compute_nil_valuation(df):
     _blk   = pr(df["blk_per"])
     _drb   = pr(df["DRB_per"])
     _fc    = pr_inv(df["pfr"])
-    _pos   = df["pos_bucket"]
 
     df["_nil_def_raw"] = (
         (_pos == "Guard") * (_dbpm*0.30 + _dprpg*0.20 + _stl*0.25 + _drb*0.10 + _fc*0.15) +
@@ -633,34 +653,34 @@ def compute_nil_valuation(df):
 
     total_score = (stat_scores + scout_scores + btp_scores).clip(0, 1)  # W
 
-    # ── Conference tier → per-tier percentile + cap ──────────────────────────
-    CONF_TO_TIER = {
+    # ── Conference adjustment (V) ─────────────────────────────────────────────
+    CONF_WEIGHTS = {
         # High Major
-        **{c: "High Major" for c in ["ACC", "B10", "B12", "SEC", "BE"]},
+        "ACC": 1.0, "B10": 1.0, "B12": 1.0, "SEC": 1.0, "BE": 1.0,
         # Mid Major
-        **{c: "Mid Major"  for c in ["MWC", "A10", "WCC", "Amer"]},
+        "MWC": 0.8, "A10": 0.8, "WCC": 0.8, "Amer": 0.8,
         # Low Major
-        **{c: "Low Major"  for c in [
-            "MVC", "SC", "MAC", "CUSA", "SB", "MAAC", "CAA", "ASun",
-            "Horz", "BW", "WAC", "BSky", "Slnd", "OVC", "Pat", "NEC",
-            "AE", "Ivy", "BSth", "Sum", "MEAC", "SWAC",
-        ]},
+        "MVC": 0.6, "SC": 0.6, "MAC": 0.6, "CUSA": 0.6,
+        "SB": 0.6, "MAAC": 0.6, "CAA": 0.6, "ASun": 0.6,
+        "Horz": 0.6, "BW": 0.6, "WAC": 0.6, "BSky": 0.6,
+        "Slnd": 0.6, "OVC": 0.6, "Pat": 0.6, "NEC": 0.6,
+        "AE": 0.6, "Ivy": 0.6, "BSth": 0.6, "Sum": 0.6,
+        "MEAC": 0.6, "SWAC": 0.6,
     }
-    TIER_CAPS = {
-        "High Major": 3_000_000,
-        "Mid Major":  2_000_000,
-        "Low Major":  1_500_000,
-    }
+    conf_adj = df["conf"].map(CONF_WEIGHTS).fillna(0.6)  # V — default low major
 
-    df["_conf_tier"]   = df["conf"].map(CONF_TO_TIER).fillna("Low Major")
-    df["_total_score"] = total_score
+    # ── NIL Cap + conference-adjusted ceiling ─────────────────────────────────
+    # High Major (V=1.0) → $3M ceiling
+    # Mid Major  (V=0.8) → $2.4M ceiling
+    # Low Major  (V=0.6) → $1.8M ceiling
+    nil_cap      = 3_000_000
+    conf_ceiling = nil_cap * conf_adj  # per-player effective cap
 
-    # Within each tier, percentile-rank total_score (0–1)
-    tier_pctile = df.groupby("_conf_tier")["_total_score"].rank(pct=True)
-    tier_cap    = df["_conf_tier"].map(TIER_CAPS)
-
-    # base_nil: top of tier → tier cap; curve with ^2 so median ≈ 25% of cap
-    base_nil = (tier_cap * tier_pctile ** 2).clip(lower=0)
+    # ── Base NIL = MIN(conf_ceiling, conf_ceiling × W² × (1 - (1-V⁴)(1-W)²)^1.2) ──
+    W = total_score
+    V = conf_adj
+    blend    = (1 - (1 - V**4) * (1 - W)**2) ** 1.2
+    base_nil = (conf_ceiling * W**2 * blend).clip(upper=conf_ceiling)
 
     # ── Position Boost ────────────────────────────────────────────────────────
     pos_boost = df["pos_bucket"].map({"Big": 1.15, "Wing": 1.0, "Guard": 1.0}).fillna(1.0)
@@ -668,21 +688,21 @@ def compute_nil_valuation(df):
     # ── Age/Year Boost ────────────────────────────────────────────────────────
     yr_col = df["yr"]  # issue 3 fix: always use Torvik yr column (Fr, So, Jr, Sr, Gr)
     yr_boost = yr_col.map(
-        {"So": 1.05, "Jr": .95, "Sr": 0.95, "Gr": 0.95, "Fr": 1.1}
+        {"So": 1, "Jr": .95, "Sr": 0.95, "Gr": 0.95, "Fr": 1.05}
     ).fillna(1.0)
 
-    base_nil_final = (base_nil * pos_boost * yr_boost).clip(lower=0, upper=tier_cap)
+    base_nil_final = (base_nil * pos_boost * yr_boost).clip(lower=0, upper=conf_ceiling)
 
     # ── Minutes Volatility → Market Range ────────────────────────────────────
-    # min_rate = tot_mp / (GP * 40); lower rate = higher volatility = wider range
-    min_rate = df["mp"] / (df["GP"].replace(0, float("nan")) * 40)
+    # Min_per = % of team minutes played (0–100); higher = more certain starter
+    min_rate = df["Min_per"].fillna(0) / 100
     min_volatility = min_rate.apply(lambda p:
-        0.7  if p >= 0.6 else
-        0.8  if p >= 0.5 else
-        0.95 if p >= 0.4 else
-        1.1  if p >= 0.3 else
-        1.3  if p >= 0.2 else
-        1.55
+        0.7  if p >= 0.60 else   # starter (60%+ of team minutes)
+        0.8  if p >= 0.45 else   # rotation
+        0.95 if p >= 0.30 else   # role player
+        1.1  if p >= 0.20 else   # fringe
+        1.3  if p >= 0.10 else   # spot minutes
+        1.55                      # rarely played
     )
     nil_interval_pct = min_volatility / 4
 
