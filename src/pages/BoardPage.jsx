@@ -4,7 +4,7 @@ import { PlayerModal }   from "@/components/PlayerModal";
 import { useAuth }       from "@/hooks/useAuth";
 import { useAdminTeam }  from "@/hooks/useAdminTeam";
 import { useRosterBoard} from "@/hooks/useRosterBoard";
-import { supabase }      from "@/lib/supabase";
+import teamConferences   from "@/data/teamConferences.json";
 
 function heightToInches(h) {
   if (!h || h === "—") return -1;
@@ -60,7 +60,19 @@ export function BoardPage() {
   const [showProgram, setShowProgram] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [confFilter,  setConfFilter]  = useState("all");
-  const [conferences, setConferences] = useState([]);
+  const conferences = [
+    "A10", "ACC", "AE", "ASun", "Amer",
+    "B10", "B12", "BE", "BSky", "BSth", "BW",
+    "CAA", "CUSA",
+    "Horz",
+    "Ivy",
+    "MAAC", "MAC", "MEAC", "MVC", "MWC",
+    "NEC",
+    "OVC",
+    "Pat",
+    "SB", "SC", "SEC", "SWAC", "Slnd", "Sum",
+    "WAC", "WCC",
+  ];
 
   const ADVC_FIELDS = [
     { key: "sei", label: "Scoring Efficiency (SEI)", src: "metric" },
@@ -170,12 +182,6 @@ export function BoardPage() {
     return terms.some(t => hometown.includes(t));
   }
 
-  useEffect(() => {
-    supabase.from("teams").select("conference").then(({ data }) => {
-      const confs = [...new Set((data || []).map(t => t.conference).filter(Boolean))].sort();
-      setConferences(confs);
-    });
-  }, []);
 
   // Reset to page 0 whenever filters or sort change
   useEffect(() => setPage(0), [search, posFilter, stateFilter, confFilter, sortKey, sortDir, hideNoNil, showProgram, advcFilters]);
@@ -192,7 +198,10 @@ export function BoardPage() {
                !(p.team||"").toLowerCase().includes(q) &&
                !(p.hometown||"").toLowerCase().includes(q)) return false;
       if (posFilter !== "all" && p.pos !== posFilter) return false;
-      if (confFilter !== "all" && p.conf !== confFilter) return false;
+      if (confFilter !== "all") {
+        const pConf = teamConferences[p.team] || p.conf;
+        if (pConf !== confFilter) return false;
+      }
       if (stateTerms && !matchesState(p.hometown || "", stateTerms)) return false;
       if (hideNoNil && !(p.marketHigh > 0)) return false;
       if (!showProgram && p.source !== "portal") return false;
