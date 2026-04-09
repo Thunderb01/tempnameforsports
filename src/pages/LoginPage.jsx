@@ -158,7 +158,7 @@ export function LoginPage() {
   // Skip login page if already signed in
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
-      if (data.session) navigate("/app", { replace: true });
+      if (data.session) navigate("/board", { replace: true });
     });
   }, [navigate]);
 
@@ -173,7 +173,7 @@ export function LoginPage() {
     setLoading(false);
 
     if (err) { setError(friendlyError(err.message)); return; }
-    navigate("/app", { replace: true });
+    navigate("/board", { replace: true });
   }
 
   async function handleReset(e) {
