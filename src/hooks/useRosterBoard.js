@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 
 const STORAGE_KEY    = "bp_roster_builder";
-const STORAGE_VERSION = 8; // bump this whenever the state shape changes
+const STORAGE_VERSION = 9; // bump this whenever the state shape changes
 
 // Legacy keys to purge on load
 const LEGACY_KEYS = ["bp_roster_builder_v1"];
@@ -110,7 +110,7 @@ export function useRosterBoard(team) {
       espn_id:        row.espn_id  ?? null,
       marketLow:      row.open_market_low  ?? 0,
       marketHigh:     row.open_market_high ?? 0,
-      projectedTier:  row.player_stats?.[0]?.projected_tier ?? null,
+      nilValuation:   row.nil_valuation    ?? 0,
       playmakerTags:  row.playmaker_tags  ? row.playmaker_tags.split(",").map(t => t.trim()).filter(Boolean)  : [],
       shootingTags:   row.shooting_tags   ? row.shooting_tags.split(",").map(t => t.trim()).filter(Boolean)   : [],
       shotmakingTags: row.shotmaking_tags ? row.shotmaking_tags.split(",").map(t => t.trim()).filter(Boolean) : [],
@@ -148,6 +148,7 @@ export function useRosterBoard(team) {
         espn_id:        row.players.espn_id  ?? null,
         marketLow:      row.players.open_market_low  ?? 0,
         marketHigh:     row.players.open_market_high ?? 0,
+        nilValuation:   row.players.nil_valuation    ?? 0,
         playmakerTags:  row.players.playmaker_tags  ? row.players.playmaker_tags.split(",").map(t => t.trim()).filter(Boolean)  : [],
         shootingTags:   row.players.shooting_tags   ? row.players.shooting_tags.split(",").map(t => t.trim()).filter(Boolean)   : [],
         shotmakingTags: row.players.shotmaking_tags ? row.players.shotmaking_tags.split(",").map(t => t.trim()).filter(Boolean) : [],
@@ -160,20 +161,28 @@ export function useRosterBoard(team) {
     setReturningPlayers(returning);
 
     // Auto-set retention for seniors/graduates and portal players
+    // Auto-set nilById to nilValuation if not already manually set
     const GRADUATING_YEARS = ["Senior", "Graduate", "SR", "GR"];
     setState(s => {
-      const auto = {};
+      const autoRetention = {};
+      const autoNil = {};
       returning.forEach(p => {
-        if (s.retentionById[p.id]) return; // don't override manual selections
-        if (p.source === "portal") {
-          auto[p.id] = "entering_portal";
-        } else if (GRADUATING_YEARS.includes(p.year)) {
-          auto[p.id] = "graduating";
+        if (!s.retentionById[p.id]) {
+          if (p.source === "portal") {
+            autoRetention[p.id] = "entering_portal";
+          } else if (GRADUATING_YEARS.includes(p.year)) {
+            autoRetention[p.id] = "graduating";
+          }
+        }
+        if (!s.nilById[p.id] && p.nilValuation > 0) {
+          autoNil[p.id] = Math.round(p.nilValuation);
         }
       });
-      return Object.keys(auto).length
-        ? { ...s, retentionById: { ...auto, ...s.retentionById } }
-        : s;
+      return {
+        ...s,
+        retentionById: { ...autoRetention, ...s.retentionById },
+        nilById:       { ...autoNil,       ...s.nilById       },
+      };
     });
   }, []);
 

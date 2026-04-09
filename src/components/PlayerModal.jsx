@@ -55,6 +55,15 @@ const TIER_COLORS = {
   "LM Role Player":                    "#64748b",
 };
 function tierColor(label) { return TIER_COLORS[label] || "#64748b"; }
+function projectedTier(nilValuation) {
+  const v = Number(nilValuation) || 0;
+  if (v >= 2_200_000) return "P4 All-American / Pre-Draft"
+  if (v >= 1_500_000) return "P4 All-Conference"
+  if (v >= 1_000_000) return "P4 Starter / MM All-Conference"
+  if (v >=   400_000) return "P4 Rotation / MM Starter"
+  if (v >=   250_000) return "MM Role Player / LM All-Conference"
+  return "LM Rotation"
+}
 
 function letterGrade(val) {
   if (val === null || val === undefined) return "—";
@@ -227,11 +236,12 @@ export function PlayerModal({ player, onClose }) {
           <div className="modal-section">
             <h4>Market Production Value Range</h4>
             <div className="modal-sub">{money(player.marketLow)} – {money(player.marketHigh)}</div>
-            {player.projectedTier && (() => {
-              const color = tierColor(player.projectedTier);
+            {player.nilValuation > 0 && (() => {
+              const label = projectedTier(player.nilValuation);
+              const color = tierColor(label);
               return (
                 <div style={{ marginTop: 6, display: "inline-block", padding: "3px 10px", borderRadius: 20, fontSize: 12, fontWeight: 600, background: `${color}22`, color, border: `1px solid ${color}55` }}>
-                  {player.projectedTier}
+                  {label}
                 </div>
               );
             })()}

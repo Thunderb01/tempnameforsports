@@ -16,6 +16,15 @@ const TIER_COLORS = {
   "LM Role Player":                    "#64748b",
 };
 function tierColor(label) { return TIER_COLORS[label] || "#64748b"; }
+function projectedTier(nilValuation) {
+  const v = Number(nilValuation) || 0;
+  if (v >= 2_200_000) return "P4 All-American / Pre-Draft"
+  if (v >= 1_500_000) return "P4 All-Conference"
+  if (v >= 1_000_000) return "P4 Starter / MM All-Conference"
+  if (v >=   400_000) return "P4 Rotation / MM Starter"
+  if (v >=   250_000) return "MM Role Player / LM All-Conference"
+  return "LM Rotation"
+}
 
 function heightToInches(h) {
   if (!h || h === "—") return -1;
@@ -78,15 +87,17 @@ export function BoardPage() {
   ];
 
   const ADVC_FIELDS = [
-    { key: "sei", label: "Scoring Efficiency (SEI)", src: "metric" },
-    { key: "ath", label: "Athleticism (ATH)",        src: "metric" },
-    { key: "ris", label: "Rim Impact (RIS)",          src: "metric" },
-    { key: "dds", label: "Defending (DDS)",           src: "metric" },
-    { key: "cdi", label: "Playmaking (CDI)",          src: "metric" },
-    { key: "usg", label: "USG%",                      src: "stat"   },
-    { key: "ppg", label: "PPG",                       src: "stat"   },
-    { key: "rpg", label: "RPG",                       src: "stat"   },
-    { key: "apg", label: "APG",                       src: "stat"   },
+    { key: "sei",        label: "Scoring Efficiency (SEI)", src: "metric" },
+    { key: "ath",        label: "Athleticism (ATH)",        src: "metric" },
+    { key: "ris",        label: "Rim Impact (RIS)",         src: "metric" },
+    { key: "dds",        label: "Defending (DDS)",          src: "metric" },
+    { key: "cdi",        label: "Playmaking (CDI)",         src: "metric" },
+    { key: "usg",        label: "USG%",                     src: "stat"   },
+    { key: "ppg",        label: "PPG",                      src: "stat"   },
+    { key: "rpg",        label: "RPG",                      src: "stat"   },
+    { key: "apg",        label: "APG",                      src: "stat"   },
+    { key: "marketLow",  label: "NIL Market Low ($)",       src: "player" },
+    { key: "marketHigh", label: "NIL Market High ($)",      src: "player" },
   ];
   const emptyAdvc = () => Object.fromEntries(ADVC_FIELDS.map(f => [f.key, { min: "", max: "" }]));
   const [advcFilters, setAdvcFilters] = useState(emptyAdvc);
@@ -209,7 +220,7 @@ export function BoardPage() {
       if (hideNoNil && !(p.marketHigh > 0)) return false;
       if (!showProgram && p.source !== "portal") return false;
       for (const f of ADVC_FIELDS) {
-        const val = f.src === "metric" ? p.stats?.[f.key] : p.stats?.[f.key];
+        const val = f.src === "player" ? p[f.key] : p.stats?.[f.key];
         const { min, max } = advcFilters[f.key];
         if (min !== "" && (val == null || Number(val) < Number(min))) return false;
         if (max !== "" && (val == null || Number(val) > Number(max))) return false;
@@ -381,11 +392,12 @@ export function BoardPage() {
                           ].filter(Boolean).join("  ·  ");
                           return line ? <div className="row-sub" style={{ opacity: .75 }}>{line}</div> : null;
                         })()}
-                        {p.projectedTier && (() => {
-                          const color = tierColor(p.projectedTier);
+                        {p.nilValuation > 0 && (() => {
+                          const label = projectedTier(p.nilValuation);
+                          const color = tierColor(label);
                           return (
                             <div style={{ marginTop: 6, display: "inline-block", padding: "2px 8px", borderRadius: 20, fontSize: 11, fontWeight: 600, background: `${color}22`, color, border: `1px solid ${color}55` }}>
-                              {p.projectedTier}
+                              {label}
                             </div>
                           );
                         })()}
