@@ -54,7 +54,7 @@ export function BoardPage() {
   const [search,       setSearch]      = useState("");
   const [posFilter,    setPosFilter]   = useState("all");
   const [stateFilter,  setStateFilter] = useState("all");
-  const [viewMode,     setViewMode]    = useState("table"); // "cards" | "table"
+  const [viewMode,     setViewMode]    = useState("cards"); // "cards" | "table"
   const [sortKey,   setSortKey]   = useState("Mkt High");
   const [sortDir,   setSortDir]   = useState("desc");
   const [modal,     setModal]     = useState(null);
