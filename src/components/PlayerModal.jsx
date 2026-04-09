@@ -59,9 +59,9 @@ function projectedTier(nilValuation) {
   const v = Number(nilValuation) || 0;
   if (v >= 2_200_000) return "P4 All-American / Pre-Draft"
   if (v >= 1_500_000) return "P4 All-Conference"
-  if (v >= 1_000_000) return "P4 Starter / MM All-Conference"
+  if (v >=   750_000) return "P4 Starter / MM All-Conference"
   if (v >=   400_000) return "P4 Rotation / MM Starter"
-  if (v >=   250_000) return "MM Role Player / LM All-Conference"
+  if (v >=   200_000) return "MM Role Player / LM All-Conference"
   return "LM Rotation"
 }
 

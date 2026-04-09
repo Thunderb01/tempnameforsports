@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 
 const STORAGE_KEY    = "bp_roster_builder";
-const STORAGE_VERSION = 9; // bump this whenever the state shape changes
+const STORAGE_VERSION = 10; // bump this whenever the state shape changes
 
 // Legacy keys to purge on load
 const LEGACY_KEYS = ["bp_roster_builder_v1"];
