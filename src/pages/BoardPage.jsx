@@ -7,13 +7,13 @@ import { useRosterBoard} from "@/hooks/useRosterBoard";
 import teamConferences   from "@/data/teamConferences.json";
 
 const TIER_COLORS = {
-  "P4 All-American / Pre-Draft":      "#f5c542",
-  "P4 All-Conference":                "#4ade80",
-  "P4 Starter / MM All-Conference":   "#5b9cf6",
-  "P4 Rotation / MM Starter":         "#a78bfa",
-  "MM Role Player / LM All-Conference":"#f97316",
-  "LM Starter":                       "#94a3b8",
-  "LM Role Player":                   "#64748b",
+  "P4 All-American / Pre-Draft":       "#4ade80",
+  "P4 All-Conference":                 "#5b9cf6",
+  "P4 Starter / MM All-Conference":    "#f5c542",
+  "P4 Rotation / MM Starter":          "#fb923c",
+  "MM Role Player / LM All-Conference":"#e05c5c",
+  "LM Starter":                        "#94a3b8",
+  "LM Role Player":                    "#64748b",
 };
 function tierColor(label) { return TIER_COLORS[label] || "#64748b"; }
 
