@@ -110,6 +110,7 @@ export function useRosterBoard(team) {
       espn_id:        row.espn_id  ?? null,
       marketLow:      row.open_market_low  ?? 0,
       marketHigh:     row.open_market_high ?? 0,
+      projectedTier:  row.player_stats?.[0]?.projected_tier ?? null,
       playmakerTags:  row.playmaker_tags  ? row.playmaker_tags.split(",").map(t => t.trim()).filter(Boolean)  : [],
       shootingTags:   row.shooting_tags   ? row.shooting_tags.split(",").map(t => t.trim()).filter(Boolean)   : [],
       shotmakingTags: row.shotmaking_tags ? row.shotmaking_tags.split(",").map(t => t.trim()).filter(Boolean) : [],

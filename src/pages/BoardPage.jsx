@@ -6,6 +6,17 @@ import { useAdminTeam }  from "@/hooks/useAdminTeam";
 import { useRosterBoard} from "@/hooks/useRosterBoard";
 import teamConferences   from "@/data/teamConferences.json";
 
+const TIER_COLORS = {
+  "P4 All-American / Pre-Draft":      "#f5c542",
+  "P4 All-Conference":                "#4ade80",
+  "P4 Starter / MM All-Conference":   "#5b9cf6",
+  "P4 Rotation / MM Starter":         "#a78bfa",
+  "MM Role Player / LM All-Conference":"#f97316",
+  "LM Starter":                       "#94a3b8",
+  "LM Role Player":                   "#64748b",
+};
+function tierColor(label) { return TIER_COLORS[label] || "#64748b"; }
+
 function heightToInches(h) {
   if (!h || h === "—") return -1;
   const m = String(h).match(/^(\d+)-(\d+)$/);
@@ -33,14 +44,6 @@ const COLS = [
   { label: "Mkt High",  get: p => money(p.marketHigh) },
 ];
 
-const STATUSES = [
-  { key: "none",       label: "No status" },
-  { key: "interested", label: "Interested" },
-  { key: "contacted",  label: "Contacted" },
-  { key: "visit",      label: "Visit" },
-  { key: "signed",     label: "Signed" },
-  { key: "passed",     label: "Passed" },
-];
 
 export function BoardPage() {
   const { profile } = useAuth();
@@ -378,16 +381,14 @@ export function BoardPage() {
                           ].filter(Boolean).join("  ·  ");
                           return line ? <div className="row-sub" style={{ opacity: .75 }}>{line}</div> : null;
                         })()}
-                        <div className="row-sub" style={{ marginTop: 8 }}>
-                          <label className="status-control">
-                            <span>Status</span>
-                            <select value={board.state.statusById?.[p.id] || "none"}
-                              onChange={e => setStatus(p.id, e.target.value)}
-                              onClick={e => e.stopPropagation()}>
-                              {STATUSES.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
-                            </select>
-                          </label>
-                        </div>
+                        {p.projectedTier && (() => {
+                          const color = tierColor(p.projectedTier);
+                          return (
+                            <div style={{ marginTop: 6, display: "inline-block", padding: "2px 8px", borderRadius: 20, fontSize: 11, fontWeight: 600, background: `${color}22`, color, border: `1px solid ${color}55` }}>
+                              {p.projectedTier}
+                            </div>
+                          );
+                        })()}
                       </div>
                       <div className="row-actions">
                         <button className="btn btn-ghost"

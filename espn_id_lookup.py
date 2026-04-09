@@ -94,7 +94,7 @@ TEAM_ALIASES = {
     "Appalachian State": "App State",
     "Appalachian St.":   "App State",
     "Hawaii":            "Hawai'i",
-    "St. John's":        "St. John's",
+    "St. John's":        "St. John's"
 }
 
 
@@ -102,6 +102,7 @@ def parse_args():
     p = argparse.ArgumentParser()
     p.add_argument("--dry-run",       action="store_true")
     p.add_argument("--skip-existing", action="store_true")
+    p.add_argument("--team",          type=str, default=None, help="Only process players from this team (e.g. 'Queens')")
     p.add_argument("--list-unmatched-teams", action="store_true")
     p.add_argument("--debug-teams",   action="store_true", help="Print raw ESPN teams API response and exit")
     return p.parse_args()
@@ -238,6 +239,11 @@ def main():
     for p in players:
         team = p.get("current_team", "") or ""
         by_team.setdefault(team, []).append(p)
+
+    if args.team:
+        by_team = {k: v for k, v in by_team.items() if k.lower() == args.team.lower()}
+        if not by_team:
+            sys.exit(f"No players found for team: {args.team!r}")
 
     # --list-unmatched-teams: just print teams with no ESPN mapping and exit
     if args.list_unmatched_teams:

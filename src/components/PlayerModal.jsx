@@ -45,6 +45,17 @@ const PENTAGON_METRICS = [
   { key: "cdi", label: "Playmaking",         desc: "Driven by AST%, TO%, and positional weighting." },
 ];
 
+const TIER_COLORS = {
+  "P4 All-American / Pre-Draft":       "#f5c542",
+  "P4 All-Conference":                 "#4ade80",
+  "P4 Starter / MM All-Conference":    "#5b9cf6",
+  "P4 Rotation / MM Starter":          "#a78bfa",
+  "MM Role Player / LM All-Conference":"#f97316",
+  "LM Starter":                        "#94a3b8",
+  "LM Role Player":                    "#64748b",
+};
+function tierColor(label) { return TIER_COLORS[label] || "#64748b"; }
+
 function letterGrade(val) {
   if (val === null || val === undefined) return "—";
   if (val >= 95) return "A+";
@@ -216,6 +227,14 @@ export function PlayerModal({ player, onClose }) {
           <div className="modal-section">
             <h4>Market Production Value Range</h4>
             <div className="modal-sub">{money(player.marketLow)} – {money(player.marketHigh)}</div>
+            {player.projectedTier && (() => {
+              const color = tierColor(player.projectedTier);
+              return (
+                <div style={{ marginTop: 6, display: "inline-block", padding: "3px 10px", borderRadius: 20, fontSize: 12, fontWeight: 600, background: `${color}22`, color, border: `1px solid ${color}55` }}>
+                  {player.projectedTier}
+                </div>
+              );
+            })()}
           </div>
 
           <div className="modal-section">

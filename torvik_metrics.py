@@ -40,6 +40,7 @@ Prerequisites — run once in Supabase SQL Editor:
     ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS sei float;
     ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS ath float;
     ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS ris float;
+    ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS projected_tier text;
     ALTER TABLE players ADD COLUMN IF NOT EXISTS nil_valuation float;
     ALTER TABLE players ADD COLUMN IF NOT EXISTS birth_year int;
 
@@ -152,12 +153,12 @@ TORVIK_TEAM_ALIASES = {
     "oklahoma st.":             "oklahoma state",
     "oregon st.":               "oregon state",
     "penn st.":                 "penn state",
-    "portland st.":             "portland state",
+    
     "sacramento st.":           "sacramento state",
     "sam houston st.":          "sam houston",
     "san diego st.":            "san diego state",
     "san jose st.":             "san jose state",
-    "south carolina st.":       "south carolina state",
+    
     "south dakota st.":         "south dakota state",
     "southeast missouri st.":   "southeast missouri state",
     "tarleton st.":             "tarleton state",
@@ -709,7 +710,18 @@ def compute_nil_valuation(df):
     market_low  = (base_nil_final * (1 - nil_interval_pct)).clip(lower=0)
     market_high = base_nil_final * (1 + nil_interval_pct)
 
-    return base_nil_final, market_low, market_high
+    # ── Projected Tier ────────────────────────────────────────────────────────
+    def assign_tier(v):
+        if v >= 2_000_000: return "P4 All-American / Pre-Draft"
+        if v >= 1_750_000: return "P4 All-Conference"
+        if v >= 1_000_000: return "P4 Starter / MM All-Conference"
+        if v >=   400_000: return "P4 Rotation / MM Starter"
+        if v >=   250_000: return "MM Role Player / LM All-Conference"
+        if v >=   100_000: return "LM Starter"
+        return "LM Role Player"
+    projected_tier = base_nil_final.apply(assign_tier)
+
+    return base_nil_final, market_low, market_high, projected_tier
 
 
 
@@ -839,7 +851,7 @@ def main():
     df["_sei"] = compute_sei(df, use_torvik=use_torvik)
     df["_ath"] = compute_ath(df, use_torvik=use_torvik)
     df["_ris"] = compute_ris(df, use_torvik=use_torvik)
-    df["_nil"], df["_nil_low"], df["_nil_high"] = compute_nil_valuation(df)
+    df["_nil"], df["_nil_low"], df["_nil_high"], df["_projected_tier"] = compute_nil_valuation(df)
 
     # ── Load players + stats from Supabase ────────────────────────────────────
     if not args.dry_run:
@@ -938,9 +950,10 @@ def main():
         sei      = safe(df.at[idx, "_sei"])
         ath      = safe(df.at[idx, "_ath"])
         ris      = safe(df.at[idx, "_ris"])
-        nil      = safe(df.at[idx, "_nil"])
-        nil_low  = safe(df.at[idx, "_nil_low"])
-        nil_high = safe(df.at[idx, "_nil_high"])
+        nil           = safe(df.at[idx, "_nil"])
+        nil_low       = safe(df.at[idx, "_nil_low"])
+        nil_high      = safe(df.at[idx, "_nil_high"])
+        tier          = str(df.at[idx, "_projected_tier"]) if "_projected_tier" in df.columns else None
 
         # ── Parse birth year ──────────────────────────────────────────────────
         birth_year = None
@@ -1001,6 +1014,8 @@ def main():
         for key_m, val in [("cdi", cdi), ("dds", dds), ("sei", sei), ("ath", ath), ("ris", ris)]:
             if val is not None:
                 stats_patch[key_m] = val
+        if tier and not args.skip_nil:
+            stats_patch["projected_tier"] = tier
 
         # Find the matching stats row (match on player_id + year class)
         stats_id = stats_lookup.get((player_id, yr))
