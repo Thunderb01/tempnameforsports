@@ -112,7 +112,7 @@ export function RosterSandboxPage() {
     const returning = board.returningPlayers
       .filter(p => {
         const s = retentionById[p.id] || "returning";
-        return s !== "entering_portal" && s !== "graduating";
+        return !["entering_portal", "graduating", "entering_draft", "transferred"].includes(s);
       })
       .map(p => ({
         ...p,

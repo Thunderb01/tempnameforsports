@@ -103,7 +103,7 @@ export function AppPage() {
       const nilById       = board.state.nilById       || {};
       const returning = board.returningPlayers
         .map(p => ({ roster_id: row.id, player_id: p.id, player_type: retentionById[p.id] || "returning", nil_offer: nilById[p.id] || 0 }))
-        .filter(p => p.player_type !== "entering_portal" && p.player_type !== "graduating");
+        .filter(p => !["entering_portal", "graduating", "entering_draft", "transferred"].includes(p.player_type));
       const transfers = board.state.roster
         .map(e => ({ roster_id: row.id, player_id: e.id, player_type: "transfer", nil_offer: e.nilOffer || 0 }));
 
@@ -188,7 +188,7 @@ export function AppPage() {
 
   // ── Returning roster grouped by retention status ────────────────────────────
   const returningByStatus = useMemo(() => {
-    const groups = { returning: [], undecided: [], graduating: [], entering_portal: [] };
+    const groups = { returning: [], undecided: [], graduating: [], entering_portal: [], entering_draft: [], transferred: [] };
     board.returningPlayers.forEach(p => {
       const status = board.state.retentionById?.[p.id] || "returning";
       groups[status].push(p);
@@ -429,6 +429,8 @@ export function AppPage() {
                         <option value="undecided">Undecided</option>
                         <option value="graduating">Graduating</option>
                         <option value="entering_portal">Entering Portal</option>
+                        <option value="entering_draft">Entering Draft</option>
+                        <option value="transferred">Transferred</option>
                       </select>
                     </div>
                   ))}
@@ -462,6 +464,8 @@ export function AppPage() {
                         <option value="undecided">Undecided</option>
                         <option value="graduating">Graduating</option>
                         <option value="entering_portal">Entering Portal</option>
+                        <option value="entering_draft">Entering Draft</option>
+                        <option value="transferred">Transferred</option>
                       </select>
                     </div>
                   ))}
@@ -487,6 +491,8 @@ export function AppPage() {
                         <option value="undecided">Undecided</option>
                         <option value="graduating">Graduating</option>
                         <option value="entering_portal">Entering Portal</option>
+                        <option value="entering_draft">Entering Draft</option>
+                        <option value="transferred">Transferred</option>
                       </select>
                     </div>
                   ))}
@@ -512,6 +518,62 @@ export function AppPage() {
                         <option value="undecided">Undecided</option>
                         <option value="graduating">Graduating</option>
                         <option value="entering_portal">Entering Portal</option>
+                        <option value="entering_draft">Entering Draft</option>
+                        <option value="transferred">Transferred</option>
+                      </select>
+                    </div>
+                  ))}
+                </>
+              )}
+
+              {/* Entering Draft */}
+              {returningByStatus.entering_draft.length > 0 && (
+                <>
+                  <div className="sub-label" style={{ color: "#a78bfa" }}>Entering Draft ({returningByStatus.entering_draft.length})</div>
+                  {returningByStatus.entering_draft.map((p, i) => (
+                    <div key={i} className="row row-click" style={{ opacity: .4 }}
+                      onClick={e => { if (!e.target.closest("select")) setModal(p); }}>
+                      <div className="row-main">
+                        <div className="row-title" style={{ fontSize: 13 }}>{p.name}</div>
+                        <div className="row-sub" style={{ fontSize: 11 }}>{p.primary_position || p.pos} · {p.year}</div>
+                      </div>
+                      <select className="input" style={{ fontSize: 11, padding: "3px 6px", width: "auto" }}
+                        value="entering_draft"
+                        onChange={e => { e.stopPropagation(); board.setRetention(p.id, e.target.value); }}
+                        onClick={e => e.stopPropagation()}>
+                        <option value="returning">Returning</option>
+                        <option value="undecided">Undecided</option>
+                        <option value="graduating">Graduating</option>
+                        <option value="entering_portal">Entering Portal</option>
+                        <option value="entering_draft">Entering Draft</option>
+                        <option value="transferred">Transferred</option>
+                      </select>
+                    </div>
+                  ))}
+                </>
+              )}
+
+              {/* Transferred */}
+              {returningByStatus.transferred.length > 0 && (
+                <>
+                  <div className="sub-label" style={{ color: "#94a3b8" }}>Transferred ({returningByStatus.transferred.length})</div>
+                  {returningByStatus.transferred.map((p, i) => (
+                    <div key={i} className="row row-click" style={{ opacity: .4 }}
+                      onClick={e => { if (!e.target.closest("select")) setModal(p); }}>
+                      <div className="row-main">
+                        <div className="row-title" style={{ fontSize: 13 }}>{p.name}</div>
+                        <div className="row-sub" style={{ fontSize: 11 }}>{p.primary_position || p.pos} · {p.year}</div>
+                      </div>
+                      <select className="input" style={{ fontSize: 11, padding: "3px 6px", width: "auto" }}
+                        value="transferred"
+                        onChange={e => { e.stopPropagation(); board.setRetention(p.id, e.target.value); }}
+                        onClick={e => e.stopPropagation()}>
+                        <option value="returning">Returning</option>
+                        <option value="undecided">Undecided</option>
+                        <option value="graduating">Graduating</option>
+                        <option value="entering_portal">Entering Portal</option>
+                        <option value="entering_draft">Entering Draft</option>
+                        <option value="transferred">Transferred</option>
                       </select>
                     </div>
                   ))}

@@ -1,5 +1,53 @@
+import { useEffect, useRef } from "react";
 import { Navigate, Outlet } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/lib/supabase";
+
+function useSessionTracking(userId) {
+  const sessionIdRef = useRef(null);
+
+  useEffect(() => {
+    if (!userId) return;
+
+    let ended = false;
+
+    // Start session
+    supabase
+      .from("user_sessions")
+      .insert({ user_id: userId })
+      .select("id")
+      .single()
+      .then(({ data }) => {
+        if (data) sessionIdRef.current = data.id;
+      });
+
+    // Heartbeat every 30s to keep last_seen fresh
+    const heartbeat = setInterval(() => {
+      if (sessionIdRef.current) {
+        supabase
+          .from("user_sessions")
+          .update({ ended_at: new Date().toISOString() })
+          .eq("id", sessionIdRef.current);
+      }
+    }, 30_000);
+
+    function endSession() {
+      if (ended || !sessionIdRef.current) return;
+      ended = true;
+      const now = new Date().toISOString();
+      navigator.sendBeacon
+        ? supabase.from("user_sessions").update({ ended_at: now }).eq("id", sessionIdRef.current)
+        : supabase.from("user_sessions").update({ ended_at: now }).eq("id", sessionIdRef.current);
+    }
+
+    window.addEventListener("beforeunload", endSession);
+    return () => {
+      clearInterval(heartbeat);
+      endSession();
+      window.removeEventListener("beforeunload", endSession);
+    };
+  }, [userId]);
+}
 
 /**
  * Wraps protected routes. Redirects to /login if not authenticated.
@@ -7,6 +55,7 @@ import { useAuth } from "@/hooks/useAuth";
  */
 export function ProtectedRoute() {
   const { session, loading } = useAuth();
+  useSessionTracking(session?.user?.id ?? null);
 
   if (loading) {
     return (
