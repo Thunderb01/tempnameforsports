@@ -75,7 +75,7 @@ export function AppPage() {
     if (!drawerOpen || !activeTeam) return;
     setLoadingDrawer(true);
     Promise.all([
-      supabase.from("saved_rosters").select("id, name, created_at, user_id").eq("team", activeTeam).order("created_at", { ascending: false }),
+      supabase.from("saved_rosters").select("id, name, created_at, user_id, nil_budget, roster_size, nil_max_pct").eq("team", activeTeam).order("created_at", { ascending: false }),
       supabase.from("coaches").select("user_id, display_name").eq("team", activeTeam),
     ]).then(([{ data: rosters }, { data: coachRows }]) => {
       const coachMap = {};
@@ -94,7 +94,14 @@ export function AppPage() {
     try {
       const { data: row, error: rErr } = await supabase
         .from("saved_rosters")
-        .insert({ name: saveName.trim(), team: activeTeam, user_id: userId })
+        .insert({
+          name:        saveName.trim(),
+          team:        activeTeam,
+          user_id:     userId,
+          nil_budget:  board.state.settings.nilTotal,
+          roster_size: board.state.settings.scholarships,
+          nil_max_pct: board.state.settings.maxPct,
+        })
         .select("id")
         .single();
       if (rErr) throw rErr;
@@ -125,11 +132,22 @@ export function AppPage() {
   }
 
   async function handleLoadRoster(rosterId) {
-    const { data, error } = await supabase
-      .from("saved_roster_players")
-      .select("player_type, nil_offer, players(*, player_stats(*))")
-      .eq("roster_id", rosterId);
+    const rosterMeta = [...myRosters, ...teamRosters].find(r => r.id === rosterId);
+    const [{ data, error }] = await Promise.all([
+      supabase.from("saved_roster_players")
+        .select("player_type, nil_offer, players(*, player_stats(*))")
+        .eq("roster_id", rosterId),
+    ]);
     if (error) { alert("Load failed: " + error.message); return; }
+
+    if (rosterMeta?.nil_budget || rosterMeta?.roster_size) {
+      board.commitSettings({
+        ...board.state.settings,
+        ...(rosterMeta.nil_budget  ? { nilTotal:     rosterMeta.nil_budget }  : {}),
+        ...(rosterMeta.roster_size ? { scholarships: rosterMeta.roster_size } : {}),
+        ...(rosterMeta.nil_max_pct ? { maxPct:       rosterMeta.nil_max_pct } : {}),
+      });
+    }
 
     const players = (data || []).map(row => ({
       ...row.players,

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 
 const STORAGE_KEY    = "bp_roster_builder";
-const STORAGE_VERSION = 10; // bump this whenever the state shape changes
+const STORAGE_VERSION = 11; // bump this whenever the state shape changes
 
 // Legacy keys to purge on load
 const LEGACY_KEYS = ["bp_roster_builder_v1"];
@@ -167,11 +167,14 @@ export function useRosterBoard(team) {
       const autoRetention = {};
       const autoNil = {};
       returning.forEach(p => {
+        // Always write every player's status so it's persisted even if default
         if (!s.retentionById[p.id]) {
           if (p.source === "portal") {
             autoRetention[p.id] = "entering_portal";
           } else if (GRADUATING_YEARS.includes(p.year)) {
             autoRetention[p.id] = "graduating";
+          } else {
+            autoRetention[p.id] = "returning";
           }
         }
         if (!s.nilById[p.id] && p.nilValuation > 0) {

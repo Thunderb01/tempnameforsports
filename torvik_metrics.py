@@ -148,7 +148,7 @@ TORVIK_TEAM_ALIASES = {
     "nicholls st.":             "nicholls state",
     "norfolk st.":              "norfolk state",
     "north dakota st.":         "north dakota state",
-    "northwestern st.":         "northwestern state",
+    # "northwestern st.":         "northwestern state",
     "ohio st.":                 "ohio state",
     "oklahoma st.":             "oklahoma state",
     "oregon st.":               "oregon state",
@@ -160,7 +160,7 @@ TORVIK_TEAM_ALIASES = {
     "san jose st.":             "san jose state",
     
     "south dakota st.":         "south dakota state",
-    "southeast missouri st.":   "southeast missouri state",
+    # "southeast missouri st.":   "southeast missouri state",
     "tarleton st.":             "tarleton state",
     "tennessee st.":            "tennessee state",
     "texas st.":                "texas state",
@@ -232,7 +232,7 @@ def normalise_pos(role):
         return "Guard"
     if any(x in role for x in ["wing", "small f", "sf"]):
         return "Wing"
-    if any(x in role for x in ["big", "pf", "c", "center", "power"]):
+    if any(x in role for x in ["big", "pf", "center", "power"]) or role in ("c",) or role.startswith("c ") or role.endswith(" c"):
         return "Big"
     return "Wing"  # default
 
@@ -456,33 +456,57 @@ def compute_nil_valuation(df):
     Base NIL    = MIN(cap, cap × W² × (1 - (1 - V⁴)(1 - W)²)^1.2)
     Final NIL   = Base NIL × Position Boost × Age Boost
     """
-    # ── Stat weights (from Weights sheet) ────────────────────────────────────
-    WEIGHTS = {
-        "ppg":     0.10,
-        # "ts_pct":  0.12,
-        # "3p_pct":  0.08,
-        # "ast_pct": 0.02,  # AST% — Torvik AST_per
-        # "ast_tov": 0.10,
-        # "stl_40":  0.05,
-        # "blk_40":  0.05,
-        # "drb_40":  0.05,
-        # "orb_40":  0.04,
-        "mpg":     0.04,  # Min_per — usage/playing-time signal
-        
-        # Scout scores (BtPM metrics scaled to 0–1)
-        
-        "nil_def_score":     0.08,  
-        "nil_versatility_score":     0.05,  # Versatility proxy
-        "nil_motor_score":     0.04,  # Motor proxy
-        "nil_iq_score":     0.06,  # IQ proxy
-
-        # Beyond the Portal Metrics
-        "sei":     0.18,  # Scoring Efficiency Index
-        "dds":     0.16,  # Defensive Disruption Score
-        "cdi":     0.15,  # Court Vision / Decision-Making Index
-        "ris":     0.07,  # Rebounding Impact Score
-        "ath":     0.07,  # Athleticism Index
+    # ── Stat weights — position-specific ─────────────────────────────────────
+    GUARD_WEIGHTS = {
+        "ppg":                   0.18,
+        "mpg":                   0.05,
+        "nil_def_score":         0.02,
+        "nil_versatility_score": 0.02,
+        "nil_motor_score":       0.03,
+        "nil_iq_score":          0.06,
+        "sei":                   0.22,
+        "dds":                   0.05,
+        "cdi":                   0.15,
+        "ris":                   0.05,
+        "ath":                   0.05,
+        "3pt_score":             0.12,
     }
+    WING_WEIGHTS = {
+        "ppg":                   0.18,
+        "mpg":                   0.05,
+        "nil_def_score":         0.03,
+        "nil_versatility_score": 0.04,
+        "nil_motor_score":       0.06,
+        "nil_iq_score":          0.05,
+        "sei":                   0.20,
+        "dds":                   0.10,
+        "cdi":                   0.10,
+        "ris":                   0.05,
+        "ath":                   0.06,
+        "3pt_score":             0.08,
+    }
+    BIG_WEIGHTS = {
+        "ppg":                   0.15,
+        "mpg":                   0.05,
+        "nil_def_score":         0.04,
+        "nil_versatility_score": 0.02,
+        "nil_motor_score":       0.06,
+        "nil_iq_score":          0.04,
+        "sei":                   0.16,
+        "dds":                   0.18,
+        "cdi":                   0.06,
+        "ris":                   0.14,
+        "ath":                   0.08,
+        "3pt_score":             0.02,
+    }
+    # Map each row to its weight dict; default Wing
+    def w(key):
+        """Return a per-row Series of weights for the given key."""
+        return (
+            (_pos == "Guard") * GUARD_WEIGHTS[key] +
+            (_pos == "Wing")  * WING_WEIGHTS[key]  +
+            (_pos == "Big")   * BIG_WEIGHTS[key]
+        )
 
     # ── Percentile-rank each stat across full df (0–1 scale) ─────────────────
     def prank(series):
@@ -510,16 +534,16 @@ def compute_nil_valuation(df):
     pts_clipped = pts_clipped.where(_pos != "Big",   pts_clipped.clip(2.80, 13.98))
 
     stat_scores = (
-        prank(pts_clipped)   * WEIGHTS["ppg"]     +  # pts per game (position-bounded)
-        # prank(df["TS_per"])  * WEIGHTS["ts_pct"]  +  # issue 1 fix: always use TS_per
-        # prank(df["TP_per"])  * WEIGHTS["3p_pct"]  +
-        # prank(df["AST_per"]) * WEIGHTS["ast_pct"] +
-        # prank(df["ast/tov"]) * WEIGHTS["ast_tov"] +
-        # prank(df["stl_per"]) * WEIGHTS["stl_40"]  +
-        # prank(df["blk_per"]) * WEIGHTS["blk_40"]  +
-        # prank(df["DRB_per"]) * WEIGHTS["drb_40"]  +
-        # prank(df["ORB_per"]) * WEIGHTS["orb_40"]  +
-        prank(df["Min_per"]) * WEIGHTS["mpg"]
+        prank(pts_clipped)   * w("ppg") +  # pts per game (position-bounded)
+        # prank(df["TS_per"])  * w("ts_pct")  +
+        # prank(df["TP_per"])  * w("3p_pct")  +
+        # prank(df["AST_per"]) * w("ast_pct") +
+        # prank(df["ast/tov"]) * w("ast_tov") +
+        # prank(df["stl_per"]) * w("stl_40")  +
+        # prank(df["blk_per"]) * w("blk_40")  +
+        # prank(df["DRB_per"]) * w("drb_40")  +
+        # prank(df["ORB_per"]) * w("orb_40")  +
+        prank(df["Min_per"]) * w("mpg")
     )
 
     # ── NIL Defensive metric  (position-specific, matches BtP sheet) ────────────
@@ -635,21 +659,44 @@ def compute_nil_valuation(df):
     )
     nil_versatility_score = percentrank_by_pos(df, "_nil_vers_raw", scale=1)
 
-    # Scout scores — keyed to match WEIGHTS dict above
+    # Scout scores — position-weighted
     scout_scores = (
-        (df["_ath"].fillna(0) / 100) * WEIGHTS["ath"] +
-        nil_def_score                * WEIGHTS["nil_def_score"] +
-        nil_versatility_score        * WEIGHTS["nil_versatility_score"] +
-        nil_motor_score              * WEIGHTS["nil_motor_score"] +
-        nil_iq_score                 * WEIGHTS["nil_iq_score"]
+        (df["_ath"].fillna(0) / 100) * w("ath") +
+        nil_def_score                * w("nil_def_score") +
+        nil_versatility_score        * w("nil_versatility_score") +
+        nil_motor_score              * w("nil_motor_score") +
+        nil_iq_score                 * w("nil_iq_score")
     )
 
-    # Beyond the Portal metrics — keyed to match WEIGHTS dict above
+    # ── 3PT Score (volume × efficiency, position-relative) ───────────────────
+    # 3PA/G bounds: Guard [1.34, 6.90], Wing [0.79, 6.07], Big [0.00, 3.88]
+    tpa_pg = (df["TPA"] / df["GP"].replace(0, float("nan"))).fillna(0)
+    tpa_pg_clipped = tpa_pg.copy()
+    tpa_pg_clipped = tpa_pg_clipped.where(_pos != "Guard", tpa_pg_clipped.clip(1.34, 6.90))
+    tpa_pg_clipped = tpa_pg_clipped.where(_pos != "Wing",  tpa_pg_clipped.clip(0.79, 6.07))
+    tpa_pg_clipped = tpa_pg_clipped.where(_pos != "Big",   tpa_pg_clipped.clip(0.00, 3.88))
+
+    # 3P% bounds: Guard [0.25, 0.44], Wing [0.21, 0.43], Big [0.00, 0.71]
+    tp_pct = df["TP_per"].fillna(0)  # TP_per is already a decimal (e.g. 0.381 = 38.1%)
+    tp_pct_clipped = tp_pct.copy()
+    tp_pct_clipped = tp_pct_clipped.where(_pos != "Guard", tp_pct_clipped.clip(0.25, 0.44))
+    tp_pct_clipped = tp_pct_clipped.where(_pos != "Wing",  tp_pct_clipped.clip(0.21, 0.43))
+    tp_pct_clipped = tp_pct_clipped.where(_pos != "Big",   tp_pct_clipped.clip(0.00, 0.71))
+
+    df["_tpa_pg_clipped"]  = tpa_pg_clipped
+    df["_tp_pct_clipped"]  = tp_pct_clipped
+    _tpa_pct_pos  = percentrank_by_pos(df, "_tpa_pg_clipped", scale=1)  # volume pct by pos
+    _tpct_pct_pos = percentrank_by_pos(df, "_tp_pct_clipped", scale=1)  # efficiency pct by pos
+    df["_3pt_score_raw"] = _tpa_pct_pos * _tpct_pct_pos
+    nil_3pt_score = percentrank_by_pos(df, "_3pt_score_raw", scale=1)
+
+    # Beyond the Portal metrics — position-weighted
     btp_scores = (
-        (df["_sei"].fillna(0) / 100) * WEIGHTS["sei"] +
-        (df["_dds"].fillna(0) / 100) * WEIGHTS["dds"] +
-        (df["_cdi"].fillna(0) / 100 ) * WEIGHTS["cdi"] +
-        (df["_ris"].fillna(0) / 100) * WEIGHTS["ris"]
+        (df["_sei"].fillna(0) / 100) * w("sei") +
+        (df["_dds"].fillna(0) / 100) * w("dds") +
+        (df["_cdi"].fillna(0) / 100) * w("cdi") +
+        (df["_ris"].fillna(0) / 100) * w("ris") +
+        nil_3pt_score                * w("3pt_score")
     )
 
     total_score = (stat_scores + scout_scores + btp_scores).clip(0, 1)  # W
@@ -680,8 +727,8 @@ def compute_nil_valuation(df):
     # ── Base NIL = MIN(conf_ceiling, conf_ceiling × W² × (1 - (1-V⁴)(1-W)²)^1.2) ──
     W = total_score
     V = conf_adj
-    blend    = (1 - (1 - V**4) * (1 - W)**2) ** 1.2
-    base_nil = (conf_ceiling * W**2 * blend).clip(upper=conf_ceiling)
+    blend    = (1 - (1 - V**4) * (1 - W)**2) ** 1.5
+    base_nil = (conf_ceiling * W**3 * blend).clip(upper=conf_ceiling)
 
     # ── Position Boost ────────────────────────────────────────────────────────
     pos_boost = df["pos_bucket"].map({"Big": 1.15, "Wing": 1.0, "Guard": 1.0}).fillna(1.0)
@@ -859,7 +906,7 @@ def main():
         players = []
         page, page_size = 0, 1000
         while True:
-            res = db.table("players").select("id, name, current_team, height") \
+            res = db.table("players").select("id, name, current_team, height, nil_valuation") \
                     .range(page * page_size, (page + 1) * page_size - 1).execute()
             players.extend(res.data)
             if len(res.data) < page_size:
@@ -876,6 +923,11 @@ def main():
         # Track existing heights so we only backfill blanks
         player_height_lookup = {
             p["id"]: p.get("height")
+            for p in players
+        }
+        # Track existing NIL for change detection
+        player_nil_lookup = {
+            p["id"]: p.get("nil_valuation")
             for p in players
         }
 
@@ -900,6 +952,7 @@ def main():
     else:
         player_lookup          = {}
         player_height_lookup   = {}
+        player_nil_lookup      = {}
         stats_lookup           = {}
         already_matched        = set()
 
@@ -907,6 +960,7 @@ def main():
     matched        = 0
     unmatched      = 0
     unmatched_rows = []
+    nil_changes    = []
 
     for _, row in df.iterrows():
         name = str(row.get("player_name", "")).strip()
@@ -1008,6 +1062,20 @@ def main():
             player_patch["height"] = ht
         if player_patch:
             db.table("players").update(player_patch).eq("id", player_id).execute()
+            if nil is not None:
+                old_nil = player_nil_lookup.get(player_id)
+                changed = old_nil is None or abs(nil - old_nil) > 1
+                if changed:
+                    direction = "new" if old_nil is None else ("up" if nil > old_nil else "down")
+                    nil_changes.append({
+                        "name":     name,
+                        "team":     team,
+                        "position": row.get("pos_bucket", ""),
+                        "old_nil":  round(old_nil) if old_nil else "",
+                        "new_nil":  round(nil),
+                        "change":   round(nil - old_nil) if old_nil else "",
+                        "direction": direction,
+                    })
 
         # Update player_stats row
         stats_patch = {**torvik}
@@ -1029,14 +1097,22 @@ def main():
         print(f"  ✓ {name} ({team})")
 
     print(f"\nDone. Matched: {matched} | Unmatched: {unmatched}")
+    import csv
     if unmatched_rows:
-        import csv
         out_path = "unmatched_players.csv"
         with open(out_path, "w", newline="", encoding="utf-8") as f:
             writer = csv.DictWriter(f, fieldnames=["name", "team", "yr"])
             writer.writeheader()
             writer.writerows(unmatched_rows)
         print(f"  → Unmatched players written to {out_path}")
+    if nil_changes:
+        nil_changes.sort(key=lambda x: abs(x["change"] or 0), reverse=True)
+        out_path = "nil_changes.csv"
+        with open(out_path, "w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=["name", "team", "position", "old_nil", "new_nil", "change", "direction"])
+            writer.writeheader()
+            writer.writerows(nil_changes)
+        print(f"  → NIL changes written to {out_path} ({len(nil_changes)} players updated)")
 
     # ── Null out metrics + zero NIL for low-minutes players ───────────────────
     if low_minutes_keys and not args.dry_run:

@@ -94,7 +94,9 @@ TEAM_ALIASES = {
     "Appalachian State": "App State",
     "Appalachian St.":   "App State",
     "Hawaii":            "Hawai'i",
-    "St. John's":        "St. John's"
+    "St. John's":        "St. John's",
+    "St. Thomas":        "St. Thomas-Minnesota",
+    "Queens":            "2511"
 }
 
 
@@ -250,7 +252,7 @@ def main():
         print("\nTeams in DB with no ESPN team ID mapping:")
         missing = sorted(
             [(name, len(ps)) for name, ps in by_team.items()
-             if not team_map.get(TEAM_ALIASES.get(name, name))],
+             if not (lambda r: r.isdigit() or team_map.get(r))(TEAM_ALIASES.get(name, name))],
             key=lambda x: -x[1]
         )
         for name, count in missing:
@@ -265,7 +267,7 @@ def main():
 
     for team_name, team_players in by_team.items():
         resolved     = TEAM_ALIASES.get(team_name, team_name)
-        espn_team_id = team_map.get(resolved)
+        espn_team_id = resolved if resolved.isdigit() else team_map.get(resolved)
         if not espn_team_id:
             print(f"\n  [skip] No ESPN team ID for: {team_name!r} (tried {resolved!r}) ({len(team_players)} players)")
             no_team += len(team_players)
