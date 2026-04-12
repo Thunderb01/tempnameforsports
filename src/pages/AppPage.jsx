@@ -119,7 +119,7 @@ export function AppPage() {
           status:      statusById[p.id] || null,
           shortlisted: shortlistIds.includes(p.id),
         }))
-        .filter(p => !["entering_portal", "graduating", "entering_draft", "transferred"].includes(p.player_type));
+        ; // save all returning players including those leaving so status is restored on load
       const transfers = board.state.roster
         .map(e => ({
           roster_id:   row.id,

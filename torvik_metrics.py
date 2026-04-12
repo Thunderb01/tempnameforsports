@@ -853,7 +853,7 @@ def main():
                 school = r.get("school") or pl.get("current_team", "")
                 _sb_stats.append({
                     "_sb_name": normalise(pl["name"]),
-                    "_sb_team": normalise(school),
+                    "_sb_team": normalise_team(school),
                     "sb_height": pl.get("height"),
                     "sb_weight": pl.get("weight"),
                     **{f"sb_{k}": v for k, v in r.items() if k != "player_id"}

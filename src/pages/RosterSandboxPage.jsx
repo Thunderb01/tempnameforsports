@@ -174,16 +174,29 @@ export function RosterSandboxPage() {
         .single();
       if (rErr) throw rErr;
 
-      const statusById   = board.state.statusById   || {};
-      const shortlistIds = board.state.shortlistIds || [];
-      const playerRows = rosterPlayers.map(p => ({
+      const retentionById = board.state.retentionById || {};
+      const nilById       = board.state.nilById       || {};
+      const statusById    = board.state.statusById    || {};
+      const shortlistIds  = board.state.shortlistIds  || [];
+
+      // Include ALL returning players (even leaving ones) so status is restored on load
+      const allReturning = board.returningPlayers.map(p => ({
         roster_id:   row.id,
         player_id:   p.id,
-        player_type: p._typeKey,
-        nil_offer:   p.nilOffer || 0,
+        player_type: retentionById[p.id] || "returning",
+        nil_offer:   nilById[p.id] || 0,
         status:      statusById[p.id] || null,
         shortlisted: shortlistIds.includes(p.id),
       }));
+      const transfers = board.state.roster.map(e => ({
+        roster_id:   row.id,
+        player_id:   e.id,
+        player_type: "transfer",
+        nil_offer:   e.nilOffer || 0,
+        status:      statusById[e.id] || null,
+        shortlisted: shortlistIds.includes(e.id),
+      }));
+      const playerRows = [...allReturning, ...transfers];
       const { error: pErr } = await supabase.from("saved_roster_players").insert(playerRows);
       if (pErr) throw pErr;
 
