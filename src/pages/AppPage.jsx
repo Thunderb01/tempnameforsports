@@ -108,11 +108,27 @@ export function AppPage() {
 
       const retentionById = board.state.retentionById || {};
       const nilById       = board.state.nilById       || {};
+      const statusById    = board.state.statusById    || {};
+      const shortlistIds  = board.state.shortlistIds  || [];
       const returning = board.returningPlayers
-        .map(p => ({ roster_id: row.id, player_id: p.id, player_type: retentionById[p.id] || "returning", nil_offer: nilById[p.id] || 0 }))
+        .map(p => ({
+          roster_id:   row.id,
+          player_id:   p.id,
+          player_type: retentionById[p.id] || "returning",
+          nil_offer:   nilById[p.id] || 0,
+          status:      statusById[p.id] || null,
+          shortlisted: shortlistIds.includes(p.id),
+        }))
         .filter(p => !["entering_portal", "graduating", "entering_draft", "transferred"].includes(p.player_type));
       const transfers = board.state.roster
-        .map(e => ({ roster_id: row.id, player_id: e.id, player_type: "transfer", nil_offer: e.nilOffer || 0 }));
+        .map(e => ({
+          roster_id:   row.id,
+          player_id:   e.id,
+          player_type: "transfer",
+          nil_offer:   e.nilOffer || 0,
+          status:      statusById[e.id] || null,
+          shortlisted: shortlistIds.includes(e.id),
+        }));
 
       const { error: pErr } = await supabase.from("saved_roster_players").insert([...returning, ...transfers]);
       if (pErr) throw pErr;
@@ -133,11 +149,10 @@ export function AppPage() {
 
   async function handleLoadRoster(rosterId) {
     const rosterMeta = [...myRosters, ...teamRosters].find(r => r.id === rosterId);
-    const [{ data, error }] = await Promise.all([
-      supabase.from("saved_roster_players")
-        .select("player_type, nil_offer, players(*, player_stats(*))")
-        .eq("roster_id", rosterId),
-    ]);
+    const { data, error } = await supabase
+      .from("saved_roster_players")
+      .select("player_type, nil_offer, status, shortlisted, players(*, player_stats(*))")
+      .eq("roster_id", rosterId);
     if (error) { alert("Load failed: " + error.message); return; }
 
     if (rosterMeta?.nil_budget || rosterMeta?.roster_size) {
@@ -151,15 +166,17 @@ export function AppPage() {
 
     const players = (data || []).map(row => ({
       ...row.players,
-      pos:       row.players.primary_position,
-      year:      row.players.year,
-      height:    row.players.height   ?? null,
-      hometown:  row.players.hometown ?? null,
+      pos:        row.players.primary_position,
+      year:       row.players.year,
+      height:     row.players.height   ?? null,
+      hometown:   row.players.hometown ?? null,
       marketLow:  row.players.open_market_low  ?? 0,
       marketHigh: row.players.open_market_high ?? 0,
       stats:      { ...(row.players.player_stats?.[0] || {}) },
       _typeKey:   row.player_type,
       nilOffer:   row.nil_offer,
+      _status:    row.status,
+      _shortlisted: row.shortlisted,
     }));
 
     board.loadFromSaved(players);

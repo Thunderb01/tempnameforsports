@@ -174,11 +174,15 @@ export function RosterSandboxPage() {
         .single();
       if (rErr) throw rErr;
 
+      const statusById   = board.state.statusById   || {};
+      const shortlistIds = board.state.shortlistIds || [];
       const playerRows = rosterPlayers.map(p => ({
         roster_id:   row.id,
         player_id:   p.id,
         player_type: p._typeKey,
         nil_offer:   p.nilOffer || 0,
+        status:      statusById[p.id] || null,
+        shortlisted: shortlistIds.includes(p.id),
       }));
       const { error: pErr } = await supabase.from("saved_roster_players").insert(playerRows);
       if (pErr) throw pErr;
@@ -197,7 +201,7 @@ export function RosterSandboxPage() {
     const rosterMeta = [...myRosters, ...teamRosters].find(r => r.id === rosterId);
     const { data, error } = await supabase
       .from("saved_roster_players")
-      .select("player_type, nil_offer, players(*, player_stats(*))")
+      .select("player_type, nil_offer, status, shortlisted, players(*, player_stats(*))")
       .eq("roster_id", rosterId);
     if (error) { alert("Load failed: " + error.message); return; }
 
@@ -212,17 +216,19 @@ export function RosterSandboxPage() {
 
     const players = (data || []).map(row => ({
       ...row.players,
-      pos:       row.players.primary_position,
-      year:      row.players.year,
-      height:    row.players.height   ?? null,
-      hometown:  row.players.hometown ?? null,
+      pos:        row.players.primary_position,
+      year:       row.players.year,
+      height:     row.players.height   ?? null,
+      hometown:   row.players.hometown ?? null,
       marketLow:  row.players.open_market_low  ?? 0,
       marketHigh: row.players.open_market_high ?? 0,
       stats:      { ...(row.players.player_stats?.[0] || {}) },
-      _type:     row.player_type === "transfer" ? "Transfer In"
-               : row.player_type === "undecided" ? "Undecided" : "Returning",
-      _typeKey:  row.player_type,
-      nilOffer:  row.nil_offer,
+      _type:      row.player_type === "transfer" ? "Transfer In"
+                : row.player_type === "undecided" ? "Undecided" : "Returning",
+      _typeKey:   row.player_type,
+      nilOffer:   row.nil_offer,
+      _status:    row.status,
+      _shortlisted: row.shortlisted,
     }));
 
     board.loadFromSaved(players);

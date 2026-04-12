@@ -254,15 +254,19 @@ export function useRosterBoard(team) {
     const roster        = [];
     const retentionById = {};
     const nilById       = {};
+    const statusById    = {};
+    const shortlistIds  = [];
     savedPlayers.forEach(p => {
+      if (p._status)     statusById[p.id] = p._status;
+      if (p._shortlisted) shortlistIds.push(p.id);
       if (p._typeKey === "transfer") {
         roster.push({ id: p.id, nilOffer: p.nilOffer || 0 });
       } else {
-        retentionById[p.id] = p._typeKey; // "returning" | "undecided"
+        retentionById[p.id] = p._typeKey;
         if (p.nilOffer) nilById[p.id] = p.nilOffer;
       }
     });
-    setState(s => ({ ...s, roster, retentionById, nilById }));
+    setState(s => ({ ...s, roster, retentionById, nilById, statusById, shortlistIds }));
   }
 
   function commitSettings(settings) {
