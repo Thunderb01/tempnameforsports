@@ -104,7 +104,7 @@ select.input { cursor: pointer; }
   display: flex; flex-wrap: wrap; gap: 12px;
   padding: 16px; background: var(--panel);
   border: 1px solid var(--border); border-radius: var(--radius);
-  margin-bottom: 20px;
+  margin-bottom: 14px;
 }
 .setting       { display: flex; flex-direction: column; gap: 5px; min-width: 140px; }
 .setting label { font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: .06em; opacity: .5; }
@@ -225,23 +225,23 @@ select.input { cursor: pointer; }
   transform: translate(-50%, -50%);
   z-index: 201;
   width: min(860px, calc(100vw - 32px));
-  max-height: 85vh; overflow-y: auto;
+  max-height: 93vh; overflow-y: auto;
 }
 .modal-card {
   background: #131929;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 24px;
+  padding: 18px 24px 14px;
 }
 .modal-head {
   display: flex; justify-content: space-between; align-items: flex-start;
-  margin-bottom: 20px;
+  margin-bottom: 14px;
 }
 .modal-kicker { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; opacity: .4; margin-bottom: 4px; }
 .modal-title  { font-size: 20px; font-weight: 600; margin: 0 0 4px; }
 .modal-sub    { font-size: 13px; color: var(--muted); }
 .modal-id     { font-size: 10px; opacity: .25; margin-top: 4px; font-family: monospace; }
-.modal-section { margin-top: 20px; }
+.modal-section { margin-top: 14px; }
 .modal-section h4 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; opacity: .4; margin: 0 0 8px; font-weight: 500; }
 .modal-grid {
   display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
@@ -256,7 +256,7 @@ select.input { cursor: pointer; }
   min-height: 100vh;
   display: flex; flex-direction: column;
   align-items: center; justify-content: center;
-  padding: 24px;
+  padding: 18px 24px 14px;
 }
 .login-card {
   width: 100%; max-width: 420px;

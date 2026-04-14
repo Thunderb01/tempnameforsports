@@ -6,6 +6,7 @@ import { useRosterBoard } from "@/hooks/useRosterBoard";
 import { useAdminTeam }       from "@/hooks/useAdminTeam";
 import { TeamAutocomplete }   from "@/components/TeamAutocomplete";
 import { supabase }       from "@/lib/supabase";
+import { exportRosterPDF } from "@/lib/exportRoster";
 
 function money(n) {
   return Number(n || 0).toLocaleString(undefined, {
@@ -287,6 +288,9 @@ export function RosterSandboxPage() {
                   ← Back to Live
                 </button>
               )}
+              <button className="btn btn-ghost" onClick={() =>
+                exportRosterPDF({ team: activeTeam, settings: board.state.settings, players: displayPlayers })
+              }>Export PDF</button>
               <button className="btn btn-ghost" onClick={() => setDrawerOpen(true)}>
                 Saved Rosters
               </button>

@@ -1,142 +1,1547 @@
 name,team,yr
-Matt Van Komen,Marshall,Sr
-Joshua Aaron Reaves,Hofstra,Sr
-RJ Johnson,Rhode Island,Sr
-James Graham,Alabama A&M,Jr
-Meechie Johnson,South Carolina,Sr
-C.J. Anthony,Iona,Sr
-Mike James,Vanderbilt,Jr
-Michael Gray Jr.,Wichita St.,Sr
-Jayme Mitchell Jr.,Jackson St.,Jr
-Chris Morgan,Coppin St.,Sr
-"Corey Floyd, Jr.",Providence,Sr
-Will Felton,North Carolina A&T,Sr
-Shay Johnson Jr.,Long Beach St.,Sr
+Robby Carmody,Le Moyne,Sr
+Drue Drinnon,Texas St.,Sr
+K.J. Hymes,Nevada,Sr
+Jack Clark,VCU,Sr
+Robert Braswell,Charlotte,Sr
+Wynston Tabbs,Morgan St.,Sr
+Tyrel Bladen,Norfolk St.,Sr
+Jerome Hunter,Xavier,Sr
+Keenan Fitzmorris,Northwestern,Sr
+Kobe Julien,Arkansas St.,Sr
+Messiah Jones,Towson,Sr
+Chris Austin,Portland,Sr
+Ebrima Dibba,Cleveland St.,Sr
+Neftali Alvarez,Southern Miss,Sr
+Savion Lewis,Quinnipiac,Sr
+CJ Fredrick,Cincinnati,Sr
+Grayson Carter,Texas Southern,Sr
+Colby Rogers,Memphis,Sr
+Jeremiah Hernandez,Ball St.,Sr
+Miguel Tomley,Weber St.,Sr
+Anderson Kopp,UMKC,Sr
+Marcus Foster,Xavier,Sr
+Cole Henry,Wyoming,Jr
+Richie Springs,Quinnipiac,Sr
+Alvin Stredic,Mississippi Valley St.,Sr
+Jalen Jackson,Western Kentucky,Sr
+Max Agbonkpolo,Montana St.,Sr
+Jalen Hill,UNLV,Sr
+Emmanuel Tshimanga,New Mexico St.,Sr
+Ofure Ujadughele,UC Irvine,Sr
+Robert Carpenter,New Mexico St.,Sr
+Trevin Knell,BYU,Sr
+David Skogman,DePaul,Sr
+Mickey Pearson Jr.,Ball St.,Sr
+Gibson Jimerson,Saint Louis,Sr
+Quinton Morton-Robertson,Purdue Fort Wayne,Sr
+Chol Marial,San Jose St.,Sr
+Keaston Willis,Tulsa,Sr
+Jarred Hyder,Cal Poly,Sr
+Festus Ndumanya,Cal St. Northridge,Sr
+Brandton Chatfield,Iowa St.,Sr
+Ryan Rapp,Hawaii,Sr
+Noah Williams,James Madison,Sr
+Tylan Pope,Texas St.,Sr
+Chase Hunter,Clemson,Sr
+Ken Evans Jr.,Florida Atlantic,Sr
+John Buggs III,East Tennessee St.,Sr
+Khalif Battle,Gonzaga,Sr
+Josh Corbin,UNC Wilmington,Sr
+Dante Wilcox,FIU,Sr
+Christian Ings,Norfolk St.,Sr
+Oumar Ballo,Indiana,Sr
+Keeshawn Barthelemy,Oregon,Sr
+Ben Wight,Stony Brook,Sr
+Julian Rishwain,UNLV,Sr
+Jacob Johnson,Middle Tennessee,Sr
+Anthony Selden,Gardner Webb,Sr
+Gerald Drumgoole Jr.,George Washington,Sr
+Tyem Freeman,Illinois Chicago,Sr
+Ryan Wade,Green Bay,Sr
+Nate Lliteras,North Florida,Sr
+KyKy Tandy,Florida Atlantic,Sr
+Josh Cohen,USC,Sr
+Dieonte Miles,Morehead St.,Sr
+Benjamin Bosmans-Verdonk,South Carolina,Sr
+Sabry Philip,Stony Brook,Sr
+Miles Jones,UNC Greensboro,Sr
+Emmanuel Kuac,Detroit Mercy,Sr
+Omar Croskey,South Carolina St.,Sr
+Zach Freemantle,Xavier,Sr
+Romelle Mansel,Jackson St.,Sr
+DK Thorn,UT Rio Grande Valley,Sr
+Juwan Gary,Nebraska,Sr
+PJ Fuller II,Cal St. Northridge,Sr
+Diante Smith,UT Arlington,Sr
+Taryn Todd,Arkansas St.,Sr
+Dontaie Allen,Wyoming,Sr
+Mylik Wilson,Houston,Sr
+Michael Christmas,Longwood,Sr
+Brice Williams,Nebraska,Sr
+Kadin Shedrick,Texas,Sr
+K'mani Doughty,Indiana St.,Sr
+Dajuan Harris Jr.,Kansas,Sr
+Ethan Brittain-Watts,Ball St.,Sr
+Brandon Newman,Oklahoma St.,Sr
+Jared Coleman-Jones,San Diego St.,Sr
+Austin Johnson,Long Beach St.,Sr
+Noah Waterman,Louisville,Sr
+Justin Hohn,UC Irvine,Sr
+Alejandro Vasquez,UAB,Sr
+Shon Robinson,Incarnate Word,Sr
+Mark Freeman,James Madison,Sr
+T.J. Weeks Jr.,Rider,Sr
+Damian Dunn,Pittsburgh,Jr
+Greg Gantt Jr.,UNC Asheville,Sr
+Dexter Akanno,Utah St.,Sr
+Raymond Somerville,Delaware St.,Sr
+Justin Bieker,Utah Tech,Sr
+Isaiah Hawthorne,Northern Colorado,Sr
+Rylan Jones,Samford,Sr
+Keeshawn Kellman,Florida Gulf Coast,Sr
+Jesus Carralero Martin,Bethune Cookman,Sr
+Nick Fiorillo,Vermont,Sr
+Jae'Lyn Withers,North Carolina,Sr
+Yusuf Jihad,Eastern Michigan,Sr
+Nate Ferguson,Drake,Sr
+Joseph Yesufu,West Virginia,Sr
+Connor Withers,Bryant,Sr
+Jovan Blacksher Jr.,California,Sr
+John Tonje,Wisconsin,Sr
+Fletcher Abee,UNC Asheville,Sr
+Caleb Grill,Missouri,Sr
+Moulaye Sissoko,North Texas,Sr
+Matthew Van Komen,Elon,Sr
+Damari Monsanto,UTSA,Sr
+Ben Hendriks,Ball St.,Sr
+Nick Johnson,Winthrop,Sr
+B. Artis White,Richmond,Jr
+J'Wan Roberts,Houston,Sr
+Akrum Ahemed,UNC Greensboro,Sr
+Lok Wur,Grand Canyon,Sr
+C.J. Walker,East Carolina,Sr
+Avery Felts,Arkansas St.,Sr
+Joe Pridgen,Montana,Sr
+Brycen Goodine,Oklahoma,Sr
+DeAntoni Gordon,Southern Miss,Sr
+Patrick McCaffery,Butler,Sr
+Essam Mostafa,Middle Tennessee,Sr
+Brendan Wenzel,TCU,Sr
+Eric Dixon,Villanova,Sr
+Denijay Harris,Southern Miss,Sr
+Ques Glover,Ohio St.,Sr
+Jeffery Armstrong,Southern Miss,Sr
+Harlond Beverly,Wichita St.,Sr
+Shereef Mitchell,Ohio,Sr
+Cameron Shockley-Okeke,Howard,Sr
+Kvonn Cramer,Bryant,Sr
+Steve Settle,Temple,Sr
+"Wayne Bristol, Jr.",Hampton,Sr
+Caleb Stone-Carrawell,Loyola Marymount,Sr
+Ahmir Langlais,Tennessee St.,Sr
+Lance Terry,Georgia Tech,Sr
+Carlos Paez,Southeastern Louisiana,Sr
+Mason Gillis,Duke,Sr
+Issac McBride,Oral Roberts,Sr
+Malcolm Wilson,Queens,Sr
+Mikal Dawson,Marshall,Sr
+Chris Moore,Auburn,Sr
+Marcus Dockery,Howard,Sr
+Nico Galette,Youngstown St.,Sr
+Fidelis Okereke,Cal St. Bakersfield,Sr
+Mwani Wilkinson,Little Rock,Sr
+DJ Davis,Washington,Sr
+Laurynas Vaistaras,Mercer,Sr
+Dylan Addae-Wusu,Seton Hall,Sr
+Jordan Wood,Stetson,Sr
+Martaz Robinson,Delaware St.,Sr
+Noel Brown,St. Bonaventure,Sr
+Ishmael Leggett,Pittsburgh,Sr
+Carlos Rosario,Oral Roberts,Jr
+Matthew Nicholson,Northwestern,Sr
+Ricardo Wright,Kennesaw St.,Sr
+Viktor Lakhin,Clemson,Sr
+Kelton Talford,Winthrop,Sr
+Ray Harrison,Grand Canyon,Sr
+Quincy Ademokoya,South Florida,Sr
+Jordan Davis,Illinois St.,Sr
+Nick McMullen,Georgia St.,Sr
+Connor Kochera,Davidson,Sr
+Yuri Covington,UMass Lowell,Sr
+Joe Anderson,Lipscomb,Sr
+Alexander Nwagha,Northeastern,Sr
+Nique Clifford,Colorado St.,Sr
+Mason Madsen,Utah,Sr
+Gabe Madsen,Utah,Sr
+Jahmyl Telfort,Butler,Sr
+Drake Dobbs,St. Thomas,Sr
+Isaiah Johnson,Portland St.,Sr
+Donovan Newby,UNC Wilmington,Sr
+Keon Ambrose-Hylton,SMU,Sr
+Vasja Pandža,Seattle,Sr
+DeMarr Langford Jr.,Albany,Sr
+Kasen Harrison,Winthrop,Sr
+Jamari Sibley,Southern Utah,Sr
+T.J. Berger,Lafayette,Sr
+Jahlil White,La Salle,Sr
+Caleb Love,Arizona,Sr
+Hayden Curtiss,Portland St.,Sr
+Collin Holloway,Samford,Jr
+Coleman Hawkins,Kansas St.,Sr
+Jackson Sivills,Wofford,Sr
+Ze'rik Onyema,Texas,Sr
+Klemen Vuga,Arkansas Pine Bluff,Sr
+Giancarlo Rosado,Charlotte,Sr
+Will Soucie,North Alabama,Sr
+Deivon Smith,St. John's,Sr
+Andersson Garcia,Texas A&M,Sr
+Luis Kortright,Washington,Sr
+Tymu Chenery,Binghamton,Sr
+Jayson Woodrich,Oakland,Sr
+Mabor Majak,Coastal Carolina,Sr
+Deven Dahlke,San Diego,Sr
+Noah Farrakhan,Hampton,Sr
+Anwar Gill,Howard,Sr
+Robby Beasley,San Francisco,Sr
+Dean Reiber,Charlotte,Sr
+Jhamir Brickus,Villanova,Sr
+Terell Strickland,LIU,Sr
+Terrence Edwards Jr.,Louisville,Sr
+Rondel Walker,North Texas,Sr
+Michael Thomas,Louisiana,Sr
+Matthew-Alexander Moncrieffe,Seattle,Sr
+Luke O'Brien,Georgia Tech,Sr
+Tyree Ihenacho,Washington,Sr
+Mike Bekelja,Kent St.,Sr
+Robert Jeter IV,Southern Utah,Sr
+Nate Martin,Marshall,Sr
+Dylan Dawson,Texas St.,Sr
+Jordan Meka,Monmouth,Sr
+Javonte Brown,Rhode Island,Sr
+Shannon Grant,Jackson St.,Sr
+Malachi Poindexter,Illinois St.,Sr
+Bryce Thompson,Oklahoma St.,Sr
+Latrell Jossell,North Texas,Sr
+Andrew Carr,Kentucky,Sr
+Ebenezer Dowuona,James Madison,Sr
+Trey Galloway,Indiana,Sr
+Aziz Bandaogo,Cincinnati,Sr
+Bowen Born,Colorado St.,Jr
+Kian Scroggins,Sam Houston St.,Sr
+Kobe Stewart,Presbyterian,Sr
+Nendah Tarke,Towson,Sr
+Kendall Munson,Jacksonville,Sr
+London Riley,Alabama A&M,Sr
+Andrew Welage,Wright St.,Sr
+Jalen Leach,Northwestern,Sr
+Ra'Heim Moss,Oregon,Sr
+Jonathan Aybar,FIU,Jr
+Lynn Kidd,Miami FL,Sr
+Dawson Garcia,Minnesota,Sr
+Terrell Ard Jr.,Mount St. Mary's,Sr
+Monty Bowser,Northern Arizona,Sr
+Grant Huffman,Vanderbilt,Sr
+Abou Ousmane,Oklahoma St.,Sr
+Dayvion McKnight,Xavier,Sr
+Brent Davis,LIU,Sr
+Chance McMillian,Texas Tech,Sr
+Jaxson Robinson,Kentucky,Sr
+Hayden Hefner,Texas A&M,Sr
+Pat Suemnick,Oklahoma St.,Sr
+Kam Farris,Bryant,Sr
+Enoch Cheeks,Dayton,Sr
+Xavier DuSell,Nevada,Sr
+Moussa Cisse,Memphis,Sr
+Tytan Anderson,Northern Iowa,Sr
+Modestas Kancleris,Illinois Chicago,Sr
+Beon Riley,Utah Tech,Sr
+Ryan Kalkbrenner,Creighton,Sr
+Rollie Worster,Nebraska,Sr
+Darlinstone Dubar,Tennessee,Sr
+Julian Larry,Texas,Sr
+Jaden Walker,Texas A&M Corpus Chris,Jr
+Collin Moore,Grand Canyon,Sr
+Cam Bryant,Mercer,Sr
+Eugene Brown III,Georgia Southern,Sr
+Kenny Hunter,Texas Southern,Sr
+Toby Okani,West Virginia,Sr
+Tyson Acuff,Rutgers,Sr
+Dezmond McKinney,Bellarmine,Sr
+Brandyn Talbot,UT Arlington,Sr
+Abdou Tsimbila,Fordham,Sr
+Leo Colimerio,Queens,Sr
+Braxton Meah,Nebraska,Sr
+CJ Huntley,Appalachian St.,Sr
+Max Murrell,UC Santa Barbara,Sr
+Michael O'Connell,N.C. State,Sr
+Daniel Foster,Nevada,Sr
+Eddie Lampkin,Syracuse,Sr
+Jordan Ivy-Curry,UCF,Sr
+Davion Bradford,East Tennessee St.,Sr
+Caleb Dorsey,William & Mary,Sr
+Jalen Terry,Eastern Michigan,Sr
+Myles Foster,Clemson,Sr
+Lance Ware,UT Arlington,Sr
+Jakari Spence,Jacksonville,Sr
+Ty Berry,Northwestern,Sr
+Kentrell Garnett,Louisiana,Sr
+Judah Brown,South Alabama,Sr
+Justin Hill,Wichita St.,Sr
+Chaunce Jenkins,Seton Hall,Sr
+Brandon Stroud,South Florida,Sr
+Noah Collier,William & Mary,Sr
+Femi Odukale,Minnesota,Sr
+Colin Granger,Coastal Carolina,Sr
+Jalin Anderson,Incarnate Word,Sr
+Christian Shumate,McNeese St.,Sr
+Woody Newton,George Mason,Sr
+Max Burchill,South Dakota,Sr
+Mawot Mag,BYU,Sr
+Kobe Elvis,Oklahoma,Sr
+Chuck Harris,SMU,Sr
+Boubacar Coulibaly,Pepperdine,Sr
+Eduardo Andre,West Virginia,Sr
+Dain Dainja,Memphis,Sr
+Noble Crawford,Chicago St.,Jr
+Lu'cye Patterson,Minnesota,Sr
+Nelly Joseph,New Mexico,Sr
+LJ Cryer,Houston,Sr
+Zaakir Sawyer,Prairie View A&M,Sr
+Zed Key,Dayton,Sr
+Cameron Matthews,Mississippi St.,Sr
+Tony Toney,UAB,Sr
+Chaz Lanier,Tennessee,Sr
+Corey McKeithan,La Salle,Sr
+Desmond Polk,SIU Edwardsville,Sr
+Paris Dawson,Seattle,Sr
+Keith Lamar,Stephen F. Austin,Sr
+Shamir Bogues,Vermont,Sr
+"Carlton Linguard, Jr.",San Francisco,Sr
+Jabe Mullins,Montana St.,Sr
+Steven Crowl,Wisconsin,Sr
+Mitchell Saxen,Saint Mary's,Sr
+Jace Roquemore,Vermont,Sr
+Donavan Yap Jr.,San Jose St.,Sr
+D'Maurian Williams,High Point,Sr
+Jamaine Mann,Gardner Webb,Sr
+Phillip Russell,VCU,Sr
+Marques Warrick,Missouri,Sr
+Darrick Jones Jr.,Le Moyne,Sr
+Matt Zona,Fordham,Sr
+Trey Robinson,Northern Kentucky,Sr
+Jordan Sears,LSU,Sr
+Garrett Hien,Furman,Sr
+Drew Thelwell,Iowa,Sr
+Johni Broome,Auburn,Sr
+R.J. Blakney,Old Dominion,Sr
+Juhlawnei Stone,Stephen F. Austin,Sr
+Trey Thomas,Bowling Green,Sr
+Churchilll Bounds,Wagner,Sr
+Carter Gilmore,Wisconsin,Sr
+Donovan Williams,Western Michigan,Sr
+Isaiah Addo-Ankrah,Denver,Sr
+Malik Henry,UNC Greensboro,Sr
+Mady Sissoko,California,Sr
+Jamie Bergens,Fairfield,Sr
+Tanner Christensen,Hawaii,Sr
+Burke Smith,Pacific,Sr
+Mark Sears,Alabama,Sr
+Posh Alexander,Dayton,Sr
+Aidan Carpenter,Sacred Heart,Sr
+Jaemyn Brakefield,Mississippi,Sr
+Matt Cross,SMU,Sr
+Darius Burford,UT Arlington,Sr
+Earl Timberlake,Bryant,Sr
+Michael Graham,Hofstra,Sr
+Kylen Milton,Murray St.,Sr
+Rubin Jones,Michigan,Sr
+Shemar Rathan-Mayes,Mercyhurst,Sr
+Brantly Stevenson,Cal Baptist,Sr
+Steven Ashworth,Creighton,Sr
+Alijah Martin,Florida,Sr
+VonCameron Davis,Kent St.,Sr
+TJ Bamba,Oregon,Sr
+Josh Morgan,Stonehill,Sr
+Justin Vander Baan,Lafayette,Sr
+Lazar Grbovic,Eastern Illinois,Jr
+Lado Laku,Northwestern St.,Sr
+Matthew Murrell,Mississippi,Sr
+Byron Joshua,Albany,Sr
+Chase Martin,Missouri St.,Sr
+Petar Krivokapic,Pacific,Sr
+K.D. Johnson,George Mason,Sr
+Hunter Jack Madden,Abilene Christian,Sr
+Jacob Hutson,Northern Iowa,Sr
+Jackson Threadgill,Appalachian St.,Sr
+Zach Anderson,George Mason,Sr
+Will Amica,Le Moyne,Sr
+Anthony Leal,Indiana,Sr
+Dji Bailey,LSU,Sr
+Dallion Johnson,Florida Gulf Coast,Sr
+Clifford Omoruyi,Alabama,Sr
+Josh Gray,Missouri,Sr
+Brandon Whitney,Montana,Sr
+Henry Coleman III,Texas A&M,Sr
+Jabri Abdur-Rahim,Providence,Sr
+Jeremy Roach,Baylor,Sr
+Tyrin Lawrence,Georgia,Sr
+Andre Lorentsson,Toledo,Sr
+Koby Brea,Kentucky,Sr
+Hassan Diarra,Connecticut,Sr
+Zarique Nutter,Georgia St.,Sr
+Luke Barrett,Saint Mary's,Sr
+Jaron Rillie,Northern Colorado,Sr
+Norchad Omier,Baylor,Sr
+Jalen Myers,Norfolk St.,Sr
+Lamont Butler,Kentucky,Sr
+Ethan Morton,Colorado St.,Sr
+Anthony Blunt,UMass Lowell,Sr
+Micah Peavy,Georgetown,Sr
+Siem Uijtendaal,Youngstown St.,Sr
+Nehemiah Benson,Binghamton,Sr
+Xavier Bell,Wichita St.,Sr
+Baylor Hebb,UTEP,Sr
+Kellen Amos,Rice,Sr
+Nicholas Jourdain,Memphis,Sr
+Zachary Visentin,Cal St. Fullerton,Sr
+David N'Guessan,Kansas St.,Sr
+Dante Maddox Jr.,Xavier,Sr
+Henry Abraham,Coastal Carolina,Sr
+Koby Jeffries,Illinois Chicago,Sr
+Zimi Nwokeji,Jacksonville,Sr
+Dishon Jackson,Iowa St.,Sr
+Jyare Davis,Syracuse,Sr
+Obinna Anochili-Killen,Marshall,Sr
+David Early,Radford,Sr
+Ian Martinez,Utah St.,Sr
+Marcus Watson Jr.,Jackson St.,Jr
+Jaden House,Rhode Island,Sr
+Zack Austin,Pittsburgh,Sr
+Alex Holt,Mercer,Sr
+Andrej Jakimovski,Colorado,Sr
+Jaylon Gibson,Charleston Southern,Sr
+Ismael Plet,Robert Morris,Sr
+Cam Hayes,East Carolina,Sr
+Shakeel Moore,Kansas,Sr
+A.J. Hoggard,Vanderbilt,Sr
+Chibuzo Agbo,USC,Sr
+Jarrett Hensley,Southern Illinois,Sr
+Joe Munden Jr.,Northern Illinois,Sr
+Lincoln Ball,American,Sr
+Trey Townsend,Arizona,Sr
+Micah Parrish,Ohio St.,Sr
+Tyler McGhie,UC San Diego,Sr
+Khristian Lander,Western Kentucky,Sr
+Sin'Cere McMahon,Norfolk St.,Sr
+Javonté Johnson,Cal Baptist,Sr
+Evan Johnson,Maryland Eastern Shore,Sr
+"Jamal Mashburn, Jr.",Temple,Sr
+Hunter Dickinson,Kansas,Sr
+Amari Williams,Kentucky,Sr
+Johnell Davis,Arkansas,Sr
+Niels Lane,Delaware,Sr
+Ahron Ulis,Nebraska,Sr
+Kellen Tynes,Maine,Sr
+Alem Huseinovic,Rice,Sr
+JaKobe Coles,Grand Canyon,Sr
+Emory Lanier,Rice,Sr
+Darius Hannah,Bradley,Sr
+Mykell Robinson,Fresno St.,Jr
+Viktor Rajković,Seattle,Sr
+Kobe Sanders,Nevada,Sr
+Dionte Bostick,New Mexico St.,Jr
+Dyson Koehler,Weber St.,Sr
+Alston Andrews,Delaware St.,Jr
+"Sam Hines, Jr.",Southeastern Louisiana,Sr
+Derek Fountain,LSU,Sr
+Delaney Heard,Kennesaw St.,Sr
+Puff Johnson,Penn St.,Sr
+Joe Bamisile,VCU,Sr
+Taelon Peter,Liberty,Sr
+Darius Maddox,George Mason,Sr
+Davonte Davis,Oklahoma St.,Sr
+Isaiah Rivera,DePaul,Sr
+Dre Davis,Mississippi,Sr
+Matteo Picarelli,Temple,Sr
+Devontae Blanton,Eastern Kentucky,Sr
+Selton Miguel,Maryland,Jr
+Tyler Brelsford,Morehead St.,Sr
+Supreme Cook,Oregon,Sr
+Tony Perkins,Missouri,Sr
+Jamahri Harvey,Presbyterian,Sr
+Jaden Seymour,East Tennessee St.,Sr
+Jordan Geronimo,Maryland,Sr
+Max Brooks,UMass Lowell,Sr
+Chris Youngblood,Alabama,Sr
+Lamar Oden Jr.,Charleston Southern,Sr
+Zeb Jackson,VCU,Sr
+John Mikey Square,Cal St. Fullerton,Sr
+Christian Turner,Texas St.,Sr
+Tyler Patterson,Montana St.,Sr
+Ray'Sean Taylor,SIU Edwardsville,Sr
+Trey Bonham,Chattanooga,Sr
+Dwayne Koroma,Le Moyne,Jr
+Dylan Branson,Bellarmine,Sr
+Bryce Johnson,Sacred Heart,Sr
+Max Shulga,VCU,Sr
+Grant Nelson,Alabama,Sr
+Jaylin Jackson-Posey,Texas Southern,Jr
+Jayson Kent,Texas,Sr
+AJ McGinnis,Wichita St.,Sr
+JaCobi Wood,Murray St.,Sr
+Andre Weir,Kennesaw St.,Sr
+Kadary Richmond,St. John's,Sr
+Even Brauns,Iowa,Sr
+Kendal Coleman,Cal Baptist,Sr
+Kerwin Walton,Texas Tech,Sr
+Dwon Odom,Tulsa,Sr
+Jhaylon Martinez,Niagara,Sr
+Tre Coleman,Nevada,Sr
+Marcus Williams,San Francisco,Sr
+Ronald Polite III,UNC Greensboro,Sr
+Dalton Banks,Illinois St.,Sr
+Andre Curbelo,Southern Miss,Sr
+Will Pruitt,Lipscomb,Sr
+Vladislav Goldin,Michigan,Sr
+Seryee Lewis,Western Michigan,So
+Rongie Gordon,Kennesaw St.,Jr
+Caleb Lohner,Utah,Sr
+Otis Frazier III,UTEP,Sr
+Kaleb Scott,Presbyterian,Sr
+Nana Antwi-Boasiako,Stephen F. Austin,Sr
+Isaac Lindsey,South Dakota St.,Sr
+Marcellus Brigham Jr,Jacksonville St.,Sr
+Brandon Angel,Oregon,Sr
+Sheldon Edwards Jr.,Loyola Chicago,Sr
+Kobe Williamson,Seattle,Sr
+Isaiah Richards,Gardner Webb,Sr
+Mylyjael Poteat,Virginia Tech,Sr
+Ileri Ayo-Faleye,Vermont,Sr
+Szymon Zapala,Michigan St.,Sr
+Kenny White Jr.,Morehead St.,Sr
+Daniel Batcho,Louisiana Tech,Sr
+Tibet Gorener,SMU,Sr
+Max Klesmit,Wisconsin,Sr
+Sam Godwin,Oklahoma,Sr
+Kyler Filewich,Wofford,Sr
+Luke Kasubke,North Dakota St.,Sr
+Myles Tate,Appalachian St.,Sr
+Colby Brooks,San Diego,Sr
+RJ Davis,North Carolina,Sr
+C.J. Wilcher,Texas A&M,Sr
+Dylan Cardwell,Auburn,Sr
+Alex Merkviladze,Loyola Marymount,Sr
+Atin Wright,North Texas,Sr
+Jeff Woodward,Colgate,Sr
+Kyle Jenkins,Fairfield,Sr
+Mikeal Brown-Jones,Mississippi,Sr
+Ronnie DeGray III,Wichita St.,Sr
+Ace Baldwin Jr.,Penn St.,Sr
+Quinton Mincey,UMass Lowell,Sr
+Dyondre Dominguez,Arkansas St.,Sr
+Amir Nesbitt,Stonehill,Sr
+Andre Screen,Butler,Sr
+Dakota Leffew,Georgia,Sr
+DaJion Humphrey,Bowling Green,Sr
+Judson Martindale,Cal St. Northridge,Sr
+Miles Brewster,Boston University,Sr
+Anthony Morales,Kent St.,Sr
+RJ Johnson,Charleston Southern,Jr
+Bo Montgomery,UNC Wilmington,Sr
+Colin Smalls,American,Sr
+Johnny O'Neil,Santa Clara,Sr
+Matt Rogers,American,Sr
+Jalen Rucker,Army,Sr
+Jamir Watkins,Florida St.,Sr
+Alonso Faure,Pepperdine,Sr
+Emmanuel Okpomo,New Hampshire,Sr
+Josh Banks,UNC Asheville,Sr
+Floyd Rideau Jr.,North Carolina Central,Sr
+Jamille Reynolds,South Florida,Sr
+Isaiah Adams,Toledo,Sr
+Bash Wieland,Chattanooga,Sr
+Jemal Davis,UNC Asheville,Sr
+Delonnie Hunt,Richmond,Sr
+Zahree Harrison,Coppin St.,Sr
+Joe Octave,Stony Brook,Sr
+Sion James,Duke,Jr
+Austin Patterson,Montana,Jr
+Chad Venning,Boston College,Sr
+Ben Gregg,Gonzaga,Sr
+Mustapha Amzil,New Mexico,Sr
+Babacar Diallo,UMKC,So
+Carter Whitt,Belmont,Sr
+Meechie Johnson,Ohio St.,Sr
+Isaiah Folkes,Charlotte,Sr
+Sadaidriene Hall,San Jose St.,Sr
+Jordan Nesbitt,Wyoming,Sr
+Mac Etienne,La Salle,Jr
+Lysander Rehnstrom,Navy,Sr
+Stephan Swenson,UC Santa Barbara,Sr
+Paul Bruns,South Dakota,Sr
+Ethan Price,Washington St.,Sr
+Joryam Saizonou,UNC Greensboro,Sr
+Luka Savicevic,Lafayette,Sr
+Jalin Billingsley,Eastern Michigan,Sr
+Tyler Beard,Cal St. Northridge,Sr
+Malachi Ndur,William & Mary,Sr
+Jalen Weaver,Fresno St.,Sr
+Jedy Cordilia,Mount St. Mary's,Sr
+Gyasi Powell,Lipscomb,Sr
+Ryan Mutombo,Georgia Tech,Sr
+James White,New Orleans,Sr
+Eric Van Der Heijden,Campbell,Sr
+Jalen Haynes,George Mason,Sr
+Sean Pedulla,Mississippi,Sr
+Gianni Thompson,Canisius,Jr
+Terence Harcum,Murray St.,Sr
+Elijah Hutchins-Everett,James Madison,Sr
+Sione Lose,UC Davis,Jr
+Will Thomas,Morgan St.,Sr
+Aubin Gateretse,Utah St.,Sr
+Walter Clayton Jr.,Florida,Sr
+Miles Stewart,Howard,Jr
+Daeshon Shepherd,La Salle,Sr
+Luke Goode,Indiana,Sr
+Elijah Hawkins,Texas Tech,Sr
+Ty Johnson,UC Davis,Sr
+Jaylen Murray,Mississippi,Sr
+Olumide Adelodun,Niagara,Sr
+Javian McCollum,Georgia Tech,Sr
+Jared Billups,George Mason,Sr
+Primo Spears,UTSA,Jr
+Robert Vaihola,San Jose St.,Jr
+Yusef Salih,East Texas A&M,Sr
+Jalen Blackmon,Miami FL,Sr
+Kamari McGee,Wisconsin,Sr
+Connor Christensen,Dartmouth,Sr
+Romeo Myrthil,Dartmouth,Sr
+Di'Andre Howell-South,Wagner,Jr
+Maxime Raynaud,Stanford,Sr
+Sam Sherry,Elon,Sr
+Rahsool Diggins,Massachusetts,Sr
+Brandon Weston,Tennessee St.,Jr
+Zakai Zeigler,Tennessee,Sr
+Mouhamed Sow,Saint Peter's,Jr
+Clarence Rupert,Iona,Sr
+Mitch Fischer,Navy,Sr
+Marchelus Avery,Oklahoma St.,Sr
+Cole Anderson,UC Santa Barbara,Sr
+Kiran Oliver,Morgan St.,Jr
+Atiki Ally Atiki,New Mexico,Sr
+Trey Stewart,BYU,Sr
+Javon Small,West Virginia,Sr
+RJ Felton,East Carolina,Sr
+Christian Wright,Louisiana,Sr
+Alexis Reyes,Quinnipiac,Sr
+Nate Barnhart,South Dakota St.,Jr
+Ben Bowen,Denver,Jr
+Trazarien White,TCU,Sr
+Jamarii Thomas,South Carolina,Sr
+Nika Metskhvarishvili,Charlotte,Sr
+Jamond Vincent,New Orleans,Sr
+Dontrez Styles,N.C. State,Sr
+Adama Bal,Santa Clara,Sr
+Shane Nowell,Portland St.,Sr
+Tyler Rice,Hampton,Sr
+Carlos Stewart,Santa Clara,Sr
+Owen Lobsinger,Western Michigan,Sr
+Brendan Mykalcio,Gardner Webb,Sr
+Ademide Badmus,Gardner Webb,Sr
+Erik Reynolds II,Saint Joseph's,Sr
+Francis Nwaokorie,Loyola Chicago,Sr
+PJ Edwards,Grambling St.,Jr
+Darius Johnson,UCF,Sr
+Jasin Sinani,Campbell,Sr
+Johnathan Massie,North Texas,Sr
+Parker Fox,Minnesota,Sr
+Jacob Holt,Sacramento St.,Sr
+Marquis Barnett,Kent St.,Sr
+Camaron Tongue,Santa Clara,Sr
+Nikita Konstantynovskyi,Notre Dame,Sr
+AD Diedhiou,Louisiana Monroe,Sr
+AJ Allenspach,Army,Sr
+Isaiah Gray,Akron,Sr
+Chris Manon,Vanderbilt,Sr
+Sean Hansen,George Washington,Sr
+Augustas Marciulionis,Saint Mary's,Sr
+Stefan Todorovic,Pepperdine,Sr
+Zhuric Phelps,Texas A&M,Sr
+Tanner Thomas,Sacred Heart,Sr
+Markeith Browning II,Lindenwood,Sr
+Ike Cornish,Nicholls St.,Jr
+Julian Reese,Maryland,Sr
+Isaac Haney,Austin Peay,Sr
+Chace Davis,Radford,Sr
+Basheer Jihad,Arizona St.,Sr
+Seth Wilson,Akron,Sr
+George Smith,Penn,Sr
+Nick Spinoso,Penn,Sr
+Trenton McLaughlin,Northern Arizona,Sr
+Jordan Longino,Villanova,Sr
+Kenny Pohto,UC Santa Barbara,Jr
+Liam Murphy,North Florida,Sr
+Manny Obaseki,Texas A&M,Sr
+Ryan Nembhard,Gonzaga,Sr
+Matteus Case,William & Mary,Sr
+Taje' Kelly,Charleston Southern,Sr
+Julian Roper II,Notre Dame,Sr
+Brooks Barnhizer,Northwestern,Sr
+Wayne McKinney III,San Diego St.,Sr
+Jack Molloy,Yale,Sr
+Matt Knowling,USC,Sr
+Bez Mbeng,Yale,Sr
+Igor Milicic Jr.,Tennessee,Sr
+John Poulakidas,Yale,Sr
+Yassine Gharram,Yale,Sr
+Quincy Clark,UMass Lowell,Sr
+Trae Benham,High Point,Sr
+Jalen Sullinger,Kent St.,Sr
+Joe Charles,McNeese St.,Sr
+CJ Noland,New Mexico,Sr
+Alston Mason,Arizona St.,Sr
+Bijan Cortes,Wichita St.,Sr
+Coltie Young,Louisiana Monroe,Sr
+Josh Uduje,San Jose St.,Sr
+Christian Tucker,California,Jr
+Cam Carter,LSU,Sr
+Zach Martini,Rutgers,Sr
+Pedro Lopez Sanvicente,Denver,Sr
+Touko Tainamo,Wyoming,Jr
+Frankie Fidler,Michigan St.,Sr
+Caleb Furst,Purdue,Sr
+Aboubacar Traore,Louisville,Sr
+Treyton Thompson,Stetson,Jr
+Fousseyni Traore,BYU,Sr
+Brandon Love,Nevada,Sr
+Tanahj Pettway,Prairie View A&M,Sr
+Benny Williams,UCF,Sr
+Taine Murray,Virginia,Sr
+Corey Tripp,Wofford,Sr
+Luke Turner,UC Riverside,Sr
+Mekhi Collins,Nicholls St.,Sr
+Ben Nau,St. Thomas,Sr
+Noa Gonsalves,Utah Tech,Sr
+Elijah Stephens,American,Sr
+Chris Ford,Robert Morris,Sr
+Des Watson,Loyola Chicago,Sr
+Kino Lilly Jr.,Brown,Sr
+Raekwon Horton,UTSA,Jr
+Reyne Smith,Louisville,Sr
+Ben Burnham,Virginia Tech,Sr
+Lyndel Erold,Brown,Sr
+Quion Burns,Maine,Sr
+Bensley Joseph,Providence,Sr
+Darius DeAveiro,Valparaiso,Sr
+Trey Woodyard,New Hampshire,Sr
+Cesare Edwards,Georgia St.,Sr
+David Brown III,Loyola MD,Sr
+Kam Jones,Marquette,Sr
+Chris Kuzemka,Loyola MD,Sr
+Emarion Ellis,Nicholls St.,Jr
+Julian Hammond III,Colorado,Sr
+Blake Peters,Princeton,Sr
+Nate Tshimanga,New Mexico St.,Sr
+AJ Braun,Cal Baptist,Sr
+Geronimo Rubio De La Rosa,Columbia,Sr
+Ryan Kiachian,Cornell,Sr
+Ian Motta,Bucknell,Sr
+Nazir Williams,Cornell,Sr
+Elvin Edmonds IV,Bucknell,Sr
+Josh Bascoe,Bucknell,Sr
+Simas Lukosius,Cincinnati,Sr
+Zeke Mayo,Kansas,Sr
+Will McClendon,San Jose St.,Jr
+Quentin Diboundje,Rhode Island,Sr
+Jordan Roberts,Texas A&M Corpus Chris,Sr
+Jahmai Mashack,Tennessee,Sr
+Rahdir Hicks,Towson,Sr
+Kaleb Stewart,South Dakota,Sr
+Andrew McConnell,USC Upstate,Jr
+Devon Savage,Merrimack,Sr
+Noah Robledo,Columbia,Sr
+Denver Jones,Auburn,Sr
+Jake Tavroff,Columbia,Sr
+Michael Gray Jr.,Nicholls St.,Jr
+Aquan Smart,North Carolina Central,Sr
+Artese Stapleton,Eastern Illinois,Sr
+Juan Reyna III,Jackson St.,Sr
+Jayme Mitchell Jr.,Jackson St.,So
+Derrick Tezeno,Southern,Sr
+Great Osobor,Washington,Sr
+Daniel Ortiz,North Alabama,Sr
+Alex Tew,Weber St.,Sr
+Tahron Allen,Delaware,Sr
+Mike Mitchell Jr.,Minnesota,Sr
+Davon Barnes,Mississippi,Sr
+Kevin Kalu,UTEP,Sr
+Christopher Mantis,Maine,Sr
+Brayon Freeman,Bethune Cookman,Sr
+Oscar Berry,North Florida,Sr
+Niyi Olabode,UC Riverside,Sr
+Saiyd Burnside,Florida A&M,Jr
+Arthur Kaluma,Texas,Sr
+Zek Montgomery,Bradley,Sr
+Byron Ireland,Nicholls St.,Sr
+Chris Morgan,Monmouth,Sr
+Aaron Scott,St. John's,Sr
+Peter Filipovity,New Mexico St.,Sr
+Clark Slajchert,USC,Sr
+Davion Everett,South Carolina St.,Sr
+Bryce Zephir,Montana St.,Jr
+Scottie Ebube,Wyoming,Jr
+Troy D'Amico,DePaul,Sr
+Muon Reath,UNC Greensboro,Sr
+Jordan Jefferson,Little Rock,Sr
+RJ Melendez,Mississippi St.,Sr
+Chris Walker,Binghamton,Jr
+Ayodele Taiwo,Howard,Jr
+Tyson Degenhart,Boise St.,Sr
+Kobe Young,Cal St. Fullerton,Jr
+Jaeden Zackery,Clemson,Sr
+Jayden Nunn,Baylor,Sr
+Nick Kern,Penn St.,Sr
+Jalen Breazeale,Morehead St.,Jr
+Jordan Gainey,Tennessee,Sr
+Keshon Gilbert,Iowa St.,Sr
+Jalen DeLoach,Loyola Chicago,Sr
+Brandon Johnson,Miami FL,Sr
+Blake Barker,Army,Sr
+"Corey Floyd, Jr.",Providence,Jr
+Sam Alajiki,Oral Roberts,Sr
+Kyrell Luc,Longwood,Sr
+Caleb Kenney,Holy Cross,Sr
+Saint Thomas,USC,Sr
+Tyrese Hunter,Memphis,Sr
+Ja'Vier Francis,Houston,Sr
+Dominic Muncey,San Diego,Sr
+Malik Lamin,Southern Utah,Sr
+Jamiya Neal,Creighton,Sr
+Will Richard,Florida,Sr
+Ben Middlebrooks,N.C. State,Sr
+Ja'Heim Hudson,Auburn,Jr
+Jackie Johnson III,Fordham,Sr
+Miles Kelly,Auburn,Sr
+Jalon Moore,Oklahoma,Sr
+"Dallan ""Deebo"" Coleman",UCF,Sr
+Jarvis Moss,Radford,Sr
+Enoch Boakye,Villanova,Sr
+Rafael Pinzon,Bryant,Sr
+Wesley Cardet,Providence,Sr
+Jaylen Blakes,Stanford,Sr
+Birima Seck,Fairfield,Sr
+Joe Ostrowsky,Central Connecticut,Sr
+Davonte Sweatman,Central Connecticut,Sr
+Babacar Faye,Western Kentucky,Sr
+Sean Durugordon,Old Dominion,Jr
+Dylan Hayman,Incarnate Word,Sr
+Samson Johnson,Connecticut,Sr
+Jace Carter,Texas A&M,Sr
+Filip Skobalj,Illinois Chicago,Sr
+Jordan Wildy,Lindenwood,Jr
+Sekou Kalle,Eastern Illinois,Sr
+Kobe Johnson,Saint Louis,Sr
+Roger McFarlane,Boston College,Sr
+Brody Peebles,Belmont,Sr
+Joshua Streit,Nebraska Omaha,Jr
+Camryn Weston,Middle Tennessee,Sr
+D'Marco Dunn,Penn St.,Sr
+Andrew Morgan,Nebraska,Sr
+Justin Bufford,Middle Tennessee,Sr
+Alvaro Cardenas,Boise St.,Sr
 Myron Amey Jr.,Loyola Marymount,Sr
-Marcus Banks,Massachusetts,Sr
-Boopie Miller,SMU,Sr
-Amar’e Marshall,St. Bonaventure,Sr
-Ali Dibba,Texas A&M,Sr
-Zine Eddine Bedri,Columbia,Sr
-Aleks Szymczyk,Cal St. Northridge,Jr
-KyeRon Lindsay-Martin,UAB,Jr
-Jack Doumbia Jr.,Towson,Sr
-DeJuan Campbell,California,Sr
-Jermaine Ballisager Webb,Portland,Sr
-Dan Skillings Jr.,Baylor,Sr
-B.B. Knight,Lamar,Jr
-"Anthony Arrington, Jr.",Mount St. Mary's,Jr
-Zach Davis,Memphis,Sr
-Dre Bullock,Hawaii,Sr
-Angel Montas Jr.,UMass Lowell,Jr
-Cam Haffner,Western Kentucky,Sr
-George Beale Jr.,UCF,Sr
-Ben Vander Wal,Furman,Sr
-Matt Hayman,Arkansas St.,Sr
-MJ Russell,Louisiana Monroe,Jr
-Elijah Chol,UC Irvine,Jr
-Tobi Lawal,Virginia Tech,Sr
-Chandler Pigge,Harvard,Sr
-Yuto Yamanouchi-Williams,Oral Roberts,Jr
-CJ Jones,Kansas St.,Sr
-Mike Walz,Richmond,Sr
-Malik Messina-Moore,Xavier,Sr
-Juanse Gorosito,San Diego,Sr
-Maurice Odum,Arizona St.,Sr
-"Jerome Brewer, Jr.",La Salle,Sr
-Greedy Williams,UNC Wilmington,Sr
-Samuel Murray,Mississippi Valley St.,Jr
-Carl Daughtery Jr.,UC Davis,Sr
-Larry Hughes II,Cal St. Northridge,Sr
-"Darin Smith, Jr.",Central Connecticut,So
-Trey Horton,UTEP,Jr
-Takai Simpkins,Oregon,Sr
-Kennard Davis Jr.,BYU,Jr
-Curtis Williams Jr.,Tulane,Jr
-Mike Evbagharu,Canisius,Jr
-Sasa Ciani,Penn St.,Jr
-Trent Middleton Jr.,North Carolina A&T,Jr
-"Teddy Washington, Jr.",Chattanooga,Sr
-Jacolb Fredson-Cole,McNeese St.,So
-Misha Bednostin,Lafayette,Jr
-Keyon Kensie Jr.,Portland St.,Jr
-Hamed Olayinka,FIU,Sr
-J.C. Riley Jr.,Northwestern St.,Sr
-Hasan Abdul Hakim,Memphis,Sr
-Darryl Simmons,St. Bonaventure,Jr
-Ronald Jessamy,Cal St. Bakersfield,Jr
-"Jamie Kaiser, Jr.",Butler,So
-Ace Talbert,Gardner Webb,Jr
-Carson Schwieger,Queens,So
-Jadin Collins-Roberts,Marist,Jr
+Zavian McLean,Florida Gulf Coast,Sr
+O'Mar Stanley,Boise St.,Sr
+Tevin Smith,Cleveland St.,Sr
+Jalen Miller,Oral Roberts,Sr
+Chucky Hepburn,Louisville,Sr
+Ernest Ross,Grambling St.,Sr
+Abdoulaye Thiam,High Point,Sr
+Breon Pass,N.C. State,Sr
+Pierre Brooks,Butler,Sr
+Jaden Akins,Michigan St.,Sr
+Nate Santos,Dayton,Sr
+Vasilije Vucinic,Weber St.,Sr
+Chika Nduka,Montana St.,Sr
+Kobe Johnson,UCLA,Sr
+Isaiah Caldwell,Army,Sr
+Bent Leuchten,UC Irvine,Sr
+Trey Edmonds,Minnesota,Sr
+Keller Boothby,William & Mary,Sr
+Hubertas Pivorius,Northern Kentucky,Sr
+Sam Vinson,Northern Kentucky,Sr
+Zach Hicks,Penn St.,Sr
+Ben Knostman,Lehigh,Sr
+AJ Burgin,Idaho St.,Sr
+Trey Hicks,Longwood,Sr
+Cli'ron Hornbeak,Kent St.,Sr
+Keith Higgins Jr.,Lehigh,Sr
+Jaylani Darden,Norfolk St.,Sr
+Tyler Whitney-Sidney,Lehigh,Sr
+Tamar Bates,Missouri,Sr
+Curt Hopf,Bellarmine,Sr
+Landin Hacker,Bellarmine,Jr
+Jayden Brown,Central Connecticut,Sr
+Guy Ragland Jr.,Cornell,Sr
+Ja'Sean Jackson,Lamar,Sr
+Cameron Jernigan,Chicago St.,Sr
+Wade Taylor IV,Texas A&M,Sr
+EJ Farmer,Youngstown St.,Sr
+Glenn Taylor Jr.,Oklahoma,Sr
+Marcus Banks,UMBC,Sr
+Boopie Miller,SMU,So
+Jasman Sangha,Canisius,Sr
+Amar’e Marshall,Albany,Jr
+Jason Roche,Richmond,Sr
+Jaquan Carlos,Syracuse,Sr
+Tyrel Morgan,Texas St.,Sr
+Jackson Price,Marist,Sr
+Bryce Johnson,UMBC,Sr
+Payton Sparks,Ball St.,Sr
+Jacobi Wright,South Carolina,Sr
+Ali Dibba,Southern Illinois,Jr
+Jahsean Corbett,Duquesne,Jr
+Matthew Marsh,Oregon St.,Jr
+Lazar Stefanovic,UCLA,Sr
+Sai Witt,Austin Peay,Sr
+Bostyn Holt,Florida St.,Sr
+Sebastian Thomas,Rhode Island,Sr
+Khalil Brantley,Oklahoma St.,Sr
+Marcus Randolph,Saint Peter's,Jr
+Shane Dezonie,Temple,Jr
+Noah Reynolds,TCU,Sr
+Darius Ford,Alabama A&M,Sr
+Gabe Dorsey,William & Mary,Sr
+David Joplin,Marquette,Sr
+KJ Adams,Kansas,Sr
+Stevie Mitchell,Marquette,Sr
+Payton Sandfort,Iowa,Sr
+Lamaj Lewis,Loyola Marymount,Sr
+Matthew Cleveland,Miami FL,Sr
+Philip Byriel,Princeton,Sr
+Andre Snoddy,Stony Brook,Jr
+Lawson Lovering,Utah,Sr
+Elias Cato,Central Arkansas,Sr
+AJ Clayton,Ohio,Sr
+Brandon Huntley-Hatfield,N.C. State,Sr
+Jonas Aidoo,Arkansas,Sr
+Hercy Miller,Southern Utah,Sr
+Roosevelt Wheeler,East Tennessee St.,Sr
+Bobby Pettiford,High Point,Sr
+Matt Allocco,Notre Dame,Sr
+Jalen Lake,Colorado St.,Sr
+Aaron Cooley,Brown,Sr
+Jalen Ware,Maryland Eastern Shore,Sr
+Bradley Ezewiro,UAB,Sr
+Efton Reid,Wake Forest,Sr
+Brandon Murray,McNeese St.,Sr
+Kario Oquendo,SMU,Jr
+Lucas Taylor,Syracuse,Sr
+Anthony Pritchard,Central Michigan,Sr
+Leo DeBruhl,UC Davis,Sr
+Cameron Hildreth,Wake Forest,Sr
+Duke Deen,Bradley,Sr
+Wooga Poplar,Villanova,Sr
+Sam Lecholat,Montana St.,Sr
+Jaren Johnson,Howard,Sr
+Dusan Neskovic,Richmond,Sr
+Gabriel McKay,Liberty,Sr
+Ian Schieffelin,Clemson,Sr
+Curtis Jones,Iowa St.,Sr
+D.J. Hughes,East Tennessee St.,Sr
+Jayden Taylor,N.C. State,Sr
+Nicolas Louis-Jacques,Colgate,Sr
+"Antonio ""TJ"" Madlock",Alabama St.,Sr
+Claudell Harris Jr.,Mississippi St.,Sr
+Nolan Hickman,Gonzaga,Sr
+Hunter Sallis,Wake Forest,Sr
+CJ Fulton,Charleston,Sr
+Ivan Reynolds,Houston Christian,Sr
+TJ Gadsden,Hofstra,Sr
+Ahamad Bynum,UTEP,Jr
+Ansley Almonor,Kentucky,Sr
+JC Harris,UMBC,Sr
+Daniel Umoh,Mississippi Valley St.,Sr
+Byron Brown,Air Force,Sr
+Ethan Taylor,Air Force,Sr
+Jeffrey Mills,Air Force,Sr
+Beau Becker,Air Force,Sr
+Timmy Adedire,North Carolina Central,Sr
+Justus Jackson,Tennessee St.,Jr
+Evan Nelson,Harvard,Sr
+Zach Riley,Fordham,Sr
+Justice Smith,Niagara,Sr
+Jack Wistrcill,Northern Arizona,Jr
+Jah Nze,Mercer,Jr
+Cedric Coward,Washington St.,Sr
+Kendall Blue,St. Thomas,Jr
+Rasheer Fleming,Saint Joseph's,Jr
+Cooper Craggs,Oakland,So
+Saxby Sunderland,Chicago St.,Jr
+Colby McAllister,The Citadel,Jr
+AJ Smith,Charleston,So
+D'Ante Bass,Alabama St.,Jr
+Quadir Pettaway,Presbyterian,Jr
+Zine Eddine Bedri,Columbia,Jr
+Brayden Reynolds,Fairleigh Dickinson,Jr
+Tauris Watson,West Georgia,Jr
+Brian Mathews,North Dakota,Sr
+Nathan McGill,Stonehill,Sr
+Christopher Melis,Stonehill,Sr
+Quincy McGriff,Alabama A&M,So
+Jason Hart Jr.,Long Beach St.,So
+Tavi Jackson,Southern Utah,Jr
+KyeRon Lindsay,Murray St.,Jr
+Jack Doumbia,Wright St.,Sr
+Isaiah Swope,Saint Louis,Sr
+Jack Mielke,Southern Indiana,Sr
+Ryan Hall,Southern Indiana,Jr
+Josh Mitchell,Alcorn St.,Sr
+Cameron Huefner,Sam Houston St.,Sr
+AJ Ferguson,Murray St.,Sr
+Cobie Montgomery,Southern Miss,Sr
+Jah Quinones,Mercer,Jr
+Samuel Gibbs,Loyola MD,Jr
+Japhet Medor,Fordham,Sr
+Adam Hamilton,Lamar,Sr
+Eric Mulder,Purdue Fort Wayne,Jr
+Lorenzo Downey,Alabama A&M,Sr
+Aaron Gray,Indiana St.,Sr
+Arturo Dean,Oklahoma St.,Jr
+JaVaughn Hannah,Western Michigan,Jr
+Jacob Wilson,Louisiana Monroe,Jr
+Jermaine Ballisager Webb,Portland,Jr
+Ante Brzovic,Charleston,Sr
+Thomas Tut,Southeastern Louisiana,Jr
+Chase Robinson,Cleveland St.,Sr
+Jackson Fields,Troy,Jr
+Andre Young,Rider,Jr
+Jonathan Dunn,Coppin St.,So
+Christian Davis,Bradley,Sr
+Jonnivius Smith,UTSA,Sr
+Trey Miller,UT Rio Grande Valley,Jr
+Peter Carey,Siena,So
+Ugnius Jarusevicius,Central Michigan,Jr
+Demetrius Davis,UNC Greensboro,Sr
+Dan Skillings Jr.,Cincinnati,Jr
+Anthony Arrington,Wofford,Jr
+Zachary Davis,South Carolina,Jr
+Bryce Baker,Winthrop,Jr
+Mason Nicholson,Jacksonville St.,Jr
+Quandre Bullock,South Dakota,Sr
+AJ McKee,Milwaukee,Sr
+K.T. Raimey,UT Rio Grande Valley,Sr
+Alex Horiuk,Southern Indiana,Jr
+Adante’ Holiman,Georgia Southern,Jr
+Rodolfo Rufino Bolis,Eastern Illinois,Sr
+Zach Reinhart,Arkansas Pine Bluff,Jr
+Gregg Glenn III,Tulane,Jr
+Kalib Mathews,Queens,Sr
+Paxton Davidson,The Citadel,So
+Jack Scott,Princeton,Jr
+Caden Pierce,Princeton,Jr
+RJ Greene,Wagner,Jr
+Angel Montas Jr.,Mercer,Jr
+Elijah Gray,Temple,Jr
+"Aaron Price, Jr.",Cal Poly,Jr
+Drey Carter,Wright St.,So
+Emeka Nnaji,Grambling St.,So
+Walter Hamilton,Mississippi Valley St.,Sr
+Khaliq Abdul-Mateen,East Texas A&M,Sr
+Paul McMillan IV,Canisius,Jr
+Cameron Haffner,Evansville,So
+Danny Wolf,Michigan,Jr
+Nate Pickens,UC Riverside,Jr
+John Wade III,Southern Miss,Sr
+Christian Moore,Arkansas Pine Bluff,Jr
+Massal Diouf,Western Illinois,Jr
+George Beale Jr.,Hampton,Jr
+Yanic Konan Niederhauser,Penn St.,Jr
+Armandas Plintauskas,Merrimack,Jr
+Knute Wood,Tennessee St.,So
+Keionte Cornelius,Alcorn St.,Jr
+Ben Shtolzberg,UC Santa Barbara,Jr
+Halil Barre,Duquesne,Jr
+Terrance Ford Jr.,Arkansas St.,So
+Dane Erikstrup,Washington St.,Sr
+Da'Sean Nelson,Eastern Michigan,Sr
+Daniel Braster,Alcorn St.,Jr
+AJ Brown,Ohio,So
+Shahar Lazar,Gardner Webb,So
+Louis Bleechmore,Fairfield,Sr
+Trey Thomas,Bethune Cookman,Jr
+Jordan Crawford,Louisiana Tech,Jr
+Deon Perry,Fairfield,Jr
+Freds Pauls Bagatskis,Le Moyne,Jr
+JJ White,Nebraska Omaha,Sr
+Jayhlon Young,Maryland,Sr
+Devan Sapp,UMBC,Sr
+Bernard Pelote,Western Carolina,Sr
+Caleb Robinson,Nicholls St.,Sr
+Tony Felder,Radford,Jr
+Matt Hayman,Stephen F. Austin,Sr
+Jalil Beaubrun,Appalachian St.,Sr
+Dantwan Grimes,Tarleton St.,Sr
+Amarr Knox,Alabama St.,Jr
+Kendal Parker,Mississippi Valley St.,Jr
+Masen Miller,North Dakota St.,Sr
+Tobi Lawal,Virginia Tech,Jr
+Naz Brown,Coastal Carolina,So
+Elijah Ormiston,South Alabama,Sr
+Julian Lual,Alcorn St.,Sr
+Jesaiah McWright,Tulsa,Jr
+Trey Pettigrew,Eastern Michigan,So
+Zek Tekin,Le Moyne,Jr
+Chandler Pigge,Harvard,Jr
+Xavier Brown,James Madison,Jr
+Dae Dae Hunter,New Orleans,Jr
+Jaret Valencia,Monmouth,So
+Devin Ceaser,Old Dominion,Jr
+Jason Drake,Drexel,Jr
+CJ Jones,Kansas St.,Jr
+JR Jacobs,New Orleans,So
+Mike Walz,Richmond,Jr
+Javier Ezquerra,Wagner,Sr
+Derick Hamilton,UTEP,Sr
+Sean Moore,UNC Wilmington,Sr
+Tyrese Proctor,Duke,Jr
+Nico Nobili,Boston University,Jr
+Chandler Baker,Colgate,Sr
+Justin Morgan,Murray St.,Jr
+Julian Brown,Samford,So
+Kentrell Pullian,Milwaukee,Sr
+Marko Maletic,Western Illinois,Sr
+Max Jones,Kansas St.,Sr
+Malik Moore,Montana,So
+Josh Ojianwuna,Baylor,Jr
+Yoro Diallo,Winthrop,So
+BJ Freeman,Arizona St.,Sr
+Elijah Walsh,Campbell,Jr
+"John Lovelace, Jr.",Milwaukee,Jr
+AJ Lesburt Jr.,Brown,Jr
+Chancellor White,Louisiana,So
+Derrin Boyd,Charleston,Sr
+Trent Scott,Morehead St.,So
+Adou Thiero,Arkansas,Jr
+RJ Luis Jr.,St. John's,Jr
+Juanse Gorosito,Ball St.,Jr
+Moe Odum,Pepperdine,Jr
+Jaden Grant,FIU,Sr
+Greedy Williams,UNC Wilmington,Jr
+Abramo Canka,Stetson,Jr
+Jameel Brown,Temple,Jr
+Jordan Tillmon,Prairie View A&M,Sr
+Will Richardson,Fordham,Jr
+Carl Daughtery Jr.,UC Davis,Jr
+Reggie Bass,Lindenwood,Jr
+Pierce Bazil,Houston Christian,Jr
+Stone Hutchings,Utah Tech,So
+Shahid Muhammad,Massachusetts,Jr
+Steven Tipton,Northern Illinois,Jr
+Samage Teel,Indiana St.,Sr
+Dylan Canoville,Jackson St.,Jr
+Wesley Robinson,Manhattan,Sr
+Jeremy Lorenz,Wofford,So
+Christian Cook,New Mexico St.,Sr
+Xzavier Lino,UMass Lowell,Sr
+Gavin Davis,UC Riverside,Jr
+Mackenzie Mgbako,Indiana,So
+Marquese Josephs,Western Michigan,So
+"Darin Smith, Jr.",Central Connecticut,Fr
+Trey Horton,UTEP,So
+Hayden Gray,UC San Diego,Sr
+Bryce Cash,Queens,So
+Quentin Bolton Jr.,Arkansas Pine Bluff,Jr
+Pip Ajayi,Bucknell,Sr
+AJ Lux,Bellarmine,So
+Julian Vaughns,Sacramento St.,Jr
+Carson Prost,Eastern Illinois,Sr
+Corey Sawyer Jr,Eastern Illinois,Sr
+TK Simpkins,Elon,Jr
+Kevin Patton Jr.,USC,So
+Aaron Smith,Alabama A&M,So
+Kailon Nicholls,Northern Illinois,So
+Doug Young,Quinnipiac,Sr
+Jeffrey Langston Jr.,Southern Utah,Sr
+Marcus Boykin,Sam Houston St.,Sr
+David Tubek,Seton Hall,So
+Stephen Olowoniyi,Southern Indiana,So
+EJ Neal,Sacramento St.,Sr
+JT Warren,Northwestern St.,Jr
+Jake Goldberg,NJIT,So
+Duane Thompson,St. Bonaventure,Fr
+Kennard Davis Jr.,Southern Illinois,So
+Christian Kirkland,Youngstown St.,Fr
+Kaleb Glenn,Florida Atlantic,So
+Curtis Williams Jr.,Georgetown,So
+Ametri Moss,North Florida,Sr
+Amar Kuljuhovic,North Dakota,Sr
+Deng Mayar,North Dakota,Sr
+Reece Potter,Miami OH,So
+Ruben Rodriguez,Rider,So
+Ife West-Ingram,Rider,So
+Spencer Mahoney,California,Fr
+TJ NeSmith,Radford,Sr
+Clayton Southwick,Stephen F. Austin,Sr
+JJ Taylor,UCF,So
+Aidan Harris,Saint Francis,So
+Latrell Davis,San Jose St.,So
+Landon Glasper,North Carolina A&T,Jr
+Donovan Sanders,Mississippi Valley St.,Sr
+Jerry Deng,Florida St.,So
+DeShawn Harris-Smith,Maryland,So
+Carnegie Johnson,Navy,So
+Michael Pajeaud,Alcorn St.,Sr
+Kris Parker,Villanova,Fr
+Levi Lawal,NJIT,So
+Mason Williams,Eastern Washington,So
+Zion Stanford,Temple,So
+Kyle Layton,Tennessee Tech,So
+Michael Evbagharu,Central Arkansas,So
+Louie Semona,Stonehill,So
+"Orlando Horton, Jr.",Prairie View A&M,So
+Matthew Reed,Tulsa,So
+Mier Panoam,North Dakota,So
+Myles Jenkins,Stephen F. Austin,Sr
+Rich Byhre,St. Thomas,Sr
+Nasir DeGruy,Abilene Christian,Jr
+Sasa Ciani,Illinois Chicago,So
+Ryan Bolton Jr.,Prairie View A&M,Fr
+Kyson Rose,Idaho,Sr
+Amahrie Simpkins,Morgan St.,Sr
+Demajion Topps,Morgan St.,Jr
+Blaise Threatt,Weber St.,Sr
+Michael Day,Evansville,So
+Gui Tesch,Evansville,So
+Julius Ellerbe III,Coppin St.,Sr
+Trent Middleton Jr.,Delaware,So
+Trevor Smith,Hampton,So
+Grant Gondrezick II,Detroit Mercy,Fr
+Kendall Campbell,Elon,So
+DQ Cole,Oakland,Sr
+Kobe Newton,Wyoming,Sr
+Nathan Johnson Jr.,Lindenwood,Sr
+David Wilkerson,Youngstown St.,So
+Jazz Gardner,Pacific,So
+Kendall Hailey,Army,So
+Markell Petro,Mississippi Valley St.,Sr
+Bobby Rosenberger,Saint Francis,So
+"Teddy Washington, Jr.",Southeast Missouri St.,Sr
+Brian Goracke,Montana St.,Sr
+Jonathan Pierre,Belmont,Sr
+Darik Dissette,North Dakota St.,So
+Myles Che,UC Irvine,So
+Jay Alvarez,Rider,Sr
+Alex Bates IV,Stonehill,So
+Vasean Allette,TCU,So
+Jamyron Keller,Oklahoma St.,So
+Mayuom Buom,South Dakota,Sr
+PJ Hayes,Rutgers,Sr
+Ben Fox,Central Arkansas,Fr
+Dylan Mclean,Alabama A&M,Sr
+Clance Crosby,Alabama A&M,Sr
+Aric Demings,Monmouth,So
+Takai Hardy,Idaho,So
+Bragi Gudmundsson,Campbell,So
+Obadiah Curtis,Eastern Illinois,Jr
+Misha Bednostin,Lafayette,So
+Chaney Johnson,Auburn,Sr
+Juslin Bodo Bodo,High Point,So
+Porter Bazil,Houston Christian,So
+Daniel Loos,Austin Peay,Sr
+Jensen Bradtke,Montana,Fr
+Hamed Olayinka,Samford,So
+Saliou Seye,Alabama A&M,Jr
+Hasan Abdul Hakim,UT Rio Grande Valley,Sr
+Ja'Derryus Eatmon,Florida A&M,Sr
+PJay Smith,Furman,Sr
+Ubong Okon,Alabama St.,Jr
+CJ Hines,Alabama St.,Sr
+Brentay Noel,Southern,Jr
+Michael Wilson,Sacramento St.,So
+Darryl Simmons II,Gardner Webb,So
+Ronald Jessamy,Tennessee St.,So
+Dillon Bailey,Wofford,Sr
+Davin Cosby Jr.,Wake Forest,So
+Jordan Jones,Central Connecticut,Sr
+Marlon Short,UMBC,Jr
+Ryan Nutter,Marshall,So
+Kameron Hobbs,Morgan St.,Sr
+Ladji Dembele,Iowa,So
+Mathok Majok,Oral Roberts,So
+Bowyn Beatty,Sacramento St.,So
+Ace Talbert,Saint Francis,So
+Antwan Robinson,Cal St. Fullerton,So
+Keith Richard,Cal St. Fullerton,So
+Carson Schwieger,Valparaiso,Fr
+Jadin Collins-Roberts,Marist,So
+Caleb McCarty,South Carolina St.,Sr
+Mitchell Taylor,South Carolina St.,So
+Ryan Forrest,North Carolina A&T,So
+Akil Watson,Massachusetts,So
+Aniwaniwa Tait-Jones,UC San Diego,Sr
+Duncan Reid,Southern Utah,So
+Omar Cooper,McNeese St.,Sr
+TJ Ford Jr.,Incarnate Word,So
+K.J. Doucet,Winthrop,Sr
+Jason Steele,LIU,So
 Gytis Nemeiksa,Hawaii,Sr
-Solo Ball,Connecticut,Jr
-"Dennis Parker, Jr.",Radford,Jr
-Fatt Hill,George Mason,Sr
-Nilavan Daniels,Providence,So
-Ibrahim Olajuwon,FIU,Jr
-Taj Glover,Sacramento St.,Fr
-Karl Poom,Northern Arizona,So
-Darius Robinson,SIU Edwardsville,Sr
-"Ryan Jackson, Jr.",William & Mary,So
-Sash Gavalyugov,Santa Clara,Fr
+Varick Lewis,Long Beach St.,So
+Shawn Fulcher,Alabama St.,So
+Lloyd McVeigh,Buffalo,So
+Stephon Roberts,Saint Peter's,Sr
+Mintautas Mockus,Incarnate Word,Fr
+Nemanja Sarenac,Weber St.,Fr
+Adam Moussa,Cal Baptist,Sr
+Diogo Seixas,Central Arkansas,So
+Collin Murray-Boyles,South Carolina,So
+Joshua Strong,Howard,Sr
+Tana Kopa,Canisius,Sr
+Ben Palacios,Boston University,Sr
+Enoch Kalambay,Western Kentucky,Sr
+Rodrick Payne,Western Illinois,Sr
+Derrick Butler,Bowling Green,Sr
+"Dennis Parker, Jr.",N.C. State,So
+Jah Short,New Orleans,So
+Tomiwa Sulaiman,Towson,Sr
+Julian Scott,Colgate,So
+Wesley Oba,Missouri St.,Sr
+Caleb Surgers,Delaware St.,So
+Denzel Hines,Coastal Carolina,So
+Tyje Kelton,Wagner,Sr
+Unisa Turay,Utah Tech,Sr
+Tanner Cuff,Evansville,Sr
+Cowandric Samuel,Jackson St.,Sr
+Rasheed Bello,Purdue Fort Wayne,Sr
+Luke Kearney,Air Force,So
+Dilen Miller,Robert Morris,Fr
+Amier Ali,Arizona St.,Fr
+Jase Richardson,Michigan St.,Fr
+Thompson Camara,Charleston Southern,Jr
+Sam Duskin,Air Force,Fr
+Dillan Baker,Northern Arizona,Jr
+David Hermes,UTSA,Jr
+Leigh Rickwood-Pitt,Northern Arizona,Jr
+Tre Johnson,Texas,Fr
+Josh Massey,Stetson,Sr
+Jon Mani,Denver,Fr
+Sam Stockton,Eastern Washington,Jr
+DaSean Stevens,Seattle,Jr
+Jake O'Neil,Idaho St.,Sr
+Mozae Downing-Rivers,Missouri St.,Jr
+Pavle Misic,Utah Tech,Fr
+Drake Powell,North Carolina,Fr
+Camerin James,East Texas A&M,So
+Stoney Hadnot,South Dakota St.,Fr
+Derik Queen,Maryland,Fr
+Cantia Rahming,South Alabama,Sr
+Jayden Mott,Northern Illinois,Fr
+Danquez Dawsey,Lamar,Sr
+Kalil Camara,Bethune Cookman,Sr
+Walt Andrews Jr.,NJIT,Fr
+TJ Thomas,East Texas A&M,Jr
+Robert Smith,Delaware St.,Sr
+Greg Moore,Mississippi Valley St.,Jr
+Jermahri Hill,Ball St.,Jr
+Frederiks Meinarts,Buffalo,Fr
+Brayden Jackson,Buffalo,Fr
+Tyson Dunn,Buffalo,Sr
+Declan Dillon,SIU Edwardsville,Jr
+Connor Dillon,Bradley,Sr
+Taj Au-Duke,Pepperdine,Fr
+Isaac Parson,North Carolina Central,Sr
+Micah Smith,Georgia Southern,Fr
+Braylhan Thomas,Georgia Southern,Fr
+Jayvon Maughmer,Liberty,Sr
+Arthur Tate,Mississippi Valley St.,Jr
+Owen Koonce,Cal Poly,Sr
+George Kimble III,Eastern Kentucky,So
+Cael Schmitt,Northern Iowa,Sr
+Caleb Jones,Arkansas Pine Bluff,Fr
+Saadiq Moore,Weber St.,Fr
+Kayden Carter,Western Illinois,So
+Jocobi Hendricks,Florida A&M,Sr
+Jamine Charles,Florida A&M,Jr
+Kon Knueppel,Duke,Fr
+Khaman Maluach,Duke,Fr
+Blake Lander,LIU,Jr
+Nathan Dudukovich,IU Indy,So
+Devin Brafford,Siena,Fr
+Luke Anderson,James Madison,Sr
+Kole Williams,FIU,Fr
+Nate Deer,Texas St.,Jr
+David Murray,Merrimack,Sr
+Isaac Jessup,Cal Poly,Sr
+Brennen Burns,Sam Houston St.,Jr
+Jaqai Murray,North Carolina Central,Jr
+Andrew Nagy,Long Beach St.,Fr
+Christian Reid,Southern Miss,Fr
+Aaron Potter,Texas A&M Corpus Chris,Jr
+Darius Robinson Jr.,Oral Roberts,Jr
+John-Paul Ricks,Prairie View A&M,Jr
+Elijah Terry,Prairie View A&M,Jr
+Josh Ijeh,UMKC,Jr
+Tyler Johnson,Mercer,Sr
+Nehemiah Turner,Central Arkansas,Fr
+Jarrell Love,Bethune Cookman,Jr
+Frank Champion,Chattanooga,Sr
+Deonte Williams,Sacramento St.,Jr
+Leo Ricketts,Sacramento St.,Fr
+Kade Ruegsegger,Morehead St.,Sr
+Max Jusianiec,Mercyhurst,Jr
+Leland Coleman,New Orleans,Fr
+Theo Grant,New Orleans,Jr
+Jakob Gibbs,Marshall,Sr
+Cade Gibbs,Marshall,Sr
+Kai Johnson,Montana,Jr
+Damarion Walkup,Southeast Missouri St.,So
+Jose Cuello,Maryland Eastern Shore,Jr
+Kyrell Shaw,Maryland Eastern Shore,Fr
+Mitch Mascari,Drake,Sr
+Doryan Onwuchekwa,Georgia Tech,Fr
+Trevor Baskin,Colorado,Sr
+Roee Oselka,Green Bay,Fr
 Bernie Blunt,Mercyhurst,Sr
-"Juan Cranford, Jr.",Eastern Kentucky,So
-Melo Baines,Norfolk St.,So
-Deuce Jones II,Saint Joseph's,So
-Zion Wilburn,Samford,So
-Biggie Patterson,Hofstra,Sr
-Makoi Mabor Makoi,UNC Wilmington,So
-Dan Gherezgher,Northern Kentucky,Sr
-Damarien Yates,Alabama St.,Jr
-D'Shay Knights Wright,South Carolina St.,So
-Todd Jones Jr.,Louisiana,So
-Josiah Moore,Tulane,So
-R.J. Kennedy,New Hampshire,Fr
-Tajuan Simpkins,Seton Hall,So
-George Natsvlishvili,North Dakota,Jr
-Luca Schaller,Northeastern,So
-Jaiden Glover-Toscano,Saint Joseph's,So
-Matija Žužic,West Georgia,Sr
-Calvin Robins Jr.,Howard,So
-Abdulai Fanta Kabba,Western Carolina,So
-Fedor Zugic,Creighton,Jr
-Chris Davis Jr,Charleston,Fr
-"Dwayne Wimbley, Jr.",Massachusetts,Fr
-Rontavious Blackshear,Youngstown St.,Jr
-Hantz Louis Jeune,South Alabama,Sr
-Ed Holland III,Howard,Sr
-Chris Cenac Jr,Houston,Fr
-Eddie Placer,Wagner,Jr
-Drew Fuquay,Marshall,Jr
-Samuel Nosakhare,Quinnipiac,Fr
-"Will James, Jr.",Toledo,Fr
-"Mario Tatum, Jr.",VMI,Fr
-"Jason Thirdkill, Jr.",Jacksonville,Sr
-Matija Samar,Oregon St.,Fr
-Bryan Akanmu,Wagner,Jr
-Kiwane Garris Jr,Cal St. Fullerton,Fr
-Cam McDowell,Tarleton St.,Sr
-Cam Wilds,Robert Morris,Sr
-"Donald Whitehead, Jr.",UNC Greensboro,Sr
-Sherman Weatherspoon IV,Utah Valley,Jr
-Jordan Muller,Cal Baptist,Fr
-"Rob Lee, Jr.",Lamar,Jr
-Eric Chatfield Jr,Georgia Tech,Fr
-Matheo Coffi,UTSA,Fr
-Tijan Saine Jr.,Weber St.,Jr
-Chris Kumu,Canisius,Fr
-Lateef Patrick Jr,Stephen F. Austin,Jr
-Guillermo Del Pino,Maryland,Fr
-Trey Williams Jr,Missouri St.,Fr
-Aiden Goins,Bowling Green,Jr
-Ayomi Odetoyinbo,Colgate,Fr
-"Fawaz ""Tacko"" Ifaola",Colorado,Fr
-Derrick Talton Jr,Buffalo,Sr
-Rashund Washington Jr,Illinois Chicago,Fr
-CJ Evans,UMKC,Jr
-Trey Booker-Lowery,UMKC,Jr
-Damon Howard Jr,Tennessee St.,Fr
-Isaac Taveras,Southern Miss,Jr
-"Ashley Sims, II",Bryant,Fr
-"Owen Bronston, Jr.",South Carolina St.,Jr
+Cam Glover,The Citadel,Sr
+Egor Demin,BYU,Fr
+Triston Wennersten,NJIT,Sr
+Xavier Sykes,Southern Utah,Jr
+Liam McNeeley,Connecticut,Fr
+Adam Njie Jr.,Iona,Fr
+Kernan Bundy,Iona,Jr
+V.J. Edgecombe,Baylor,Fr
+Maximo Milovich,UC San Diego,Sr
+Matej Bosnjak,Wichita St.,Sr
+John Adams,The Citadel,Sr
+Tommy Gankhuyag,UT Rio Grande Valley,Fr
+Matt Becht,Merrimack,Sr
+Jaylen Colon,Alabama A&M,Fr
+Michael Griffin,West Georgia,Sr
+Amiri Stewart,Sacred Heart,Sr
+Carter Bryant,Arizona,Fr
+Jack d'Entremont,Richmond,Sr
+Jaden Martin,Morgan St.,Jr
+Jayden Quaintance,Arizona St.,Fr
+Zion Richardson,Cal St. Fullerton,Sr
+"Juan Cranford, Jr.",Saint Francis,Fr
+Keenan Wilkins,Charleston Southern,Fr
+Ray Glasgow,Tennessee Tech,Jr
+Dylan Fasoyiro,South Alabama,Sr
+Vic Searls,Ohio,Sr
+Ryan Jolly,Winthrop,Sr
+Erik Taylor,Sam Houston St.,Fr
+Asa Newell,Georgia,Fr
+Jaden Wells,UT Arlington,Sr
+Will Riley,Illinois,Fr
+Jahki Howard,Auburn,Fr
+Kasparas Jakucionis,Illinois,Fr
+Deuce Jones,La Salle,Fr
+Cam'Ron Brown,Coppin St.,Jr
+LoLo Rudolph,Cal St. Fullerton,Fr
+Caden Boser,Illinois St.,Jr
+Ben Callahan-Gold,Binghamton,Sr
+Ja'Kair Sanchez,Wagner,Sr
+Jackson Greene,Idaho St.,Jr
+Peyton Rogers,Houston Christian,Sr
+Bismark Nsiah,Fairleigh Dickinson,Sr
+Caleb Zurliene,Campbell,Sr
+Stephen Okoro,Detroit Mercy,Fr
+Sean Trumper,Merrimack,Sr
+Marcus Johnson,Bowling Green,Sr
+Ethan Menzies,Cal Poly,Sr
+Moses Horne,Mississippi Valley St.,Fr
+"Troy McKoy, Jr.",Chicago St.,Fr
+Matthew Robinson,Chicago St.,Fr
+James Patterson,Iona,Jr
+Mister Dean,USC Upstate,Fr
+Jeremiah Fears,Oklahoma,Fr
+Jalen Keago,Alabama St.,Jr
+Taye Fields,North Alabama,Sr
+Jarvis Walker,IU Indy,Sr
+Dan Gherezgher,Northern Kentucky,Jr
+Kevin Kogbara,Delaware,Jr
+Ron Rutland III,IU Indy,Fr
+Tyreck Morris,Saint Peter's,Jr
+Josh Harris,North Florida,Fr
+Jair Horton,Mississippi Valley St.,Jr
+Darrion Salery,Mississippi Valley St.,Jr
+Trey Lewis,Florida A&M,Jr
+Isaiah Jackson,Drake,Sr
+Damondre McKnight,Niagara,So
+Kameron Foman,Alcorn St.,So
+Garrison Keeslar,Chattanooga,Sr
+Jaelen McGlone,Central Connecticut,Sr
+Will Cooper,Air Force,Fr
+Mason McBride,Houston Christian,Jr
+Sam Kodi,Southern Indiana,Jr
+Hakim Byrd,Utah Tech,Sr
+Jack Kostel,Chattanooga,Sr
+Todd Jones,Portland,Fr
+Riley Parker,Saint Francis,Jr
+Chop Paljor,Arkansas Pine Bluff,Fr
+Dante Sawyer,Arkansas Pine Bluff,Jr
+Raphael Dumon,Arkansas Pine Bluff,Fr
+Javon Ervin,Mount St. Mary's,Jr
+Christian Nitu,Florida St.,Fr
+Daquan Davis,Florida St.,Fr
+Alec Millender,IU Indy,Sr
+Gob Gob,UMKC,Jr
+Davontae Hall,UMKC,Jr
+Jeff Planutis,Mercyhurst,Sr
+Sean Elkinton,Louisiana Tech,Jr
+Zach Laput,Davidson,Sr
+Cooper Flagg,Duke,Fr
+Mac Riniker,Cal Poly,Sr
+Berk Can Akin,UC Irvine,Fr
+Thomas Sorber,Georgetown,Fr
+Carlos Cortijo,Tennessee Martin,So
+Warren Yeh,Alabama A&M,Fr
+JoJo Moore,Oral Roberts,Fr
+Darius Dawson,Austin Peay,Sr
+Elijah Moore,Syracuse,Fr
+Chase Kuiper,Detroit Mercy,Fr
+Miles Mitchell,Detroit Mercy,Fr
+CJ Luster,Stony Brook,Jr
+Kohen Rowbatham,New Orleans,Fr
+Jawarie Hamelin,New Hampshire,Jr
+Qiant Myers,Portland St.,Sr
+Timaris Brown,IU Indy,Jr
+Jacksen Moni,North Dakota St.,Sr
+Akili Evans,Austin Peay,Jr
+Ace Bailey,Rutgers,Fr
+Dylan Harper,Rutgers,Fr
+Nick Anderson,Furman,Sr
+Jalen Barr,Iona,Sr
+Brody Fox,The Citadel,Sr
+Damarion Bonds,Central Michigan,Jr
+TJ Simpkins,Elon,So
+Jasir Tremble,Fresno St.,Jr
+Keitenn Bristow,Tarleton St.,Fr
+Karim Elgizawy,Tarleton St.,Fr
+Paul Zilinskas,IU Indy,Sr
+Shakir Odunewu,Cal St. Bakersfield,So
+Brandon Morgan,Western Carolina,Jr
+Jared Washington,Southern Indiana,Jr
+Jadyn Shider,Southern Indiana,Jr
+Caleb Mackrey,Marist,Jr
+Josh Dilling,Northern Kentucky,Sr
+Daniel Abreu,Drake,Sr
+Gabriel Pozzato,Evansville,Fr
+Carter Benton,Pacific,Fr
+Matthew Sells,Tennessee Tech,Sr
+Marty Silvera,Tarleton St.,Sr
+Aidan Reichert,Mercyhurst,Sr
+Erik Timko,Delaware,Sr
+Ahmed Barba-Bey,Fairleigh Dickinson,Sr
+Demetrus Johnson II,West Georgia,Jr
+Vianney Salatchoum,FIU,Jr
+Amsal Delalić,Pittsburgh,Fr
+Justas Stonkus,Charleston,Fr
+Josué Grullon,Tennessee Martin,Jr
+Matija Žužić,Tennessee Martin,Jr
+Kean Webb,San Diego,Fr
+Calvin Robins Jr.,Howard,Fr
+Abdulai Fanta Kabba,Denver,Fr
+Raeshun McGregory,Mississippi Valley St.,Jr
+Fedor Zugic,Creighton,Fr

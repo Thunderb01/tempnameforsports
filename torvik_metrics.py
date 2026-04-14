@@ -1,7 +1,7 @@
 """
 torvik_metrics.py — Load Torvik CSV → compute BtPM metrics + NIL valuation → write to Supabase
 ================================================================================================
-Reads trank_data.csv, matches players to Supabase by (name, team), writes:
+Reads trank_data_2026.csv, matches players to Supabase by (name, team), writes:
   - Raw Torvik inputs to player_stats (torvik_* columns)
   - Computed BtPM metrics to player_stats (cdi, dds, sei, ath, ris)
   - NIL valuation to players (nil_valuation)
@@ -70,7 +70,9 @@ SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")
 
 def parse_args():
     p = argparse.ArgumentParser()
-    p.add_argument("--csv",     default="data/trank_data.csv")
+    p.add_argument("--csv",     default="data/trank_data_2026.csv")
+    p.add_argument("--year",    type=int, default=2026,
+                   help="Calendar year of this dataset (e.g. 2025 or 2026). Controls which player_stats row is written.")
     p.add_argument("--dry-run",        action="store_true")
     p.add_argument("--skip-matched",   action="store_true",
                    help="Skip players that already have cdi written in player_stats")
@@ -78,6 +80,8 @@ def parse_args():
                    help="Use Torvik CSV columns for all metrics instead of scraped Supabase totals")
     p.add_argument("--skip-nil",        action="store_true",
                    help="Do not overwrite nil_valuation on the players table")
+    p.add_argument("--historical",      action="store_true",
+                   help="Historical mode: only write player_stats rows, skip updating players table (nil, position, etc.)")
     p.add_argument("--teams", nargs="+", metavar="TEAM",
                    help="Only process players from these teams (exact Torvik team name)")
     p.add_argument("--players", nargs="+", metavar="PLAYER",
@@ -308,16 +312,29 @@ def compute_sei(df, use_torvik=False):
     """
     SEI — Scoring Efficiency Index
     Measures how efficiently a player scores relative to usage.
+    For 3PT specialists (3PA/FGA >= 0.70, 3P% >= 37%), USG is floored at 15
+    so catch-and-shoot players aren't penalized for low creation volume.
+    Everyone uses the same formula so percentile ranks stay comparable.
     """
-    ts = df["TS_per"].fillna(0)
+    ts  = df["TS_per"].fillna(0)
+    usg = df["usg"].fillna(0)
+
+    total_fga  = (df["twoPA"].fillna(0) + df["TPA"].fillna(0)).replace(0, float("nan"))
+    three_ratio = df["TPA"].fillna(0) / total_fga
+    is_specialist = (three_ratio >= 0.70) & (df["TP_per"].fillna(0) >= 0.37)
+
+    # Floor USG at 15 for specialists — keeps the formula comparable across all players
+    usg_adj = usg.where(~is_specialist, usg.clip(lower=15))
+
     if use_torvik:
-        usg = df["usg"].fillna(0)
-        df["_sei_raw"] = ts * (usg ** 0.5)
+        df["_sei_raw"] = ts * (usg_adj ** 0.5)
     else:
-        fga = df["sb_tot_fga"].fillna(0)
-        mp  = df["sb_tot_mp"].replace(0, float("nan")).fillna(0)
+        fga    = df["sb_tot_fga"].fillna(0) if "sb_tot_fga" in df.columns else usg_adj
+        mp     = df["sb_tot_mp"].replace(0, float("nan")).fillna(0) if "sb_tot_mp" in df.columns else pd.Series(1, index=df.index)
         fga_40 = (fga / mp.replace(0, float("nan"))) * 40
-        df["_sei_raw"] = ts * fga_40.fillna(0) ** 0.5
+        # For specialists with missing sb data, fall back to torvik usg_adj
+        fga_40_adj = fga_40.where(fga_40 > 0, usg_adj)
+        df["_sei_raw"] = ts * (fga_40_adj ** 0.5)
 
     return percentrank_by_pos(df, "_sei_raw").apply(clamp)
 
@@ -739,7 +756,16 @@ def compute_nil_valuation(df):
         {"So": 1, "Jr": .95, "Sr": 0.95, "Gr": 0.95, "Fr": 1.05}
     ).fillna(1.0)
 
-    base_nil_final = (base_nil * pos_boost * yr_boost).clip(lower=0, upper=conf_ceiling)
+# ── 3PT Specialist Boost ─────────────────────────────────────────────────
+    # Players where 3PA/(2PA+3PA) >= 0.70 AND 3P% >= 37% are floor-spacers
+    # with market value independent of low USG — apply a specialist multiplier.
+    total_fga  = (df["twoPA"].fillna(0) + df["TPA"].fillna(0)).replace(0, float("nan"))
+    three_ratio = df["TPA"].fillna(0) / total_fga
+    is_specialist = (three_ratio >= 0.70) & (df["TP_per"].fillna(0) >= 0.37)
+    # Scale boost from 1.0 at threshold to 1.20 at 100% 3PA ratio
+    specialist_boost = (1 + 0.20 * ((three_ratio - 0.70) / 0.30).clip(0, 1)).where(is_specialist, 1.0)
+
+    base_nil_final = (base_nil * pos_boost * yr_boost * specialist_boost).clip(lower=0, upper=conf_ceiling)
 
     # ── Minutes Volatility → Market Range ────────────────────────────────────
     # Min_per = % of team minutes played (0–100); higher = more certain starter
@@ -799,17 +825,17 @@ def main():
 
     print(f"  {len(df)} rows after dedup")
 
-    # Filter out players with too little playing time to produce meaningful metrics
-    low_minutes_keys = set()
+    # Split into qualified (Min_per >= 10%) and low-minutes players.
+    # Metrics (CDI/DDS/SEI/ATH/RIS) are only computed on qualified players so
+    # small-sample outliers don't skew percentile ranks. Low-minutes players
+    # still get their basic stats written (ppg, rpg, fg_pct, etc.) but no metrics or NIL.
     if "Min_per" in df.columns:
         before = len(df)
-        low = df[df["Min_per"] < 10]
-        low_minutes_keys = {
-            (normalise(row["player_name"]), normalise_team(str(row["team"])))
-            for _, row in low.iterrows()
-        }
-        df = df[df["Min_per"] >= 10].reset_index(drop=True)
-        print(f"  {len(df)} rows after filtering Min_per < 10% ({before - len(df)} removed)")
+        df_low = df[df["Min_per"] < 10].copy()
+        df     = df[df["Min_per"] >= 10].reset_index(drop=True)
+        print(f"  {len(df)} rows after filtering Min_per < 10% ({before - len(df)} set aside for stats-only write)")
+    else:
+        df_low = pd.DataFrame()
 
     # ── Merge Supabase player_stats into df ───────────────────────────────────
     # Gives access to ppg, apg, rpg, stl_40, blk_40, ast/40, etc. in formulas.
@@ -848,9 +874,10 @@ def main():
         for r in _ps_rows:
             pl = _pl_map.get(r["player_id"], {})
             if pl:
-                # Use player_stats.school for team matching (consistent with scraper)
-                # Fall back to players.current_team if school is missing
-                school = r.get("school") or pl.get("current_team", "")
+                # Always use players.current_team as the team key so _sb_df and
+                # player_lookup both resolve to the same string — avoids mismatches
+                # caused by player_stats.school diverging from players.current_team
+                school = pl.get("current_team", "") or r.get("school", "")
                 _sb_stats.append({
                     "_sb_name": normalise(pl["name"]),
                     "_sb_team": normalise_team(school),
@@ -900,13 +927,18 @@ def main():
     df["_ris"] = compute_ris(df, use_torvik=use_torvik)
     df["_nil"], df["_nil_low"], df["_nil_high"], df["_projected_tier"] = compute_nil_valuation(df)
 
+    # ── Specialist tags ───────────────────────────────────────────────────────
+    _total_fga   = (df["twoPA"].fillna(0) + df["TPA"].fillna(0)).replace(0, float("nan"))
+    _three_ratio = df["TPA"].fillna(0) / _total_fga
+    df["_specialist_3pt"] = (_three_ratio >= 0.70) & (df["TP_per"].fillna(0) >= 0.37)
+
     # ── Load players + stats from Supabase ────────────────────────────────────
     if not args.dry_run:
         print("Fetching players from Supabase …")
         players = []
         page, page_size = 0, 1000
         while True:
-            res = db.table("players").select("id, name, current_team, height, nil_valuation") \
+            res = db.table("players").select("id, name, current_team, height, nil_valuation, torvik_pid") \
                     .range(page * page_size, (page + 1) * page_size - 1).execute()
             players.extend(res.data)
             if len(res.data) < page_size:
@@ -917,8 +949,14 @@ def main():
 
         # Build lookup: (norm_name, norm_team) → player_id
         player_lookup = {
-            (normalise(p["name"]), normalise(p["current_team"])): p["id"]
+            (normalise(p["name"]), normalise_team(p["current_team"])): p["id"]
             for p in players
+        }
+        # Build PID lookup: torvik_pid (int) → player_id
+        pid_lookup = {
+            p["torvik_pid"]: p["id"]
+            for p in players
+            if p.get("torvik_pid") is not None
         }
         # Track existing heights so we only backfill blanks
         player_height_lookup = {
@@ -931,17 +969,17 @@ def main():
             for p in players
         }
 
-        # Build stats lookup: player_id → stats_row_year_key (paginated)
+        # Build stats lookup: (player_id, calendar_year) → stats row id (paginated)
         _sr_rows, _page = [], 0
         while True:
-            _sr = db.table("player_stats").select("id, player_id, year, cdi") \
+            _sr = db.table("player_stats").select("id, player_id, calendar_year, cdi") \
                     .range(_page * 1000, (_page + 1) * 1000 - 1).execute()
             _sr_rows.extend(_sr.data or [])
             if len(_sr.data or []) < 1000:
                 break
             _page += 1
         stats_lookup = {
-            (r["player_id"], r["year"]): r["id"]
+            (r["player_id"], r["calendar_year"]): r["id"]
             for r in _sr_rows
         }
         already_matched = {
@@ -973,7 +1011,20 @@ def main():
         if _player_filter and name not in _player_filter:
             continue
 
-        # ── Extract raw Torvik inputs ─────────────────────────────────────────
+        # ── Compute display stats from Torvik columns ─────────────────────────
+        # pts, treb, ast are already per-game averages in the Torvik CSV
+        _gp      = int(safe(row.get("GP"), 0) or 0)
+        _twoPM   = safe(row.get("twoPM"))
+        _twoPA   = safe(row.get("twoPA"))
+        _tpm     = safe(row.get("TPM"))
+        _tpa     = safe(row.get("TPA"))
+
+        _fgm  = (_twoPM or 0) + (_tpm or 0)
+        _fga  = (_twoPA or 0) + (_tpa or 0)
+        _fg_pct  = round((_fgm / _fga) * 100, 1) if _fga else None
+        _3p_pct  = round((safe(row.get("TP_per")) or 0) * 100, 1) if safe(row.get("TP_per")) is not None else None
+        _ft_pct  = round((safe(row.get("FT_per")) or 0) * 100, 1) if safe(row.get("FT_per")) is not None else None
+
         torvik = {
             "torvik_ortg":   safe(row.get("ORtg")),
             "torvik_usg":    safe(row.get("usg")),
@@ -994,7 +1045,16 @@ def main():
             "torvik_porpag": safe(row.get("porpag")),
             "torvik_adjoe":  safe(row.get("adjoe")),
             "torvik_min_pct":safe(row.get("Min_per")),
-            "torvik_gp":     int(safe(row.get("GP"), 0) or 0),
+            "torvik_gp":     _gp,
+            # ── Per-game stats (already per-game in Torvik CSV) ───────────────
+            "ppg":    round(safe(row.get("pts")),  1) if safe(row.get("pts"))  is not None else None,
+            "rpg":    round(safe(row.get("treb")), 1) if safe(row.get("treb")) is not None else None,
+            "apg":    round(safe(row.get("ast")),  1) if safe(row.get("ast"))  is not None else None,
+            "fg_pct": _fg_pct,
+            "3p_pct": _3p_pct,
+            "ft_pct": _ft_pct,
+            "usg":     safe(row.get("usg")),
+            "ast_tov": safe(row.get("ast/tov")),
         }
 
         # ── Pull pre-computed metrics ─────────────────────────────────────────
@@ -1008,6 +1068,7 @@ def main():
         nil_low       = safe(df.at[idx, "_nil_low"])
         nil_high      = safe(df.at[idx, "_nil_high"])
         tier          = str(df.at[idx, "_projected_tier"]) if "_projected_tier" in df.columns else None
+        # is_3pt_specialist = bool(df.at[idx, "_specialist_3pt"]) if "_specialist_3pt" in df.columns else False
 
         # ── Parse birth year ──────────────────────────────────────────────────
         birth_year = None
@@ -1024,74 +1085,84 @@ def main():
             continue
 
         # ── Match to Supabase ─────────────────────────────────────────────────
-        key = (normalise(name), normalise_team(team))
-        player_id = player_lookup.get(key)
+        # Prefer torvik_pid (exact) over name+team (fuzzy)
+        torvik_pid_val = int(row["pid"]) if str(row.get("pid", "")).strip().isdigit() else None
+        player_id = (pid_lookup.get(torvik_pid_val) if torvik_pid_val else None) \
+                    or player_lookup.get((normalise(name), normalise_team(team)))
 
         if not player_id:
             unmatched += 1
-            print(f"  ✗ NO MATCH: {name} ({team})")
+            match_method = "pid" if torvik_pid_val else "name+team"
+            print(f"  ✗ NO MATCH ({match_method}): {name} ({team})")
             unmatched_rows.append({"name": name, "team": team, "yr": yr})
             continue
 
         if args.skip_matched and player_id in already_matched:
             continue
 
-        # Update player row
-        player_patch = {}
-        if birth_year:
-            player_patch["birth_year"] = birth_year
-        if nil is not None and not args.skip_nil:
-            player_patch["nil_valuation"] = nil
-        if nil_low is not None and not args.skip_nil:
-            player_patch["open_market_low"] = nil_low
-        if nil_high is not None and not args.skip_nil:
-            player_patch["open_market_high"] = nil_high
-        hometown = str(row.get("type", "")).strip()
-        if hometown and hometown not in ("nan", ""):
-            player_patch["hometown"] = hometown
-        pos = normalise_pos(row.get("role", ""))
-        if pos:
-            player_patch["primary_position"] = pos
-        YR_MAP = {"Fr": "Freshman", "So": "Sophomore", "Jr": "Junior", "Sr": "Senior", "Gr": "Graduate"}
-        yr_raw = str(row.get("yr", "")).strip()
-        yr_mapped = YR_MAP.get(yr_raw)
-        if yr_mapped:
-            player_patch["year"] = yr_mapped
-        ht = str(row.get("ht", "")).strip()
-        if ht and ht not in ("nan", "") and not player_height_lookup.get(player_id):
-            player_patch["height"] = ht
-        if player_patch:
-            db.table("players").update(player_patch).eq("id", player_id).execute()
-            if nil is not None:
-                old_nil = player_nil_lookup.get(player_id)
-                changed = old_nil is None or abs(nil - old_nil) > 1
-                if changed:
-                    direction = "new" if old_nil is None else ("up" if nil > old_nil else "down")
-                    nil_changes.append({
-                        "name":     name,
-                        "team":     team,
-                        "position": row.get("pos_bucket", ""),
-                        "old_nil":  round(old_nil) if old_nil else "",
-                        "new_nil":  round(nil),
-                        "change":   round(nil - old_nil) if old_nil else "",
-                        "direction": direction,
-                    })
+        # ── Update players table (skip in historical mode) ────────────────────
+        if not args.historical:
+            player_patch = {}
+            if torvik_pid_val is not None:
+                player_patch["torvik_pid"] = torvik_pid_val
+            if birth_year:
+                player_patch["birth_year"] = birth_year
+            if nil is not None and not args.skip_nil:
+                player_patch["nil_valuation"] = nil
+            if nil_low is not None and not args.skip_nil:
+                player_patch["open_market_low"] = nil_low
+            if nil_high is not None and not args.skip_nil:
+                player_patch["open_market_high"] = nil_high
+            hometown = str(row.get("type", "")).strip()
+            if hometown and hometown not in ("nan", ""):
+                player_patch["hometown"] = hometown
+            pos = normalise_pos(row.get("role", ""))
+            if pos:
+                player_patch["primary_position"] = pos
+            YR_MAP = {"Fr": "Freshman", "So": "Sophomore", "Jr": "Junior", "Sr": "Senior", "Gr": "Graduate"}
+            yr_raw = str(row.get("yr", "")).strip()
+            yr_mapped = YR_MAP.get(yr_raw)
+            if yr_mapped:
+                player_patch["year"] = yr_mapped
+            ht = str(row.get("ht", "")).strip()
+            if ht and ht not in ("nan", "") and not player_height_lookup.get(player_id):
+                player_patch["height"] = ht
+            # player_patch["specialist_tags"] = "3pt_specialist" if is_3pt_specialist else None
+            if player_patch:
+                db.table("players").update(player_patch).eq("id", player_id).execute()
+                if nil is not None:
+                    old_nil = player_nil_lookup.get(player_id)
+                    changed = old_nil is None or abs(nil - old_nil) > 1
+                    if changed:
+                        direction = "new" if old_nil is None else ("up" if nil > old_nil else "down")
+                        nil_changes.append({
+                            "name":     name,
+                            "team":     team,
+                            "position": row.get("pos_bucket", ""),
+                            "old_nil":  round(old_nil) if old_nil else "",
+                            "new_nil":  round(nil),
+                            "change":   round(nil - old_nil) if old_nil else "",
+                            "direction": direction,
+                        })
 
-        # Update player_stats row
-        stats_patch = {**torvik}
+        # ── Upsert player_stats row keyed on (player_id, calendar_year) ───────
+        YR_MAP = {"Fr": "Freshman", "So": "Sophomore", "Jr": "Junior", "Sr": "Senior", "Gr": "Graduate"}
+        stats_patch = {**torvik, "name": name, "school": team, "year": YR_MAP.get(yr, yr)}
         for key_m, val in [("cdi", cdi), ("dds", dds), ("sei", sei), ("ath", ath), ("ris", ris)]:
             if val is not None:
                 stats_patch[key_m] = val
         if tier and not args.skip_nil:
             stats_patch["projected_tier"] = tier
 
-        # Find the matching stats row (match on player_id + year class)
-        stats_id = stats_lookup.get((player_id, yr))
+        stats_id = stats_lookup.get((player_id, args.year))
         if stats_id:
             db.table("player_stats").update(stats_patch).eq("id", stats_id).execute()
         else:
-            # Fallback: update most recent stats row for this player
-            db.table("player_stats").update(stats_patch).eq("player_id", player_id).execute()
+            db.table("player_stats").insert({
+                **stats_patch,
+                "player_id":    player_id,
+                "calendar_year": args.year,
+            }).execute()
 
         matched += 1
         print(f"  ✓ {name} ({team})")
@@ -1114,21 +1185,70 @@ def main():
             writer.writerows(nil_changes)
         print(f"  → NIL changes written to {out_path} ({len(nil_changes)} players updated)")
 
-    # ── Null out metrics + zero NIL for low-minutes players ───────────────────
-    if low_minutes_keys and not args.dry_run:
-        zeroed = 0
-        for key in low_minutes_keys:
-            pid = player_lookup.get(key)
-            if not pid:
+    # ── Write basic stats for low-minutes players (no metrics, no NIL) ───────
+    if not df_low.empty and not args.dry_run:
+        written = 0
+        for _, row in df_low.iterrows():
+            name = str(row.get("player_name", "")).strip()
+            team = str(row.get("team", "")).strip()
+            torvik_pid_val = int(row["pid"]) if str(row.get("pid", "")).strip().isdigit() else None
+            player_id = (pid_lookup.get(torvik_pid_val) if torvik_pid_val else None) \
+                        or player_lookup.get((normalise(name), normalise_team(team)))
+            if not player_id:
                 continue
-            # Null all metrics so the modal shows "insufficient playing time"
-            stats_patch = {"cdi": None, "dds": None, "sei": None, "ath": None, "ris": None}
-            stats_id = stats_lookup.get((pid, ""))  # best effort
-            db.table("player_stats").update(stats_patch).eq("player_id", pid).execute()
-            if not args.skip_nil:
-                db.table("players").update({"nil_valuation": 0}).eq("id", pid).execute()
-            zeroed += 1
-        print(f"  Cleared metrics/NIL for {zeroed} low-minutes players")
+
+            _gp    = int(safe(row.get("GP"), 0) or 0)
+            _twoPM = safe(row.get("twoPM")); _twoPA = safe(row.get("twoPA"))
+            _tpm   = safe(row.get("TPM"));   _tpa   = safe(row.get("TPA"))
+            _fgm   = (_twoPM or 0) + (_tpm or 0)
+            _fga   = (_twoPA or 0) + (_tpa or 0)
+
+            stats_patch = {
+                "torvik_ortg":   safe(row.get("ORtg")),
+                "torvik_usg":    safe(row.get("usg")),
+                "torvik_efg":    safe(row.get("eFG")),
+                "torvik_ts":     safe(row.get("TS_per")),
+                "torvik_obpm":   safe(row.get("obpm")),
+                "torvik_dbpm":   safe(row.get("dbpm")),
+                "torvik_bpm":    safe(row.get("bpm")),
+                "torvik_drtg":   safe(row.get("drtg")),
+                "torvik_stops":  safe(row.get("stops")),
+                "torvik_ast_pct":safe(row.get("AST_per")),
+                "torvik_to_pct": safe(row.get("TO_per")),
+                "torvik_orb_pct":safe(row.get("ORB_per")),
+                "torvik_drb_pct":safe(row.get("DRB_per")),
+                "torvik_rim_pct":safe(row.get("rimmade/(rimmade+rimmiss)")),
+                "torvik_mid_pct":safe(row.get("midmade/(midmade+midmiss)")),
+                "torvik_3p_pct": safe(row.get("TP_per")),
+                "torvik_porpag": safe(row.get("porpag")),
+                "torvik_adjoe":  safe(row.get("adjoe")),
+                "torvik_min_pct":safe(row.get("Min_per")),
+                "torvik_gp":     _gp,
+                "ppg":    round(safe(row.get("pts")),  1) if safe(row.get("pts"))  is not None else None,
+                "rpg":    round(safe(row.get("treb")), 1) if safe(row.get("treb")) is not None else None,
+                "apg":    round(safe(row.get("ast")),  1) if safe(row.get("ast"))  is not None else None,
+                "fg_pct": round((_fgm / _fga) * 100, 1) if _fga else None,
+                "3p_pct": round((safe(row.get("TP_per")) or 0) * 100, 1) if safe(row.get("TP_per")) is not None else None,
+                "ft_pct": round((safe(row.get("FT_per")) or 0) * 100, 1) if safe(row.get("FT_per")) is not None else None,
+                "usg":     safe(row.get("usg")),
+                "ast_tov": safe(row.get("ast/tov")),
+                "cdi": None, "dds": None, "sei": None, "ath": None, "ris": None,
+                "name":   name,
+                "school": team,
+                "year":   {"Fr": "Freshman", "So": "Sophomore", "Jr": "Junior", "Sr": "Senior", "Gr": "Graduate"}.get(str(row.get("yr", "")).strip(), str(row.get("yr", "")).strip()),
+            }
+
+            stats_id = stats_lookup.get((player_id, args.year))
+            if stats_id:
+                db.table("player_stats").update(stats_patch).eq("id", stats_id).execute()
+            else:
+                db.table("player_stats").insert({
+                    **stats_patch,
+                    "player_id":     player_id,
+                    "calendar_year": args.year,
+                }).execute()
+            written += 1
+        print(f"  Wrote basic stats for {written} low-minutes players (no metrics/NIL)")
 
     if args.dry_run:
         print("(dry-run — nothing written)")

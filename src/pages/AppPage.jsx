@@ -7,6 +7,7 @@ import { useRosterBoard } from "@/hooks/useRosterBoard";
 import { useAdminTeam }       from "@/hooks/useAdminTeam";
 import { TeamAutocomplete }   from "@/components/TeamAutocomplete";
 import { supabase }       from "@/lib/supabase";
+import { exportRosterPDF } from "@/lib/exportRoster";
 
 function money(n) {
   return Number(n || 0).toLocaleString(undefined, {
@@ -347,12 +348,16 @@ export function AppPage() {
               </button>
               </>)}
               <button className="btn btn-ghost" onClick={() => {
-                const blob = new Blob([JSON.stringify(board.state, null, 2)], { type: "application/json" });
-                const a = Object.assign(document.createElement("a"), {
-                  href: URL.createObjectURL(blob), download: "roster-build.json"
-                });
-                a.click(); URL.revokeObjectURL(a.href);
-              }}>Export Build</button>
+                const retentionById = board.state.retentionById || {};
+                const nilById       = board.state.nilById       || {};
+                const returning = board.returningPlayers
+                  .filter(p => (retentionById[p.id] || "returning") === "returning")
+                  .map(p => ({ ...p, _type: "Returning", nilOffer: nilById[p.id] || 0 }));
+                const transfers = board.state.roster
+                  .map(r => { const p = board.byId(r.id); return p ? { ...p, _type: "Transfer In", nilOffer: r.nilOffer } : null; })
+                  .filter(Boolean);
+                exportRosterPDF({ team: activeTeam, settings: board.state.settings, players: [...returning, ...transfers] });
+              }}>Export PDF</button>
               <button className="btn btn-ghost" onClick={() => setDrawerOpen(true)}>
                 Saved Rosters
               </button>

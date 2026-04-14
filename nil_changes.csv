@@ -1,250 +1,127 @@
 name,team,position,old_nil,new_nil,change,direction
-Justin Pippen,California,Guard,948952,1596775,647823,up
-Milos Ilic,California,Wing,1056464,450660,-605804,down
-Semetri (TT) Carr,California,Guard,745780,188044,-557736,down
-Nolan Dorsey,California,Wing,320917,23594,-297323,down
-Dai Dai Ames,California,Guard,611976,889921,277945,up
-Mantas Kocanas,California,Wing,280275,34556,-245719,down
-Lee Dort,California,Big,1016555,1159585,143030,up
-Chris Bell,California,Wing,700828,768367,67539,up
-John Camden,California,Wing,1102082,1071578,-30504,down
-Richie Saunders,BYU,Wing,1782378,1779878,-2500,down
-Tounde Yessoufou,Baylor,Wing,1606941,1604528,-2412,down
-Tyler Bilodeau,UCLA,Wing,1457058,1454873,-2186,down
-Lamar Wilkerson,Indiana,Wing,1437772,1439941,2168,up
-Isaiah Evans,Duke,Wing,1343106,1345213,2108,up
-Corey Camper Jr.,Nevada,Wing,1373983,1371898,-2086,down
-Ivan Kharchenkov,Arizona,Wing,1125714,1123811,-1903,down
-Jaylin Sellers,Providence,Wing,1158833,1156957,-1876,down
-Tramon Mark,Texas,Wing,1155558,1153686,-1873,down
-Terri Miller Jr.,Portland St.,Wing,1307181,1305357,-1824,down
-Myles Colvin,Wake Forest,Wing,1044930,1043180,-1751,down
-Madden Collins,American,Wing,1095173,1093431,-1742,down
-Jamal Fuller,LIU,Wing,1178954,1177223,-1731,down
-Gavin Doty,Siena,Wing,1058215,1056542,-1673,down
-Derrion Reid,Oklahoma,Wing,927546,929193,1647,up
-AJ Casey,Evansville,Wing,1038923,1037305,-1618,down
-Nate Kingz,Syracuse,Wing,902251,900663,-1588,down
-Lavell Brodnex,Louisiana Monroe,Wing,985516,983944,-1572,down
-Chisom Okpara,Stanford,Wing,886679,888250,1571,up
-Ebuka Okorie,Stanford,Guard,2380172,2378604,-1568,down
-Andrej Stojakovic,Illinois,Wing,872702,874257,1555,up
-Isaac Garrett,Oakland,Wing,953116,951574,-1542,down
-Christian Anderson,Texas Tech,Guard,2375374,2373834,-1540,down
-Malik Thomas,Virginia,Wing,856371,854838,-1533,down
-Andrija Bukumirović,Tennessee Martin,Wing,941513,939981,-1532,down
-Kobe Knox,South Carolina,Wing,835530,834022,-1508,down
-Brycen Blaine,Charleston Southern,Wing,877476,876005,-1471,down
-Joshua O'Garro,Cal St. Northridge,Wing,867775,866313,-1462,down
-Ronnie Harrison,East Texas A&M,Wing,847511,846069,-1442,down
-Trent Mosquera,Le Moyne,Wing,829897,828473,-1424,down
-Boden Kapke,Boston College,Wing,744476,743079,-1397,down
-Kevin Overton,Auburn,Wing,731820,730439,-1381,down
-Dontrez Williams,Lindenwood,Wing,736649,735295,-1353,down
-Vaughn Weems,Nevada,Wing,683517,682169,-1349,down
-Xavier Edmonds,TCU,Big,1852804,1851460,-1344,down
-Howie Fleming Jr.,UNLV,Wing,677358,676017,-1341,down
-Quentin Jones,Saint Louis,Wing,665585,664260,-1326,down
-Isaiah Johnson-Arigu,St. Thomas,Wing,694499,695805,1306,up
-Andrew Henderson,UC Riverside,Wing,704932,703641,-1291,down
-Ben Bradford,Charlotte,Wing,621065,619777,-1289,down
-Kilian Brockhoff,William & Mary,Wing,688569,687297,-1273,down
-Justin Rochelin,Pacific,Wing,585918,584699,-1218,down
-Kody Clouet,Winthrop,Wing,618851,617660,-1191,down
-Javan Simmons,Ohio,Wing,613414,612229,-1185,down
-Tae Dozier,Northern Kentucky,Wing,612029,610846,-1183,down
-Trey Kaufman-Renn,Purdue,Big,1526506,1525325,-1181,down
-Cayden Ward,Cal Poly,Wing,589606,588428,-1178,down
-William Kyle III,Syracuse,Big,1494138,1495303,1165,up
-Nimari Burnett,Michigan,Wing,563409,562249,-1160,down
-Jamie Phillips Jr.,Stetson,Wing,523093,522003,-1091,down
-Dalton Gayman,North Florida,Wing,527694,528772,1078,up
-Mercy Miller,Houston,Wing,488487,489561,1074,up
-Mekhi Mason,Wake Forest,Wing,497257,496190,-1067,down
-Jaiun Simon,Dayton,Wing,464738,465783,1045,up
-Hank Alvey,Lehigh,Big,1417320,1416276,-1044,down
-Darius Adams,Maryland,Wing,452960,451924,-1037,down
-C.J. Cox,Purdue,Wing,461872,460839,-1033,down
-Ose Okojie,Howard,Wing,489286,488260,-1026,down
-Mason Lee,North Florida,Wing,475359,476385,1026,up
-Caleb Shaw,Grand Canyon,Wing,445495,446510,1015,up
+Koa Peat,Arizona,Wing,1392115,1394309,2194,up
+John Blackwell,Wisconsin,Wing,1381398,1383510,2111,up
+Tre White,Kansas,Wing,1380740,1378631,-2109,down
+Devin Vanterpool,Florida Atlantic,Wing,1337227,1339325,2098,up
+Tyler Cochran,Rhode Island,Wing,1369770,1367688,-2082,down
+Jordan Riley,East Carolina,Wing,1305640,1307666,2026,up
+Ty Robinson,Central Arkansas,Wing,1256313,1258148,1835,up
+Bryce Harris,Howard,Wing,1263106,1264901,1794,up
+LeJuan Watts,Texas Tech,Wing,1046290,1044537,-1752,down
+Larry Johnson,McNeese St.,Wing,982050,983689,1639,up
+Josh Dix,Creighton,Wing,935880,934253,-1627,down
+Tru Washington,Miami FL,Wing,922278,923891,1613,up
+Andre Mills,Maryland,Wing,888555,890156,1601,up
+Austin Swartz,Creighton,Wing,880154,881744,1590,up
+Trent Mosquera,Le Moyne,Wing,829043,830467,1425,up
+Roberts Blums,Davidson,Wing,694011,695399,1388,up
+JJ Harper,Liberty,Wing,728175,726858,-1317,down
+Tylik Weeks,Southern Miss,Wing,709498,708201,-1296,down
+Eric Mahaffey,Akron,Wing,675689,676973,1284,up
+Amon Dörries,Bucknell,Wing,609342,608118,-1224,down
+KJ Younger,UNC Greensboro,Wing,600429,601643,1214,up
+Tennessee Rainwater,Le Moyne,Wing,538459,539551,1092,up
+Mercy Miller,Houston,Wing,488648,489722,1074,up
+Michael Eley,Hampton,Wing,520350,521419,1069,up
+Chas Stinson,Stonehill,Wing,495103,496138,1035,up
+C.J. Cox,Purdue,Wing,457543,456516,-1027,down
+Ben Oosterbaan,St. Thomas,Wing,472297,473319,1022,up
 Justin Allen,Green Bay,Wing,480318,481332,1015,up
-Kaleb Washington,Florida A&M,Wing,477671,476661,-1010,down
-Javon Cooley,Pepperdine,Wing,438725,437722,-1003,down
-Sam Hoiberg,Nebraska,Guard,1280811,1279808,-1003,down
-Donovan Draper,Navy,Wing,472100,471098,-1002,down
-Isaac Bruns,South Dakota,Wing,469110,468112,-998,down
-Elijah Lewis,Marist,Wing,454047,453070,-977,down
-Jackson Munro,Dartmouth,Wing,450442,451415,973,up
-Jabez Jenkins,Belmont,Wing,427333,428305,973,up
-Jack Benter,Purdue,Wing,365836,364937,-899,down
-Braden East,Lamar,Big,1077120,1076222,-898,down
-Adam Olsen,South Alabama,Wing,397440,398336,896,up
-Ayden Carter,Detroit Mercy,Wing,389861,388977,-884,down
-Ernest Shelton,Merrimack,Wing,390005,389121,-884,down
-Tyler Spratt,Detroit Mercy,Wing,362523,361653,-870,down
-Kaden Cooper,Louisiana Tech,Wing,360442,359603,-839,down
-Travelle Bryson,Howard,Wing,349809,348973,-836,down
-Desmond Claude,Washington,Wing,344237,343402,-835,down
-Scotty Washington,High Point,Wing,349364,350186,823,up
-Amari Evans,Tennessee,Wing,318611,317791,-820,down
-Ketron Shaw,Old Dominion,Wing,345551,346368,817,up
-Melvin Council Jr.,Kansas,Guard,933480,932667,-812,down
-Harold Woods,Incarnate Word,Wing,339038,338233,-805,down
-A'lahn Sumler,Charleston Southern,Guard,1005183,1005978,795,up
-Sir Mohammed,Notre Dame,Wing,296136,296905,770,up
-Nicholas Shogbonyo,Texas A&M Corpus Chris,Wing,315436,316204,768,up
-Austin Benigni,Navy,Guard,919278,920034,756,up
-Braxton Stacker,Southeast Missouri St.,Wing,293825,293095,-731,down
-Dontae Horne,Prairie View A&M,Guard,863196,863925,729,up
-Aaron Franklin,Milwaukee,Wing,292507,291779,-728,down
-Myles Parker,Marist,Wing,275686,274964,-722,down
-Kosy Akametu,Iona,Wing,281040,280331,-709,down
-Randy Brady,South Alabama,Wing,276707,276006,-701,down
-Emmanuel Innocenti,Gonzaga,Wing,258485,257789,-697,down
-Churchill Abass,New Orleans,Big,673644,672982,-662,down
-Jesse Hafemeister,Charleston Southern,Wing,252867,252208,-659,down
-Isaiah Gaines,Southeastern Louisiana,Big,661453,660799,-654,down
-Chrishawn Christmas,Stephen F. Austin,Wing,246710,246062,-648,down
-Vince Buzelis,South Dakota,Wing,230696,230058,-638,down
-Rhyjon Blackwell,Marist,Wing,234361,234987,627,up
-Kyric Davis,North Carolina Central,Wing,232191,231570,-622,down
-JJ Kelly,Ohio,Wing,213927,214534,607,up
-Orlando Lovejoy,Detroit Mercy,Guard,626691,626091,-601,down
-Trent Noah,Kentucky,Wing,204636,204036,-600,down
-Joey Madimba,Prairie View A&M,Wing,216273,215681,-592,down
-Parker Friedrichsen,Davidson,Guard,553129,552543,-587,down
-Brandon Garrison,Kentucky,Big,526782,526201,-581,down
-N'famara Dabo,Brown,Big,547851,547271,-580,down
-Taj Walters,Northern Illinois,Wing,198442,197868,-574,down
-Jaden Schutt,Virginia Tech,Wing,192935,192368,-568,down
-Cody Pennebaker,Lamar,Wing,201305,200743,-563,down
-Andrea Holden,Wright St.,Big,498864,498309,-555,down
-Jacob Hogarth,Gardner Webb,Big,497884,497330,-554,down
-Jamar Brown,UCLA,Wing,176908,176372,-536,down
-Filip Radaković,Tennessee Martin,Wing,176319,175798,-521,down
-Tolu Samuels,Southern Indiana,Wing,177088,176574,-515,down
-Bryson Wilson,Binghamton,Wing,174335,173826,-509,down
-Shammah Scott,Akron,Guard,472317,472818,502,up
-Jaquan Womack,Towson,Wing,163085,163587,501,up
-Osiris Grady,UC Riverside,Wing,168230,168728,497,up
-Jamai Felt,Temple,Big,386698,386209,-489,down
-Bradley Douglas,James Madison,Guard,451933,451446,-487,down
-Jaden Cooper,Maryland Eastern Shore,Wing,162769,162284,-485,down
-Melo Sanchez,Central Connecticut,Wing,160160,160641,480,up
-D.J. Jefferson,Gardner Webb,Wing,157977,157502,-475,down
-Lukas Walls,Radford,Wing,157599,157125,-474,down
-Ryan Williams,Northeastern,Guard,408452,408917,464,up
-Reis Jones,Charleston Southern,Big,388793,388331,-462,down
-Maximus Edwards,Duquesne,Wing,144007,143546,-461,down
-Chris Mpaka,Tarleton St.,Big,374470,374019,-451,down
-Justin Mullins,Northwestern,Wing,132028,132469,442,up
-Tye Dorset,Merrimack,Guard,378770,378329,-441,down
-Victor Payne,Saint Francis,Wing,135569,136002,433,up
-CJ Happy,Princeton,Wing,131301,131725,424,up
-Jerrell Bellamy,Troy,Big,341258,340835,-423,down
-Comeh Emuobor,New Hampshire,Wing,129069,128658,-411,down
-Niko Abusara,Dartmouth,Wing,127052,126646,-407,down
-Griffen Goodbary,Drake,Wing,120609,121014,404,up
-Dillon Tingler,Drexel,Wing,122603,123007,403,up
-David Bolden,NJIT,Guard,308762,309152,391,up
-Brian Sumpter,Wofford,Big,284066,283681,-385,down
-Nick Ellington,George Mason,Big,275954,275574,-381,down
-Rob Brown III,Stony Brook,Wing,114300,114678,378,up
-Quin Gorman,Stony Brook,Wing,110743,110368,-374,down
-Ashton Walker,La Salle,Guard,273421,273047,-374,down
-Bubu Benjamin,George Washington,Wing,104807,105175,369,up
-Po'Boigh King,Sam Houston St.,Guard,290555,290918,363,up
-Ian Inman,Colorado,Wing,90829,91185,356,up
-Daniel Michelini-Jackson,Texas A&M Corpus Chris,Wing,101702,101355,-347,down
-Jorn Everson,Army,Wing,98327,97988,-339,down
-Anthony Smith lll,North Dakota,Guard,249150,249487,337,up
-Sam Alamutu,Wright St.,Wing,96113,95780,-333,down
-Karyiek Dixon,Western Illinois,Wing,95018,94688,-330,down
-Florian Tenebay,South Carolina St.,Wing,94544,94215,-329,down
-LA Hayes,UTEP,Wing,94383,94054,-329,down
-JJ Mandaquit,Washington,Guard,220599,220920,321,up
-Egan Shields,Northern Colorado,Big,218440,218129,-311,down
-Stefan Cicic,Pepperdine,Big,190783,190481,-302,down
-Gabe Dynes,USC,Big,196736,196434,-301,down
-Jamias Ferere,Gardner Webb,Wing,78554,78851,297,up
-Isaiah Langham,Brown,Wing,75308,75021,-287,down
-Jaden Slaughter,Sacred Heart,Wing,75656,75376,-280,down
-Tyeree Bryan,Texas Tech,Wing,64408,64135,-273,down
-Musa Sagnia,N.C. State,Big,158778,158508,-270,down
-Deangelo Elisee,Purdue Fort Wayne,Big,177157,176888,-268,down
-Jae Slack,North Carolina Central,Wing,69689,69954,265,up
-Ian Platteeuw,Davidson,Big,155237,154977,-261,down
-Myles Rice,Maryland,Guard,164083,163828,-255,down
-Zach Day,Mississippi,Wing,53740,53490,-250,down
-Major Freeman,Charlotte,Guard,155600,155844,244,up
-Dylan Ducommun,Northern Illinois,Guard,150654,150891,237,up
-Matt Dann,Sam Houston St.,Big,136526,136297,-229,down
-Dominique Ford,San Diego,Wing,53582,53355,-227,down
-Zion Cruz,Rider,Guard,146479,146704,225,up
-Carmelo Pacheco,UCF,Wing,45214,44999,-216,down
-Alexis Marmolejos,Pacific,Wing,49763,49548,-215,down
-Ty Tabales,Bryant,Guard,127537,127747,210,up
-Ethan Simmon,Stony Brook,Wing,49981,49774,-207,down
-Ramon Walker Jr.,Houston,Wing,41644,41440,-204,down
-Jaylen Fenner,Louisiana Tech,Wing,46358,46156,-201,down
-Rahmir Moore,Delaware St.,Wing,46760,46958,198,up
-Logan Woods,Wright St.,Wing,44577,44386,-191,down
-Ryan Sullivan,Harvard,Big,105733,105542,-191,down
-Robert Davis Jr.,Old Dominion,Wing,41589,41771,182,up
-BJ Plummer,North Florida,Wing,39599,39778,180,up
-Trent Hundley,Evansville,Wing,40265,40088,-177,down
-Anthony Robinson,Xavier,Big,82407,82235,-172,down
-Calvin Sirmans III,Stetson,Guard,97916,98085,169,up
-John Broom,South Alabama,Wing,36425,36260,-164,down
-Jackson Keith,Butler,Wing,27157,26999,-159,down
-Carter Berg-McLean,Loyola MD,Wing,33153,33311,158,up
-Taj Bryant,Sacred Heart,Wing,32844,32999,155,up
-Daemar Kelly,Northern Illinois,Wing,31468,31321,-147,down
-Michael Simcoe,UC Santa Barbara,Wing,29586,29731,145,up
-Ben Eisendrath,Harvard,Guard,74577,74436,-141,down
-Dylan Jones,Southern Utah,Wing,28705,28567,-138,down
-Achille Lonati,St. Bonaventure,Wing,26107,25969,-138,down
-Collin O'Connor,Stony Brook,Guard,70645,70781,136,up
-Jordan Pickett,SIU Edwardsville,Wing,26198,26327,129,up
-Jaylen Pazon,VMI,Wing,25541,25413,-128,down
-Chase Martin,Oral Roberts,Wing,24929,24805,-124,down
-Melvyn Ebonkoli,NJIT,Big,52273,52162,-111,down
-Austin Nunez,UTSA,Guard,49193,49300,107,up
-Errol White,Lamar,Big,48811,48705,-106,down
-KJ Thomas,UTEP,Guard,49540,49645,105,up
-Troy Cole Jr.,Southeast Missouri St.,Wing,19898,19793,-105,down
-Devin Ree,Jackson St.,Wing,19626,19522,-104,down
-Cameron Crawford,Duquesne,Wing,17287,17187,-100,down
-Marcus Rigsby Jr.,UT Arlington,Wing,18176,18078,-98,down
-Davide Poser,New Hampshire,Guard,46103,46201,98,up
-Curtis Williams,Gardner Webb,Wing,18060,18158,98,up
-Javante Edwards,Canisius,Guard,41501,41594,93,up
-Charles Caporaso,Jacksonville,Big,33034,32954,-80,down
-Carter Hopoi,Valparaiso,Big,31081,31004,-78,down
-Jaiden Lawrence,Southeastern Louisiana,Wing,12791,12867,76,up
-Aidan Losiewicz,New Haven,Guard,31176,31252,75,up
-Raevon Thomas,Jackson St.,Wing,11262,11331,69,up
-Sebastian Tidor,Portland St.,Wing,10728,10662,-66,down
-AB Coulibaly,Rider,Wing,10403,10337,-66,down
-Jeremiah Evans,Louisiana,Big,22109,22050,-60,down
-Kyle Jones,Buffalo,Wing,8817,8760,-57,down
-Donovan Raymond,Old Dominion,Big,18137,18085,-51,down
-Curtis Stinson Jr.,North Texas,Wing,6516,6466,-50,down
-Josh Pickett,Presbyterian,Guard,16188,16233,46,up
-Rory Hawke,Saint Mary's,Wing,5641,5597,-44,down
-Josh Lee,Denver,Wing,6062,6105,43,up
-Nasir Rodriguez,Fairfield,Wing,5301,5341,40,up
-Dalyn Brandon,Southern Miss,Wing,4653,4617,-35,down
-Noah Melson,Fairleigh Dickinson,Wing,3395,3423,28,up
-LJ Brown,UTSA,Guard,6821,6847,25,up
-Tyler Wagner,Austin Peay,Wing,2620,2596,-23,down
-Jayden Gambrell,Lamar,Wing,2170,2190,20,up
-David Idada,Southeast Missouri St.,Big,4665,4646,-18,down
-Alex Dupre,Portland St.,Wing,1803,1786,-18,down
-Blaize Sagna,Southeast Missouri St.,Wing,1805,1822,17,up
-Rocco Awad,NJIT,Wing,1336,1350,14,up
-Eunique Rink,Hampton,Big,1783,1774,-9,down
-Jesse Burris,Ohio,Wing,604,596,-8,down
-Evan Phelps,East Texas A&M,Guard,1257,1263,7,up
-Samuel Obenjo,Robert Morris,Big,1315,1308,-7,down
+Jailen Bedford,Virginia Tech,Wing,451164,452165,1002,up
+Aaron McBride,Loyola Marymount,Wing,419368,420342,974,up
+Jabez Jenkins,Belmont,Wing,427770,428744,973,up
+Ari Fulton,NJIT,Wing,437828,438801,972,up
+Cale Jacobsen,Nebraska,Wing,427037,428003,966,up
+Trey Autry,George Washington,Wing,402714,403680,966,up
+Patton Pinkins,Mississippi,Wing,383955,383027,-929,down
+Hayden Wood,Jacksonville,Wing,387118,388029,911,up
+Tate Darner,Chattanooga,Wing,378122,379019,896,up
+Davian Brown,Montana St.,Wing,391023,390138,-885,down
+Austin Williford,Saint Joseph's,Wing,326630,327477,847,up
+Ketron Shaw,Old Dominion,Wing,345062,345878,816,up
+Carmelo Adkins,USC Upstate,Wing,320363,321152,789,up
+Nicholas Shogbonyo,Texas A&M Corpus Chris,Wing,315743,314976,-767,down
+Josiah Shackelford,Bowling Green,Wing,298814,299567,752,up
+Amar Augillard,Milwaukee,Wing,300500,301243,743,up
+TJ Long,Vermont,Wing,283178,283891,714,up
+Maki Johnson,East Tennessee St.,Wing,258610,259302,692,up
+Tae Simmons,San Diego St.,Wing,243912,243223,-689,down
+Boden Skunberg,Illinois St.,Wing,259952,259280,-672,down
+Cade Norris,Samford,Wing,244296,244951,655,up
+Damon Nicholas Jr.,Sam Houston St.,Wing,249247,249901,654,up
+Cole Franklin,North Texas,Wing,221725,222352,627,up
+AJ Clark,VMI,Wing,211151,211735,583,up
+Landon Clark,Princeton,Wing,199542,200120,578,up
+Daylen Berry,Winthrop,Wing,207265,207840,576,up
+Lucas Lorenzen,Western Illinois,Wing,207321,207897,576,up
+Andre Henry,UC Irvine,Wing,200770,201333,563,up
+Josh Ahayere,Colgate,Wing,192924,193480,556,up
+Austin Hunt,Harvard,Wing,191919,192473,554,up
+Camaren Sparrow,Coppin St.,Wing,195814,196367,553,up
+Rashad King,LSU,Wing,183599,184149,550,up
+Madiba Owona,Utah Tech,Wing,180005,180535,530,up
+TJ Caldwell,Arkansas St.,Wing,169498,169998,500,up
+Trey Fort,Michigan St.,Wing,156185,156679,494,up
+Melo Sanchez,Central Connecticut,Wing,159753,160232,480,up
+Jakai Newton,Georgia St.,Wing,149125,149589,464,up
+Jaylen Robinson,Richmond,Wing,136071,135615,-456,down
+Ibu Yamazaki,Northern Colorado,Wing,142311,142753,442,up
+Harun Zrno,Rutgers,Wing,120175,120603,429,up
+Jordan Butler,South Carolina,Wing,123912,123489,-422,down
+Emanuel Richards,Longwood,Wing,129928,130342,414,up
+Chuck Bailey III,Nevada,Wing,114793,115186,393,up
+Kade Sebastian,American,Wing,112102,112486,384,up
+Sader Servilus,Valparaiso,Wing,111890,112273,383,up
+Leon Horner,Texas Tech,Wing,90641,90991,350,up
+Duncan Powell,Providence,Wing,81308,81627,320,up
+Quaran McPherson,UAB,Wing,84074,84389,315,up
+Luke Paragon,Brown,Wing,86565,86878,313,up
+Jake Johnson,Stetson,Wing,85395,85090,-306,down
+Melvin Bell Jr.,San Jose St.,Wing,77061,77365,304,up
+Brandon McCreesh,Bucknell,Wing,82493,82792,299,up
+Dariyus Woodson,Louisiana,Wing,81186,80891,-295,down
+Jamias Ferere,Gardner Webb,Wing,78081,77786,-295,down
+Isaiah Griffin,Western Illinois,Wing,79885,79593,-292,down
+Isaiah Langham,Brown,Wing,74634,74349,-285,down
+Landon Williams,Niagara,Wing,71448,71725,277,up
+Reggie Thomas,North Dakota,Wing,73950,73674,-276,down
+Anquan Boldin Jr.,Florida A&M,Wing,69863,70129,265,up
+Melakih Cunningham,Missouri St.,Wing,65070,65329,259,up
+Nicolus Anderson,Loyola Chicago,Wing,58247,58495,248,up
+Ashton Reynolds,Central Connecticut,Wing,43209,43401,192,up
+Aleksander Pachucki,Bucknell,Wing,40904,40721,-184,down
+Maison Adeleye,New Haven,Wing,39086,39260,174,up
+Jalen Bolden,Texas St.,Wing,35221,35382,161,up
+Ethan Pickett,Southeastern Louisiana,Wing,34553,34711,159,up
+Will Harper III,Richmond,Wing,30373,30528,155,up
+Miles Klapper,Idaho,Wing,31033,30887,-146,down
+Zach Halligan,Akron,Wing,30311,30455,144,up
+AJ George,Cal St. Bakersfield,Wing,27174,27042,-132,down
+Myles Mayfield,UNC Asheville,Wing,25988,26120,132,up
+Cam Polak,Youngstown St.,Wing,22114,22001,-114,down
+Brayden Shorter,Murray St.,Wing,18492,18392,-99,down
+Marcus Rigsby Jr.,UT Arlington,Wing,17917,17819,-97,down
+Kolby Gilles,Air Force,Wing,15496,15404,-92,down
+Tybo Bailey,East Carolina,Wing,14901,14810,-91,down
+Daniil Glazkov,Loyola Chicago,Wing,13540,13455,-85,down
+Bryson Ogletree,North Carolina A&T,Wing,14388,14471,83,up
+Jaxon Prunty,Charleston,Wing,10702,10635,-67,down
+Morris Ugusuk,West Virginia,Wing,6205,6263,58,up
+Karris Bilal,Louisiana,Wing,6275,6230,-45,down
+Vince Dawson III,Morehead St.,Wing,6122,6077,-45,down
+Antwan Wilson,Rider,Wing,5988,5945,-43,down
+Ahmed Essahaty,Southeastern Louisiana,Wing,4879,4842,-37,down
+Evan Anderson,South Dakota,Wing,4344,4378,35,up
+Isaiah Henderson,Siena,Wing,3750,3720,-31,down
+Noah Melson,Fairleigh Dickinson,Wing,3423,3395,-28,down
+John Clemmons,Delaware St.,Wing,3029,3003,-26,down
+Miles Daniels,Cal Baptist,Wing,3074,3048,-26,down
+Khalil Farmer,UMass Lowell,Wing,2981,3006,25,up
+Brady Cummins,Colgate,Wing,2675,2652,-23,down
+James Dent Jr.,Middle Tennessee,Wing,2526,2503,-22,down
+Brandon Russell,Saint Francis,Wing,1062,1050,-12,down
+Logan Epes,Missouri St.,Wing,810,800,-9,down
+Geon Hutchins,Northern Iowa,Wing,689,698,9,up
+Judson Bjornstad,Samford,Wing,370,365,-5,down
+Kanye Jones,USC Upstate,Wing,89,91,2,up
+Solo Ball,Connecticut,Wing,,558338,,new

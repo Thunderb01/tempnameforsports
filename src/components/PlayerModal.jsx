@@ -181,6 +181,7 @@ function SkillProfile({ stats }) {
 export function PlayerModal({ player, onClose }) {
   const [stats, setStats] = useState(null);
   const [loadingStats, setLoadingStats] = useState(true);
+  const [profileIdx, setProfileIdx] = useState(0);
 
   useEffect(() => {
     function onKey(e) { if (e.key === "Escape") onClose(); }
@@ -195,10 +196,9 @@ export function PlayerModal({ player, onClose }) {
       .from("player_stats")
       .select("*")
       .eq("player_id", player.id)
-      .maybeSingle()
+      .order("calendar_year", { ascending: false })
       .then(({ data }) => {
-        console.log("player_stats row:", data);
-        setStats(data ?? null);
+        setStats(data?.length ? data : null);
         setLoadingStats(false);
       });
   }, [player?.id]);
@@ -245,6 +245,13 @@ export function PlayerModal({ player, onClose }) {
                 </div>
               );
             })()}
+            {/* 3PT Specialist badge — hidden until ready to surface
+            {player.specialistTags?.includes("3pt_specialist") && (
+              <div style={{ marginTop: 6, marginLeft: 6, display: "inline-block", padding: "3px 10px", borderRadius: 20, fontSize: 12, fontWeight: 600, background: "#38bdf822", color: "#38bdf8", border: "1px solid #38bdf855" }}>
+                3PT Specialist
+              </div>
+            )}
+            */}
           </div>
 
           <div className="modal-section">
@@ -267,13 +274,15 @@ export function PlayerModal({ player, onClose }) {
                     </tr>
                   </thead>
                   <tbody>
-                    <tr>
-                      {STAT_ROWS.map(({ key }) => (
-                        <td key={key} style={{ padding: "6px 10px", textAlign: "center", fontVariantNumeric: "tabular-nums", fontWeight: 600 }}>
-                          {fmt(stats[key], key)}
-                        </td>
-                      ))}
-                    </tr>
+                    {stats.map((row, i) => (
+                      <tr key={row.calendar_year ?? i} style={i > 0 ? { opacity: 0.55 } : {}}>
+                        {STAT_ROWS.map(({ key }) => (
+                          <td key={key} style={{ padding: "6px 10px", textAlign: "center", fontVariantNumeric: "tabular-nums", fontWeight: 600 }}>
+                            {fmt(row[key], key)}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>
@@ -308,7 +317,23 @@ export function PlayerModal({ player, onClose }) {
           </div>
 
           <div className="modal-section">
-            <h4>Beyond the Portal Skill Profile</h4>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+              <h4 style={{ margin: 0 }}>Beyond the Portal Skill Profile</h4>
+              {stats?.length > 1 && (
+                <div style={{ display: "flex", gap: 4 }}>
+                  {stats.map((row, i) => (
+                    <button key={row.calendar_year ?? i} onClick={() => setProfileIdx(i)} style={{
+                      fontSize: 11, fontWeight: 600, padding: "2px 10px", borderRadius: 20, cursor: "pointer", border: "1px solid",
+                      background: profileIdx === i ? "rgba(91,156,246,.2)" : "transparent",
+                      color:      profileIdx === i ? "#5b9cf6" : "rgba(255,255,255,.35)",
+                      borderColor: profileIdx === i ? "rgba(91,156,246,.5)" : "rgba(255,255,255,.12)",
+                    }}>
+                      {row.calendar_year ?? `Season ${i + 1}`}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
             <div style={{ fontSize: 11, opacity: .4, marginBottom: 10 }}>
               Grades reflect percentile rank within position group (Guard, Wing, or Big).
             </div>
@@ -316,12 +341,12 @@ export function PlayerModal({ player, onClose }) {
               <div style={{ opacity: .4, fontSize: 13 }}>Loading…</div>
             ) : !stats ? (
               <div style={{ opacity: .4, fontSize: 13 }}>No metrics on file.</div>
-            ) : PENTAGON_METRICS.every(m => stats[m.key] == null) ? (
+            ) : PENTAGON_METRICS.every(m => stats[profileIdx]?.[m.key] == null) ? (
               <div style={{ opacity: .4, fontSize: 13, fontStyle: "italic" }}>
                 Insufficient playing time to generate a skill profile.
               </div>
             ) : (
-              <SkillProfile stats={stats} />
+              <SkillProfile stats={stats[profileIdx]} />
             )}
           </div>
 
