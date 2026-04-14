@@ -147,7 +147,7 @@ function SkillProfile({ stats }) {
           const color = gradeColor(grade);
           return (
             <div key={key} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <div style={{ width: 90, fontSize: 12, opacity: .6, flexShrink: 0, position: "relative", cursor: "default", whiteSpace: "nowrap" }}
+              <div style={{ width: 90, fontSize: 12, color: "rgba(255,255,255,.6)", flexShrink: 0, position: "relative", cursor: "default", whiteSpace: "nowrap" }}
                 onMouseEnter={e => {
                   const tip = e.currentTarget.querySelector(".metric-tip");
                   if (tip) tip.style.display = "block";
@@ -159,13 +159,14 @@ function SkillProfile({ stats }) {
                 {label}
                 <div className="metric-tip" style={{
                   display: "none", position: "absolute", left: 0, bottom: "calc(100% + 6px)",
-                  background: "#1e2a3a", border: "1px solid rgba(255,255,255,.12)",
-                  borderRadius: 6, padding: "7px 10px", fontSize: 11, lineHeight: 1.5,
-                  width: 200, color: "rgba(255,255,255,.75)", zIndex: 10,
-                  boxShadow: "0 4px 16px rgba(0,0,0,.4)", pointerEvents: "none",
+                  background: "#1e2d45", border: "1px solid rgba(255,255,255,.35)",
+                  borderRadius: 6, padding: "8px 11px", fontSize: 11, lineHeight: 1.6,
+                  width: 220, whiteSpace: "normal", wordBreak: "break-word",
+                  color: "#fff", zIndex: 10,
+                  boxShadow: "0 4px 20px rgba(0,0,0,.9)", pointerEvents: "none",
                 }}>
-                  <div style={{ fontWeight: 700, marginBottom: 3, opacity: 1, color: "#fff" }}>{label}</div>
-                  {desc}
+                  <div style={{ fontWeight: 700, marginBottom: 4, color: "#fff" }}>{label}</div>
+                  <div style={{ opacity: .85 }}>{desc}</div>
                 </div>
               </div>
               <div style={{ flex: 1, height: 6, background: "rgba(255,255,255,.08)", borderRadius: 3, overflow: "hidden" }}>
@@ -243,7 +244,7 @@ export function PlayerModal({ player, onClose }) {
               const label = projectedTier(player.nilValuation);
               const color = tierColor(label);
               return (
-                <div style={{ marginTop: 6, display: "inline-block", padding: "4px 12px", borderRadius: 20, fontSize: 12, fontWeight: 600, background: `${color}40`, color, border: `1px solid ${color}99`, whiteSpace: "nowrap" }}>
+                <div style={{ marginTop: 6, display: "inline-block", padding: "3px 10px", borderRadius: 20, fontSize: 12, fontWeight: 600, background: `${color}22`, color, border: `1px solid ${color}55` }}>
                   {label}
                 </div>
               );
