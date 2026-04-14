@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { SiteHeader }   from "@/components/SiteHeader";
 import { PlayerCard }   from "@/components/PlayerCard";
 import { PlayerModal }  from "@/components/PlayerModal";
+import { PlayerFinder } from "@/components/PlayerFinder";
 import { useAuth }      from "@/hooks/useAuth";
 import { useRosterBoard } from "@/hooks/useRosterBoard";
 import { useAdminTeam }       from "@/hooks/useAdminTeam";
@@ -53,6 +54,7 @@ export function AppPage() {
   const [modal,         setModal]         = useState(null);
   const [settings,      setSettings]      = useState(null);
   const [drawerOpen,    setDrawerOpen]    = useState(false);
+  const [finderOpen,    setFinderOpen]    = useState(false);
   const [myRosters,     setMyRosters]     = useState([]);
   const [teamRosters,   setTeamRosters]   = useState([]);
   const [coaches,       setCoaches]       = useState({});
@@ -358,6 +360,9 @@ export function AppPage() {
                   .filter(Boolean);
                 exportRosterPDF({ team: activeTeam, settings: board.state.settings, players: [...returning, ...transfers] });
               }}>Export PDF</button>
+              <button className="btn btn-ghost" onClick={() => setFinderOpen(true)}>
+                Find Players
+              </button>
               <button className="btn btn-ghost" onClick={() => setDrawerOpen(true)}>
                 Saved Rosters
               </button>
@@ -663,6 +668,15 @@ export function AppPage() {
         <PlayerModal
           player={modal}
           onClose={() => setModal(null)}
+        />
+      )}
+
+      {finderOpen && (
+        <PlayerFinder
+          board={board}
+          returningPlayers={board.returningPlayers}
+          retentionById={board.state.retentionById}
+          onClose={() => setFinderOpen(false)}
         />
       )}
 

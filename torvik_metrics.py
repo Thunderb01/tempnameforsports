@@ -319,6 +319,11 @@ def compute_sei(df, use_torvik=False):
     ts  = df["TS_per"].fillna(0)
     usg = df["usg"].fillna(0)
 
+    # Discount USG by TO rate so turnover-prone players don't get a free SEI boost.
+    # e.g. USG=27 with 17% TO rate → effective USG = 27 * (1 - 0.17) = 22.4
+    to_rate = df["TO_per"].fillna(0) / 100
+    usg = usg * (1 - to_rate)
+
     total_fga  = (df["twoPA"].fillna(0) + df["TPA"].fillna(0)).replace(0, float("nan"))
     three_ratio = df["TPA"].fillna(0) / total_fga
     is_specialist = (three_ratio >= 0.70) & (df["TP_per"].fillna(0) >= 0.37)
