@@ -9,6 +9,7 @@ import { useAdminTeam }       from "@/hooks/useAdminTeam";
 import { TeamAutocomplete }   from "@/components/TeamAutocomplete";
 import { supabase }       from "@/lib/supabase";
 import { exportRosterPDF } from "@/lib/exportRoster";
+import { track } from "@/lib/track";;
 
 function money(n) {
   return Number(n || 0).toLocaleString(undefined, {
@@ -32,22 +33,6 @@ export function AppPage() {
   const { isAdmin, isNonAffiliate, activeTeam, selectedTeam, setSelectedTeam, allTeams } = useAdminTeam(profile);
 
   const board = useRosterBoard(activeTeam);
-  //some debug logs to help track down state loading issues
-  console.log("DEBUG profile:", profile);
-  console.log("DEBUG team:", activeTeam);
-  console.log("DEBUG board object:", board);
-  console.log("DEBUG board.state:", board?.state);
-  console.log("DEBUG board.state.board:", board?.state?.board);
-  console.log("DEBUG board.returningPlayers:", board?.returningPlayers);
-  console.log("DEBUG board.state.settings:", board?.state?.settings);
-  console.log("DEBUG shortlistIds:", board?.state?.shortlistIds);
-  console.log("DEBUG roster:", board?.state?.roster);
-
-  //safe guards
-  if (!board) return <div>board missing</div>;
-  if (!board.state) return <div>board.state missing</div>;
-  if (!Array.isArray(board.state.board)) return <div>board.state.board not array</div>;
-  if (!Array.isArray(board.returningPlayers)) return <div>returningPlayers not array</div>;
 
   const [search,   setSearch]   = useState("");
   const [posFilter,setPosFilter]= useState("all");
@@ -62,6 +47,15 @@ export function AppPage() {
   const [saveName,      setSaveName]      = useState("");
   const [saving,        setSaving]        = useState(false);
 
+  // Page view tracking — sessionStorage guard prevents double-fires from
+  // React Strict Mode and HMR remounts in development.
+  useEffect(() => {
+    if (!sessionStorage.getItem("btp_pv_app")) {
+      sessionStorage.setItem("btp_pv_app", "1");
+      track("page_view", { page: "app" });
+    }
+  }, []);
+
   // Load data on mount / when active team changes
   useEffect(() => {
     board.loadPortalBoard();
@@ -72,6 +66,11 @@ export function AppPage() {
   useEffect(() => {
     setSettings(board.state.settings);
   }, [board.state.settings]);
+
+  function handleOpenModal(p) {
+    track("player_modal_opened", { player_id: p.id, player_name: p.name, team: p.team, pos: p.pos });
+    setModal(p);
+  }
 
   // Load saved rosters when drawer opens
   useEffect(() => {
@@ -133,7 +132,20 @@ export function AppPage() {
           shortlisted: shortlistIds.includes(e.id),
         }));
 
-      const { error: pErr } = await supabase.from("saved_roster_players").insert([...returning, ...transfers]);
+      // Save shortlisted portal players that aren't on the roster yet
+      const rosteredIds = new Set(board.state.roster.map(e => e.id));
+      const shortlistedOnly = shortlistIds
+        .filter(id => !rosteredIds.has(id))
+        .map(id => ({
+          roster_id:   row.id,
+          player_id:   id,
+          player_type: "shortlisted",
+          nil_offer:   0,
+          status:      statusById[id] || null,
+          shortlisted: true,
+        }));
+
+      const { error: pErr } = await supabase.from("saved_roster_players").insert([...returning, ...transfers, ...shortlistedOnly]);
       if (pErr) throw pErr;
 
       setMyRosters(prev => [{ id: row.id, name: saveName.trim(), created_at: new Date().toISOString(), user_id: userId }, ...prev]);
@@ -358,9 +370,10 @@ export function AppPage() {
                 const transfers = board.state.roster
                   .map(r => { const p = board.byId(r.id); return p ? { ...p, _type: "Transfer In", nilOffer: r.nilOffer } : null; })
                   .filter(Boolean);
+                track("pdf_exported", { team: activeTeam, roster_size: returning.length + transfers.length });
                 exportRosterPDF({ team: activeTeam, settings: board.state.settings, players: [...returning, ...transfers] });
               }}>Export PDF</button>
-              <button className="btn btn-ghost" onClick={() => setFinderOpen(true)}>
+              <button className="btn btn-ghost" onClick={() => { setFinderOpen(true); track("finder_opened", {}); }}>
                 Find Players <span style={{ fontSize: 10, opacity: 0.5, fontWeight: 400 }}>(Beta)</span>
               </button>
               <button className="btn btn-ghost" onClick={() => setDrawerOpen(true)}>
@@ -400,9 +413,9 @@ export function AppPage() {
                   <PlayerCard key={p.id} player={p}
                     inRoster={board.inRoster(p.id)}
                     inShortlist={board.inShort(p.id)}
-                    onRoster={board.addToRoster}
-                    onShortlist={board.addToShortlist}
-                    onClick={setModal}
+                    onRoster={id => { track("roster_add",    { player_id: id, player_name: p.name, pos: p.pos }); board.addToRoster(id); }}
+                    onShortlist={id => { track("shortlist_add", { player_id: id, player_name: p.name, pos: p.pos }); board.addToShortlist(id); }}
+                    onClick={handleOpenModal}
                   />
                 ))
               }
@@ -423,7 +436,7 @@ export function AppPage() {
                     if (!p) return null;
                     return (
                       <div key={id} className="row row-click"
-                        onClick={e => { if (!e.target.closest("button,select")) setModal(p); }}>
+                        onClick={e => { if (!e.target.closest("button,select")) handleOpenModal(p); }}>
                         <div className="row-main">
                           <div className="row-title">{p.name}</div>
                           <div className="row-sub">{p.team} · {p.pos} · {p.year}</div>
@@ -453,7 +466,7 @@ export function AppPage() {
                   <div className="sub-label">Returning ({returningByStatus.returning.length})</div>
                   {returningByStatus.returning.map((p, i) => (
                     <div key={i} className="row row-click" style={{ opacity: .75 }}
-                      onClick={e => { if (!e.target.closest("select,input")) setModal(p); }}>
+                      onClick={e => { if (!e.target.closest("select,input")) handleOpenModal(p); }}>
                       <div className="row-main">
                         <div className="row-title" style={{ fontSize: 13 }}>{p.name}</div>
                         <div className="row-sub" style={{ fontSize: 11 }}>{p.primary_position || p.pos} · {p.year}</div>
@@ -488,7 +501,7 @@ export function AppPage() {
                   <div className="sub-label" style={{ color: "var(--warning, #f5a623)" }}>Undecided ({returningByStatus.undecided.length})</div>
                   {returningByStatus.undecided.map((p, i) => (
                     <div key={i} className="row row-click"
-                      onClick={e => { if (!e.target.closest("select,input")) setModal(p); }}>
+                      onClick={e => { if (!e.target.closest("select,input")) handleOpenModal(p); }}>
                       <div className="row-main">
                         <div className="row-title" style={{ fontSize: 13 }}>{p.name}</div>
                         <div className="row-sub" style={{ fontSize: 11 }}>{p.primary_position || p.pos} · {p.year}</div>
@@ -523,7 +536,7 @@ export function AppPage() {
                   <div className="sub-label" style={{ color: "var(--danger, #e05c5c)" }}>Entering Portal ({returningByStatus.entering_portal.length})</div>
                   {returningByStatus.entering_portal.map((p, i) => (
                     <div key={i} className="row row-click" style={{ opacity: .6 }}
-                      onClick={e => { if (!e.target.closest("select")) setModal(p); }}>
+                      onClick={e => { if (!e.target.closest("select")) handleOpenModal(p); }}>
                       <div className="row-main">
                         <div className="row-title" style={{ fontSize: 13 }}>{p.name}</div>
                         <div className="row-sub" style={{ fontSize: 11 }}>{p.primary_position || p.pos} · {p.year}</div>
@@ -550,7 +563,7 @@ export function AppPage() {
                   <div className="sub-label" style={{ color: "var(--muted, rgba(255,255,255,.4))" }}>Graduating ({returningByStatus.graduating.length})</div>
                   {returningByStatus.graduating.map((p, i) => (
                     <div key={i} className="row row-click" style={{ opacity: .4 }}
-                      onClick={e => { if (!e.target.closest("select")) setModal(p); }}>
+                      onClick={e => { if (!e.target.closest("select")) handleOpenModal(p); }}>
                       <div className="row-main">
                         <div className="row-title" style={{ fontSize: 13 }}>{p.name}</div>
                         <div className="row-sub" style={{ fontSize: 11 }}>{p.primary_position || p.pos} · {p.year}</div>
@@ -577,7 +590,7 @@ export function AppPage() {
                   <div className="sub-label" style={{ color: "#a78bfa" }}>Entering Draft ({returningByStatus.entering_draft.length})</div>
                   {returningByStatus.entering_draft.map((p, i) => (
                     <div key={i} className="row row-click" style={{ opacity: .4 }}
-                      onClick={e => { if (!e.target.closest("select")) setModal(p); }}>
+                      onClick={e => { if (!e.target.closest("select")) handleOpenModal(p); }}>
                       <div className="row-main">
                         <div className="row-title" style={{ fontSize: 13 }}>{p.name}</div>
                         <div className="row-sub" style={{ fontSize: 11 }}>{p.primary_position || p.pos} · {p.year}</div>
@@ -604,7 +617,7 @@ export function AppPage() {
                   <div className="sub-label" style={{ color: "#94a3b8" }}>Transferred ({returningByStatus.transferred.length})</div>
                   {returningByStatus.transferred.map((p, i) => (
                     <div key={i} className="row row-click" style={{ opacity: .4 }}
-                      onClick={e => { if (!e.target.closest("select")) setModal(p); }}>
+                      onClick={e => { if (!e.target.closest("select")) handleOpenModal(p); }}>
                       <div className="row-main">
                         <div className="row-title" style={{ fontSize: 13 }}>{p.name}</div>
                         <div className="row-sub" style={{ fontSize: 11 }}>{p.primary_position || p.pos} · {p.year}</div>
@@ -636,7 +649,7 @@ export function AppPage() {
                     if (!p) return null;
                     return (
                       <div key={entry.id} className="row row-click"
-                        onClick={e => { if (!e.target.closest("button,input,select")) setModal(p); }}>
+                        onClick={e => { if (!e.target.closest("button,input,select")) handleOpenModal(p); }}>
                         <div className="row-main">
                           <div className="row-title">{p.name}</div>
                           <div className="row-sub">{p.team} · {p.pos} · {p.year}</div>

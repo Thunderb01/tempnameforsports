@@ -1,6 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 
+// Module-level caches so data survives page navigation without re-fetching.
+let _boardCache = [];
+const _rosterCache = {}; // keyed by teamName
+
 const STORAGE_KEY    = "bp_roster_builder";
 const STORAGE_VERSION = 12; // bump this whenever the state shape changes
 
@@ -82,6 +86,12 @@ export function useRosterBoard(team) {
   // ── Portal board ────────────────────────────────────────────────────────────
 
   const loadPortalBoard = useCallback(async () => {
+    // Return cached data immediately if already fetched this session
+    if (_boardCache.length > 0) {
+      setState(s => ({ ...s, board: _boardCache }));
+      return;
+    }
+
     const all = [];
     const PAGE = 1000;
     let page = 0;
@@ -121,6 +131,7 @@ export function useRosterBoard(team) {
       stats:          { ...(row.player_stats?.[0] || {}) },
     }));
 
+    _boardCache = players;
     setState(s => ({ ...s, board: players }));
   }, []);
 
@@ -130,6 +141,12 @@ export function useRosterBoard(team) {
 
   const loadReturningRoster = useCallback(async (teamName) => {
     if (!teamName) return;
+
+    if (_rosterCache[teamName]) {
+      setReturningPlayers(_rosterCache[teamName]);
+      return;
+    }
+
     const { data, error } = await supabase
       .from("team_players")
       .select("*, players(*, player_stats(*))")
@@ -160,6 +177,7 @@ export function useRosterBoard(team) {
       }))
       .sort((a, b) => a.name.localeCompare(b.name));
 
+    _rosterCache[teamName] = returning;
     setReturningPlayers(returning);
 
     // Auto-set retention for seniors/graduates and portal players
@@ -259,10 +277,12 @@ export function useRosterBoard(team) {
     const statusById    = {};
     const shortlistIds  = [];
     savedPlayers.forEach(p => {
-      if (p._status)     statusById[p.id] = p._status;
+      if (p._status)      statusById[p.id] = p._status;
       if (p._shortlisted) shortlistIds.push(p.id);
       if (p._typeKey === "transfer") {
         roster.push({ id: p.id, nilOffer: p.nilOffer || 0 });
+      } else if (p._typeKey === "shortlisted") {
+        // shortlisted-only portal players — already added to shortlistIds above
       } else {
         retentionById[p.id] = p._typeKey;
         if (p.nilOffer) nilById[p.id] = p.nilOffer;

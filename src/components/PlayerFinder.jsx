@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { PlayerModal } from "@/components/PlayerModal";
+import { track } from "@/lib/track";
 
 // BtP skill metrics shown in the finder
 const METRICS = [
@@ -104,7 +105,15 @@ export function PlayerFinder({ board, returningPlayers, retentionById, onClose }
     }
 
     scored.sort((a, b) => b._score - a._score);
-    setResults(scored.slice(0, 20));
+    const top = scored.slice(0, 20);
+    track("finder_search", {
+      mode,
+      pos_filter: posFilter,
+      max_nil: maxNil,
+      ...(mode === "need" ? { priorities } : { replace_id: replaceId }),
+      result_count: top.length,
+    });
+    setResults(top);
   }
 
   const replacePlayer = [...returningPlayers, ...board.state.board].find(p => p.id === replaceId);
