@@ -226,6 +226,22 @@ def normalise_team(team_str):
     return TORVIK_TEAM_ALIASES.get(n, n)
 
 
+# Maps Torvik display names → canonical display names for player_stats.school
+# Add entries here when Torvik and SR use different names for the same school.
+SCHOOL_DISPLAY_MAP = {
+    "UConn": "Connecticut",
+    # "Pitt":  "Pittsburgh",
+    # "UNC":   "North Carolina",
+    # "WKU":   "Western Kentucky",
+    # "WVU":   "West Virginia",
+    # "Miami FL": "Miami",
+}
+
+def display_school(team_str):
+    """Return the canonical display name for a school (used when writing player_stats.school)."""
+    return SCHOOL_DISPLAY_MAP.get(team_str, team_str)
+
+
 # ── POSITION NORMALISATION ─────────────────────────────────────────────────────
 # Torvik's 'role' column values (e.g. "Wing F", "Combo G", "Big") are mapped
 # to three position buckets so percentile ranks are position-relative.
@@ -1152,7 +1168,7 @@ def main():
 
         # ── Upsert player_stats row keyed on (player_id, calendar_year) ───────
         YR_MAP = {"Fr": "Freshman", "So": "Sophomore", "Jr": "Junior", "Sr": "Senior", "Gr": "Graduate"}
-        stats_patch = {**torvik, "name": name, "school": team, "year": YR_MAP.get(yr, yr)}
+        stats_patch = {**torvik, "name": name, "school": display_school(team), "year": YR_MAP.get(yr, yr)}
         for key_m, val in [("cdi", cdi), ("dds", dds), ("sei", sei), ("ath", ath), ("ris", ris)]:
             if val is not None:
                 stats_patch[key_m] = val
@@ -1239,7 +1255,7 @@ def main():
                 "ast_tov": safe(row.get("ast/tov")),
                 "cdi": None, "dds": None, "sei": None, "ath": None, "ris": None,
                 "name":   name,
-                "school": team,
+                "school": display_school(team),
                 "year":   {"Fr": "Freshman", "So": "Sophomore", "Jr": "Junior", "Sr": "Senior", "Gr": "Graduate"}.get(str(row.get("yr", "")).strip(), str(row.get("yr", "")).strip()),
             }
 

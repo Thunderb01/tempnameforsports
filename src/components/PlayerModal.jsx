@@ -243,7 +243,7 @@ export function PlayerModal({ player, onClose }) {
               const label = projectedTier(player.nilValuation);
               const color = tierColor(label);
               return (
-                <div style={{ marginTop: 6, display: "inline-block", padding: "3px 10px", borderRadius: 20, fontSize: 12, fontWeight: 600, background: `${color}22`, color, border: `1px solid ${color}55` }}>
+                <div style={{ marginTop: 6, display: "inline-block", padding: "4px 12px", borderRadius: 20, fontSize: 12, fontWeight: 600, background: `${color}40`, color, border: `1px solid ${color}99`, whiteSpace: "nowrap" }}>
                   {label}
                 </div>
               );
