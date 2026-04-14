@@ -361,7 +361,7 @@ export function AppPage() {
                 exportRosterPDF({ team: activeTeam, settings: board.state.settings, players: [...returning, ...transfers] });
               }}>Export PDF</button>
               <button className="btn btn-ghost" onClick={() => setFinderOpen(true)}>
-                Find Players
+                Find Players <span style={{ fontSize: 10, opacity: 0.5, fontWeight: 400 }}>(Beta)</span>
               </button>
               <button className="btn btn-ghost" onClick={() => setDrawerOpen(true)}>
                 Saved Rosters

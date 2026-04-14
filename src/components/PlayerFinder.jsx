@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { PlayerModal } from "@/components/PlayerModal";
 
 // BtP skill metrics shown in the finder
@@ -44,6 +44,11 @@ function gradeColor(val) {
 }
 
 export function PlayerFinder({ board, returningPlayers, retentionById, onClose }) {
+  useEffect(() => {
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = ""; };
+  }, []);
+
   const [mode, setMode]           = useState("need"); // "need" | "replace"
   const [posFilter, setPosFilter] = useState("All");
   const [maxNil, setMaxNil]       = useState(board.state.settings.nilTotal ?? 3000000);
