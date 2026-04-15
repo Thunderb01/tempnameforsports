@@ -806,11 +806,11 @@ def compute_nil_valuation(df):
 
     # ── Projected Tier ────────────────────────────────────────────────────────
     def assign_tier(v):
-        if v >= 2_200_000: return "P4 All-American / Pre-Draft"
-        if v >= 1_500_000: return "P4 All-Conference"
-        if v >= 1_000_000: return "P4 Starter / MM All-Conference"
-        if v >=   400_000: return "P4 Rotation / MM Starter"
-        if v >=   250_000: return "MM Role Player / LM All-Conference"
+        if v >= 2_200_000: return "HM All-American / Pre-Draft"
+        if v >= 1_500_000: return "HM All-Conference"
+        if v >= 1_000_000: return "HM Starter / MM All-Conference"
+        if v >=   400_000: return "HM Rotation / MM Starter"
+        if v >=   100_000: return "MM Role Player / LM All-Conference"
         return "LM Rotation"
         
     projected_tier = base_nil_final.apply(assign_tier)

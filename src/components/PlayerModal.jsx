@@ -49,24 +49,24 @@ const PENTAGON_METRICS = [
 ];
 
 const TIER_COLORS = {
-  "P4 All-American / Pre-Draft":       "#4ade80",
-  "P4 All-Conference":                 "#5b9cf6",
-  "P4 Starter / MM All-Conference":    "#f5c542",
-  "P4 Rotation / MM Starter":          "#fb923c",
+  "HM All-American / Pre-Draft":       "#4ade80",
+  "HM All-Conference":                 "#5b9cf6",
+  "HM Starter / MM All-Conference":    "#f5c542",
+  "HM Rotation / MM Starter":          "#fb923c",
   "MM Role Player / LM All-Conference":"#e05c5c",
-  "LM Starter":                        "#94a3b8",
-  "LM Role Player":                    "#64748b",
+  "LM Rotation":                       "#94a3b8",
 };
 function tierColor(label) { return TIER_COLORS[label] || "#64748b"; }
 function projectedTier(nilValuation) {
   const v = Number(nilValuation) || 0;
-  if (v >= 2_200_000) return "P4 All-American / Pre-Draft"
-  if (v >= 1_500_000) return "P4 All-Conference"
-  if (v >=   750_000) return "P4 Starter / MM All-Conference"
-  if (v >=   400_000) return "P4 Rotation / MM Starter"
-  if (v >=   200_000) return "MM Role Player / LM All-Conference"
+  if (v >= 2_200_000) return "HM All-American / Pre-Draft"
+  if (v >= 1_500_000) return "HM All-Conference"
+  if (v >=   750_000) return "HM Starter / MM All-Conference"
+  if (v >=   400_000) return "HM Rotation / MM Starter"
+  if (v >=   100_000) return "MM Role Player / LM All-Conference"
   return "LM Rotation"
 }
+
 
 function letterGrade(val) {
   if (val === null || val === undefined) return "—";
