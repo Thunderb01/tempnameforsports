@@ -34,7 +34,7 @@ export function SiteHeader() {
             Roster Sandbox
           </NavLink>
           <NavLink to="/compare" className={({ isActive }) => "nav-link" + (isActive ? " active" : "")}>
-            Compare
+            Compare Players
           </NavLink>
           {isSuperAdmin && (
             <NavLink to="/admin" className={({ isActive }) => "nav-link" + (isActive ? " active" : "")}
