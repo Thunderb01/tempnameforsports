@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { Navigate, Outlet } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { useAdminTeam } from "@/hooks/useAdminTeam";
 import { supabase } from "@/lib/supabase";
 
 function useSessionTracking(userId) {
@@ -68,6 +69,28 @@ export function ProtectedRoute() {
   if (!session) {
     return <Navigate to="/login" replace />;
   }
+
+  return <Outlet />;
+}
+
+/**
+ * Wraps routes that require superadmin role.
+ * Redirects to /app if authenticated but not superadmin.
+ */
+export function SuperAdminRoute() {
+  const { session, profile, loading } = useAuth();
+  const { isSuperAdmin } = useAdminTeam(profile);
+
+  if (loading) {
+    return (
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", opacity: .4 }}>
+        Loading…
+      </div>
+    );
+  }
+
+  if (!session) return <Navigate to="/login" replace />;
+  if (!isSuperAdmin) return <Navigate to="/app" replace />;
 
   return <Outlet />;
 }

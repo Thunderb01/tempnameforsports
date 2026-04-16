@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { PlayerModal } from "@/components/PlayerModal";
 import { track } from "@/lib/track";
+import { money, gradeColorFromVal as gradeColor } from "@/lib/display";
 
 // BtP skill metrics shown in the finder
 const METRICS = [
@@ -20,10 +21,6 @@ const PRIORITY_OPTIONS = [
 
 const POSITIONS = ["All", "Guard", "Wing", "Big"];
 
-function money(n) {
-  return Number(n || 0).toLocaleString(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 0 });
-}
-
 function cosineSimilarity(a, b) {
   const dot  = a.reduce((s, v, i) => s + v * b[i], 0);
   const magA = Math.sqrt(a.reduce((s, v) => s + v * v, 0));
@@ -33,15 +30,6 @@ function cosineSimilarity(a, b) {
 
 function metricVec(stats) {
   return METRICS.map(m => stats?.[m.key] ?? 0);
-}
-
-function gradeColor(val) {
-  if (val == null) return "rgba(255,255,255,.25)";
-  if (val >= 85) return "#4ade80";
-  if (val >= 70) return "#5b9cf6";
-  if (val >= 50) return "#f5a623";
-  if (val >= 30) return "#fb923c";
-  return "#e05c5c";
 }
 
 export function PlayerFinder({ board, returningPlayers, retentionById, onClose }) {

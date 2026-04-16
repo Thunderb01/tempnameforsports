@@ -1,37 +1,46 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
+import { money } from "@/lib/display";
 
 // Module-level caches so data survives page navigation without re-fetching.
 let _boardCache = [];
 const _rosterCache = {}; // keyed by teamName
 
-const STORAGE_KEY    = "bp_roster_builder";
-const STORAGE_VERSION = 12; // bump this whenever the state shape changes
+export function getBoardCache() { return _boardCache; }
+export function setBoardCache(players) { _boardCache = players; }
+
+const STORAGE_KEY_PREFIX = "bp_roster_builder";
+const STORAGE_VERSION    = 13; // bump this whenever the state shape changes
 
 // Legacy keys to purge on load
-const LEGACY_KEYS = ["bp_roster_builder_v1"];
+const LEGACY_KEYS = ["bp_roster_builder_v1", "bp_roster_builder"];
 
-function loadLocal(team) {
+function storageKey(userId) {
+  return userId ? `${STORAGE_KEY_PREFIX}_${userId}` : STORAGE_KEY_PREFIX;
+}
+
+function loadLocal(team, userId) {
   try {
     LEGACY_KEYS.forEach(k => localStorage.removeItem(k));
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const key = storageKey(userId);
+    const raw = localStorage.getItem(key);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (parsed._version !== STORAGE_VERSION) {
-      localStorage.removeItem(STORAGE_KEY); // stale schema — discard
+      localStorage.removeItem(key); // stale schema — discard
       return null;
     }
     // If the saved state belongs to a different team, discard it
     if (team && parsed._team && parsed._team !== team) {
-      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(key);
       return null;
     }
     return { ...parsed, board: [] };
   } catch { return null; }
 }
 
-function saveLocal(state, team) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...state, _team: team, _version: STORAGE_VERSION }));
+function saveLocal(state, team, userId) {
+  localStorage.setItem(storageKey(userId), JSON.stringify({ ...state, _team: team, _version: STORAGE_VERSION }));
 }
 
 function defaultState(team = "") {
@@ -46,39 +55,33 @@ function defaultState(team = "") {
   };
 }
 
-function money(n) {
-  return Number(n || 0).toLocaleString(undefined, {
-    style: "currency", currency: "USD", maximumFractionDigits: 0,
-  });
-}
-
 /**
  * All roster-builder state in one hook.
  * Components just call the returned actions — no state management needed inline.
  */
-export function useRosterBoard(team) {
+export function useRosterBoard(team, userId) {
   const [state, _setState] = useState(() => {
-    const saved = loadLocal(team);
+    const saved = loadLocal(team, userId);
     return saved ?? defaultState(team);
   });
 
-  // When team resolves (e.g. coach auth finishes), reload from localStorage
+  // When team or userId resolves (e.g. auth finishes), reload from localStorage
   useEffect(() => {
-    if (!team) return;
-    const saved = loadLocal(team);
+    if (!team && !userId) return;
+    const saved = loadLocal(team, userId);
     if (saved) {
       _setState(prev => ({ ...saved, board: prev.board }));
-    } else if (!state.settings.program) {
+    } else if (!state.settings.program && team) {
       setState(s => ({ ...s, settings: { ...s.settings, program: team } }));
     }
-  }, [team]);
+  }, [team, userId]);
 
   function setState(updater) {
     _setState(prev => {
       const next = typeof updater === "function" ? updater(prev) : updater;
       // Only persist user-driven state — never the fetched board (too large for localStorage)
       const { board: _omit, ...persist } = next;
-      saveLocal(persist, team);
+      saveLocal(persist, team, userId);
       return next;
     });
   }
@@ -97,8 +100,8 @@ export function useRosterBoard(team) {
     let page = 0;
     while (true) {
       const { data, error } = await supabase
-        .from("players")
-        .select("*, player_stats(*)")
+        .from("vw_players")
+        .select("*")
         .order("name")
         .range(page * PAGE, (page + 1) * PAGE - 1);
       if (error) { console.error("players fetch:", error); return; }
@@ -112,7 +115,7 @@ export function useRosterBoard(team) {
       source:         row.source ?? "program",
       name:           row.name,
       team:           row.current_team,
-      conf:           row.player_stats?.[0]?.conference ?? null,
+      conf:           row.conference ?? null,
       pos:            row.primary_position,
       year:           row.year,
       height:         row.height   ?? null,
@@ -128,7 +131,22 @@ export function useRosterBoard(team) {
       interiorTags:   row.interior_tags   ? row.interior_tags.split(",").map(t => t.trim()).filter(Boolean)   : [],
       defensiveTags:  row.defensive_tags  ? row.defensive_tags.split(",").map(t => t.trim()).filter(Boolean)  : [],
       tags:           [],
-      stats:          { ...(row.player_stats?.[0] || {}) },
+      stats: {
+        ppg:         row.ppg,
+        rpg:         row.rpg,
+        apg:         row.apg,
+        usg:         row.usg,
+        ast_tov:     row.ast_tov,
+        fg_pct:      row.fg_pct,
+        "3p_pct":    row["3p_pct"],
+        ft_pct:      row.ft_pct,
+        sei:         row.sei,
+        ath:         row.ath,
+        ris:         row.ris,
+        dds:         row.dds,
+        cdi:         row.cdi,
+        calendar_year: row.calendar_year,
+      },
     }));
 
     _boardCache = players;
@@ -147,33 +165,58 @@ export function useRosterBoard(team) {
       return;
     }
 
-    const { data, error } = await supabase
+    // Step 1: get the player IDs for this team
+    const { data: teamData, error: teamError } = await supabase
       .from("team_players")
-      .select("*, players(*, player_stats(*))")
+      .select("player_id")
       .eq("team", teamName);
 
-    if (error) { console.error("team_players fetch:", error); return; }
+    if (teamError) { console.error("team_players fetch:", teamError); return; }
+    const ids = (teamData || []).map(r => r.player_id);
+    if (ids.length === 0) {
+      _rosterCache[teamName] = [];
+      setReturningPlayers([]);
+      return;
+    }
+
+    // Step 2: fetch player data from the optimized view
+    const { data, error } = await supabase
+      .from("vw_players")
+      .select("*")
+      .in("id", ids);
+
+    if (error) { console.error("vw_players roster fetch:", error); return; }
 
     const returning = (data || [])
       .map(row => ({
-        ...row.players,
-        name:           row.players.name,
-        team:           row.players.current_team,
-        pos:            row.players.primary_position,
-        year:           row.players.year,
-        height:         row.players.height   ?? null,
-        hometown:       row.players.hometown ?? null,
-        espn_id:        row.players.espn_id  ?? null,
-        marketLow:      row.players.open_market_low  ?? 0,
-        marketHigh:     row.players.open_market_high ?? 0,
-        nilValuation:   row.players.nil_valuation    ?? 0,
-        playmakerTags:  row.players.playmaker_tags  ? row.players.playmaker_tags.split(",").map(t => t.trim()).filter(Boolean)  : [],
-        specialistTags: row.players.specialist_tags ? row.players.specialist_tags.split(",").map(t => t.trim()).filter(Boolean) : [],
-        shootingTags:   row.players.shooting_tags   ? row.players.shooting_tags.split(",").map(t => t.trim()).filter(Boolean)   : [],
-        shotmakingTags: row.players.shotmaking_tags ? row.players.shotmaking_tags.split(",").map(t => t.trim()).filter(Boolean) : [],
-        interiorTags:   row.players.interior_tags   ? row.players.interior_tags.split(",").map(t => t.trim()).filter(Boolean)   : [],
-        defensiveTags:  row.players.defensive_tags  ? row.players.defensive_tags.split(",").map(t => t.trim()).filter(Boolean)  : [],
-        stats:          { ...(row.players.player_stats?.[0] || {}) },
+        ...row,
+        team:           row.current_team,
+        pos:            row.primary_position,
+        marketLow:      row.open_market_low  ?? 0,
+        marketHigh:     row.open_market_high ?? 0,
+        nilValuation:   row.nil_valuation    ?? 0,
+        playmakerTags:  row.playmaker_tags  ? row.playmaker_tags.split(",").map(t => t.trim()).filter(Boolean)  : [],
+        specialistTags: row.specialist_tags ? row.specialist_tags.split(",").map(t => t.trim()).filter(Boolean) : [],
+        shootingTags:   row.shooting_tags   ? row.shooting_tags.split(",").map(t => t.trim()).filter(Boolean)   : [],
+        shotmakingTags: row.shotmaking_tags ? row.shotmaking_tags.split(",").map(t => t.trim()).filter(Boolean) : [],
+        interiorTags:   row.interior_tags   ? row.interior_tags.split(",").map(t => t.trim()).filter(Boolean)   : [],
+        defensiveTags:  row.defensive_tags  ? row.defensive_tags.split(",").map(t => t.trim()).filter(Boolean)  : [],
+        stats: {
+          ppg:          row.ppg,
+          rpg:          row.rpg,
+          apg:          row.apg,
+          usg:          row.usg,
+          ast_tov:      row.ast_tov,
+          fg_pct:       row.fg_pct,
+          "3p_pct":     row["3p_pct"],
+          ft_pct:       row.ft_pct,
+          sei:          row.sei,
+          ath:          row.ath,
+          ris:          row.ris,
+          dds:          row.dds,
+          cdi:          row.cdi,
+          calendar_year: row.calendar_year,
+        },
       }))
       .sort((a, b) => a.name.localeCompare(b.name));
 

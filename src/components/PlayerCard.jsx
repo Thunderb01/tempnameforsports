@@ -1,9 +1,4 @@
-
-function money(n) {
-  return Number(n || 0).toLocaleString(undefined, {
-    style: "currency", currency: "USD", maximumFractionDigits: 0,
-  });
-}
+import { money } from "@/lib/display";
 
 export function PlayerCard({ player, inRoster, inShortlist, onRoster, onShortlist, onClick }) {
   const s = player.stats || {};

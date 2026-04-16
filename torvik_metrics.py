@@ -331,9 +331,28 @@ def compute_sei(df, use_torvik=False):
     For 3PT specialists (3PA/FGA >= 0.70, 3P% >= 37%), USG is floored at 15
     so catch-and-shoot players aren't penalized for low creation volume.
     Everyone uses the same formula so percentile ranks stay comparable.
+
+    Special case: Bigs with fewer than 10 total 3PA have their TS% recomputed
+    excluding 3-point shots so rare/failed 3PT attempts don't drag down their
+    scoring efficiency percentile.
     """
     ts  = df["TS_per"].fillna(0)
     usg = df["usg"].fillna(0)
+
+    # ── Adjust TS% for Bigs who barely shot threes ────────────────────────────
+    # A Big who attempted < 10 threes all season shouldn't be penalized for those
+    # misses. Recompute TS% using only 2PA + FTA for those players.
+    big_low_tpa = (df["pos_bucket"] == "Big") & (df["TPA"].fillna(0) < 10)
+    if big_low_tpa.any():
+        fga     = (df["twoPA"].fillna(0) + df["TPA"].fillna(0)).replace(0, float("nan"))
+        fta     = (df["ftr"].fillna(0) * fga).fillna(0)
+        pts     = df["TS_per"].fillna(0) * 2 * (fga.fillna(0) + 0.44 * fta)
+        adj_fga = df["twoPA"].fillna(0)
+        adj_fta = df["ftr"].fillna(0) * adj_fga
+        adj_pts = pts - df["TPM"].fillna(0) * 3
+        denom   = (2 * (adj_fga + 0.44 * adj_fta)).replace(0, float("nan"))
+        adj_ts  = (adj_pts / denom).fillna(df["TS_per"].fillna(0))
+        ts = ts.where(~big_low_tpa, adj_ts)
 
     # Discount USG by TO rate so turnover-prone players don't get a free SEI boost.
     # e.g. USG=27 with 17% TO rate → effective USG = 27 * (1 - 0.17) = 22.4
@@ -815,7 +834,7 @@ def compute_nil_valuation(df):
         
     projected_tier = base_nil_final.apply(assign_tier)
 
-    return base_nil_final, market_low, market_high, projected_tier
+    return base_nil_final, market_low, market_high, projected_tier, total_score
 
 
 
@@ -946,7 +965,7 @@ def main():
     df["_sei"] = compute_sei(df, use_torvik=use_torvik)
     df["_ath"] = compute_ath(df, use_torvik=use_torvik)
     df["_ris"] = compute_ris(df, use_torvik=use_torvik)
-    df["_nil"], df["_nil_low"], df["_nil_high"], df["_projected_tier"] = compute_nil_valuation(df)
+    df["_nil"], df["_nil_low"], df["_nil_high"], df["_projected_tier"], df["_nil_perf_score"] = compute_nil_valuation(df)
 
     # ── Specialist tags ───────────────────────────────────────────────────────
     _total_fga   = (df["twoPA"].fillna(0) + df["TPA"].fillna(0)).replace(0, float("nan"))
@@ -1089,6 +1108,7 @@ def main():
         nil_low       = safe(df.at[idx, "_nil_low"])
         nil_high      = safe(df.at[idx, "_nil_high"])
         tier          = str(df.at[idx, "_projected_tier"]) if "_projected_tier" in df.columns else None
+        nil_perf_score = safe(df.at[idx, "_nil_perf_score"]) if "_nil_perf_score" in df.columns else None
         # is_3pt_specialist = bool(df.at[idx, "_specialist_3pt"]) if "_specialist_3pt" in df.columns else False
 
         # ── Parse birth year ──────────────────────────────────────────────────
@@ -1174,6 +1194,8 @@ def main():
                 stats_patch[key_m] = val
         if tier and not args.skip_nil:
             stats_patch["projected_tier"] = tier
+        if nil_perf_score is not None and not args.skip_nil:
+            stats_patch["nil_perf_score"] = round(float(nil_perf_score), 6)
 
         stats_id = stats_lookup.get((player_id, args.year))
         if stats_id:

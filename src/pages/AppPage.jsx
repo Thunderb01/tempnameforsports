@@ -9,13 +9,8 @@ import { useAdminTeam }       from "@/hooks/useAdminTeam";
 import { TeamAutocomplete }   from "@/components/TeamAutocomplete";
 import { supabase }       from "@/lib/supabase";
 import { exportRosterPDF } from "@/lib/exportRoster";
-import { track } from "@/lib/track";;
-
-function money(n) {
-  return Number(n || 0).toLocaleString(undefined, {
-    style: "currency", currency: "USD", maximumFractionDigits: 0,
-  });
-}
+import { track } from "@/lib/track";
+import { money } from "@/lib/display";
 
 // const STATUSES = [
 //   { key: "none",       label: "No status" },
@@ -32,7 +27,7 @@ export function AppPage() {
   const userId = user?.id || "";
   const { isAdmin, isNonAffiliate, activeTeam, selectedTeam, setSelectedTeam, allTeams } = useAdminTeam(profile);
 
-  const board = useRosterBoard(activeTeam);
+  const board = useRosterBoard(activeTeam, userId);
 
   const [search,   setSearch]   = useState("");
   const [posFilter,setPosFilter]= useState("all");
@@ -56,10 +51,11 @@ export function AppPage() {
     }
   }, []);
 
-  // Load data on mount / when active team changes
+  // Load portal board + returning roster in parallel on mount / when active team changes
   useEffect(() => {
-    board.loadPortalBoard();
-    if (activeTeam) board.loadReturningRoster(activeTeam);
+    const fetches = [board.loadPortalBoard()];
+    if (activeTeam) fetches.push(board.loadReturningRoster(activeTeam));
+    Promise.all(fetches);
   }, [activeTeam]);
 
   // Sync local settings state
@@ -678,10 +674,7 @@ export function AppPage() {
       </div>
 
       {modal && (
-        <PlayerModal
-          player={modal}
-          onClose={() => setModal(null)}
-        />
+        <PlayerModal player={modal} onClose={() => setModal(null)} />
       )}
 
       {finderOpen && (

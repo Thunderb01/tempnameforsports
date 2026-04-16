@@ -4,17 +4,21 @@ import teams from "@/data/allTeams.json";
 const ADMIN_TEAM_KEY = "bp_admin_selected_team";
 
 export function useAdminTeam(profile) {
-  const isAdmin        = profile?.role === "admin";
+  const isSuperAdmin   = profile?.role === "superadmin";
+  const isAdmin        = profile?.role === "admin" || isSuperAdmin;
   const isNonAffiliate = profile?.role === "nonaffiliate";
   const canSelectTeam  = isAdmin || isNonAffiliate;
 
-  const [selectedTeam, _setSelectedTeam] = useState("");
+  // Pre-populate from localStorage immediately so the dropdown isn't blank on first render
+  const [selectedTeam, _setSelectedTeam] = useState(
+    () => localStorage.getItem(ADMIN_TEAM_KEY) || ""
+  );
 
-  // Sync once profile is available (auth finishes loading)
+  // Once profile resolves, fall back to profile.team if nothing was saved
   useEffect(() => {
     if (!profile) return;
     if (canSelectTeam) {
-      _setSelectedTeam(localStorage.getItem(ADMIN_TEAM_KEY) || profile.team || "");
+      if (!selectedTeam) _setSelectedTeam(profile.team || "");
     } else {
       _setSelectedTeam(profile.team || "");
     }
@@ -27,5 +31,5 @@ export function useAdminTeam(profile) {
 
   const activeTeam = canSelectTeam ? selectedTeam : (profile?.team || "");
 
-  return { isAdmin, isNonAffiliate, activeTeam, selectedTeam, setSelectedTeam, allTeams: teams };
+  return { isSuperAdmin, isAdmin, isNonAffiliate, activeTeam, selectedTeam, setSelectedTeam, allTeams: teams };
 }

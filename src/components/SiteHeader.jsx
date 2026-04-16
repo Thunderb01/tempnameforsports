@@ -1,11 +1,13 @@
 import { NavLink, useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
+import { useAdminTeam } from "@/hooks/useAdminTeam";
 import logo from "/logo.jpg";
 import teamLogos from "@/data/teamLogos.json";
 
 export function SiteHeader() {
   const { profile } = useAuth();
+  const { isSuperAdmin } = useAdminTeam(profile);
   const navigate    = useNavigate();
 
   async function handleSignOut() {
@@ -31,6 +33,15 @@ export function SiteHeader() {
           <NavLink to="/sandbox" className={({ isActive }) => "nav-link" + (isActive ? " active" : "")}>
             Roster Sandbox
           </NavLink>
+          <NavLink to="/compare" className={({ isActive }) => "nav-link" + (isActive ? " active" : "")}>
+            Compare
+          </NavLink>
+          {isSuperAdmin && (
+            <NavLink to="/admin" className={({ isActive }) => "nav-link" + (isActive ? " active" : "")}
+              style={{ color: "#f5a623" }}>
+              Admin
+            </NavLink>
+          )}
 
           {profile && (
             teamLogos[profile.team]

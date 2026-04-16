@@ -1,12 +1,7 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
-
-
-function money(n) {
-  return Number(n || 0).toLocaleString(undefined, {
-    style: "currency", currency: "USD", maximumFractionDigits: 0,
-  });
-}
+import { money, letterGrade, gradeColor, tierColor, projectedTier } from "@/lib/display";
 
 function fmt(val, key) {
   if (val === null || val === undefined || val === "" || (typeof val === "number" && isNaN(val)) || val === "NaN") return "—";
@@ -47,51 +42,6 @@ const PENTAGON_METRICS = [
   { key: "dds", label: "Defending",          desc: "Driven by BLK%, STL%, DRB%, and FC/40." },
   { key: "cdi", label: "Playmaking",         desc: "Driven by AST%, TO%, and positional weighting." },
 ];
-
-const TIER_COLORS = {
-  "HM All-American / Pre-Draft":       "#4ade80",
-  "HM All-Conference":                 "#5b9cf6",
-  "HM Starter / MM All-Conference":    "#f5c542",
-  "HM Rotation / MM Starter":          "#fb923c",
-  "MM Role Player / LM All-Conference":"#e05c5c",
-  "LM Rotation":                       "#94a3b8",
-};
-function tierColor(label) { return TIER_COLORS[label] || "#64748b"; }
-function projectedTier(nilValuation) {
-  const v = Number(nilValuation) || 0;
-  if (v >= 2_200_000) return "HM All-American / Pre-Draft"
-  if (v >= 1_500_000) return "HM All-Conference"
-  if (v >=   750_000) return "HM Starter / MM All-Conference"
-  if (v >=   400_000) return "HM Rotation / MM Starter"
-  if (v >=   100_000) return "MM Role Player / LM All-Conference"
-  return "LM Rotation"
-}
-
-
-function letterGrade(val) {
-  if (val === null || val === undefined) return "—";
-  if (val >= 95) return "A+";
-  if (val >= 90) return "A";
-  if (val >= 85) return "A-";
-  if (val >= 80) return "B+";
-  if (val >= 75) return "B";
-  if (val >= 70) return "B-";
-  if (val >= 60) return "C+";
-  if (val >= 50) return "C";
-  if (val >= 40) return "C-";
-  if (val >= 30) return "D+";
-  if (val >= 20) return "D";
-  return "F";
-}
-
-function gradeColor(grade) {
-  if (grade.startsWith("A")) return "#4ade80";
-  if (grade.startsWith("B")) return "#5b9cf6";
-  if (grade.startsWith("C")) return "#f5a623";
-  if (grade.startsWith("D")) return "#fb923c";
-  if (grade === "F")         return "#e05c5c";
-  return "rgba(255,255,255,.4)";
-}
 
 function SkillProfile({ stats }) {
   const cx = 100, cy = 98, r = 58;
@@ -183,6 +133,7 @@ function SkillProfile({ stats }) {
 }
 
 export function PlayerModal({ player, onClose }) {
+  const navigate = useNavigate();
   const [stats, setStats] = useState(null);
   const [loadingStats, setLoadingStats] = useState(true);
   const [profileIdx, setProfileIdx] = useState(0);
@@ -234,8 +185,16 @@ export function PlayerModal({ player, onClose }) {
                 </div>
               </div>
             </div>
-            <button className="btn btn-ghost" onClick={onClose}>Close</button>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button className="btn btn-ghost" style={{ fontSize: 12 }}
+                onClick={() => { onClose(); navigate(`/compare?p0=${player.id}`); }}>
+                Compare
+              </button>
+              <button className="btn btn-ghost" onClick={onClose}>Close</button>
+            </div>
           </div>
+
+          <>
 
           <div className="modal-section">
             <h4>Market Production Value Range</h4>
@@ -353,6 +312,8 @@ export function PlayerModal({ player, onClose }) {
               <SkillProfile stats={stats[profileIdx]} />
             )}
           </div>
+
+          </>
 
         </div>
       </div>

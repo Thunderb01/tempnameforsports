@@ -1,42 +1,12 @@
 import { useState, useEffect, useMemo } from "react";
-import { SiteHeader }    from "@/components/SiteHeader";
-import { PlayerModal }   from "@/components/PlayerModal";
-import { useAuth }       from "@/hooks/useAuth";
-import { useAdminTeam }  from "@/hooks/useAdminTeam";
-import { useRosterBoard} from "@/hooks/useRosterBoard";
-import teamConferences   from "@/data/teamConferences.json";
-
-const TIER_COLORS = {
-  "P4 All-American / Pre-Draft":       "#4ade80",
-  "P4 All-Conference":                 "#5b9cf6",
-  "P4 Starter / MM All-Conference":    "#f5c542",
-  "P4 Rotation / MM Starter":          "#fb923c",
-  "MM Role Player / LM All-Conference":"#e05c5c",
-  "LM Starter":                        "#94a3b8",
-  "LM Role Player":                    "#64748b",
-};
-function tierColor(label) { return TIER_COLORS[label] || "#64748b"; }
-function projectedTier(nilValuation) {
-  const v = Number(nilValuation) || 0;
-  if (v >= 2_200_000) return "P4 All-American / Pre-Draft"
-  if (v >= 1_500_000) return "P4 All-Conference"
-  if (v >=   750_000) return "P4 Starter / MM All-Conference"
-  if (v >=   400_000) return "P4 Rotation / MM Starter"
-  if (v >=   200_000) return "MM Role Player / LM All-Conference"
-  return "LM Rotation"
-}
-
-function heightToInches(h) {
-  if (!h || h === "—") return -1;
-  const m = String(h).match(/^(\d+)-(\d+)$/);
-  return m ? parseInt(m[1]) * 12 + parseInt(m[2]) : -1;
-}
-
-function money(n) {
-  return Number(n || 0).toLocaleString(undefined, {
-    style: "currency", currency: "USD", maximumFractionDigits: 0,
-  });
-}
+import { SiteHeader }      from "@/components/SiteHeader";
+import { PlayerModal }     from "@/components/PlayerModal";
+import { TeamAutocomplete } from "@/components/TeamAutocomplete";
+import { useAuth }         from "@/hooks/useAuth";
+import { useAdminTeam }    from "@/hooks/useAdminTeam";
+import { useRosterBoard }  from "@/hooks/useRosterBoard";
+import teamConferences     from "@/data/teamConferences.json";
+import { money, heightToInches, tierColor, projectedTier } from "@/lib/display";
 
 // label → getter(player)
 const COLS = [
@@ -55,12 +25,20 @@ const COLS = [
 
 
 export function BoardPage() {
-  const { profile } = useAuth();
-  const { activeTeam } = useAdminTeam(profile);
-  const board = useRosterBoard(activeTeam);
+  const { profile, user } = useAuth();
+  const userId = user?.id || "";
+  const { isAdmin, activeTeam, selectedTeam, setSelectedTeam, allTeams } = useAdminTeam(profile);
+  const board = useRosterBoard(activeTeam, userId);
 
   const [loading,      setLoading]     = useState(true);
+  const [searchInput,  setSearchInput] = useState("");
   const [search,       setSearch]      = useState("");
+
+  // Debounce search input so the filter doesn't rerun on every keystroke
+  useEffect(() => {
+    const t = setTimeout(() => setSearch(searchInput), 200);
+    return () => clearTimeout(t);
+  }, [searchInput]);
   const [posFilter,    setPosFilter]   = useState("all");
   const [stateFilter,  setStateFilter] = useState("all");
   const [viewMode,     setViewMode]    = useState("cards"); // "cards" | "table"
@@ -68,8 +46,8 @@ export function BoardPage() {
   const [sortDir,   setSortDir]   = useState("desc");
   const [modal,     setModal]     = useState(null);
   const [page,        setPage]        = useState(0);
-  const [hideNoNil,   setHideNoNil]   = useState(true);
-  const [showProgram, setShowProgram] = useState(false);
+  const [portalOnly,        setPortalOnly]        = useState(false);
+  const [includeUnevaluated, setIncludeUnevaluated] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [confFilter,  setConfFilter]  = useState("all");
   const conferences = [
@@ -198,16 +176,16 @@ export function BoardPage() {
 
 
   // Reset to page 0 whenever filters or sort change
-  useEffect(() => setPage(0), [search, posFilter, stateFilter, confFilter, sortKey, sortDir, hideNoNil, showProgram, advcFilters]);
+  useEffect(() => setPage(0), [search, posFilter, stateFilter, confFilter, sortKey, sortDir, portalOnly, includeUnevaluated, advcFilters]);
 
-  // ── Filter + sort ───────────────────────────────────────────────────────────
+  // ── Filter ──────────────────────────────────────────────────────────────────
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     const stateTerms = stateFilter !== "all"
       ? STATE_OPTIONS.find(o => o.label === stateFilter)?.terms ?? []
       : null;
 
-    let out = players.filter(p => {
+    return players.filter(p => {
       if (q && !p.name.toLowerCase().includes(q) &&
                !(p.team||"").toLowerCase().includes(q) &&
                !(p.hometown||"").toLowerCase().includes(q)) return false;
@@ -217,8 +195,8 @@ export function BoardPage() {
         if (pConf !== confFilter) return false;
       }
       if (stateTerms && !matchesState(p.hometown || "", stateTerms)) return false;
-      if (hideNoNil && !(p.marketHigh > 0)) return false;
-      if (!showProgram && p.source !== "portal") return false;
+      if (!includeUnevaluated && !(p.marketHigh > 0)) return false;
+      if (portalOnly && p.source !== "portal") return false;
       for (const f of ADVC_FIELDS) {
         const val = f.src === "player" ? p[f.key] : p.stats?.[f.key];
         const { min, max } = advcFilters[f.key];
@@ -227,30 +205,29 @@ export function BoardPage() {
       }
       return true;
     });
+  }, [players, search, posFilter, confFilter, stateFilter, portalOnly, includeUnevaluated, advcFilters]);
 
-    if (sortKey) {
-      const col = COLS.find(c => c.label === sortKey);
-      if (col) {
-        out = [...out].sort((a, b) => {
-          const av = col.get(a);
-          const bv = col.get(b);
-          let cmp;
-          if (sortKey === "Ht") {
-            cmp = heightToInches(av) - heightToInches(bv);
-          } else {
-            const an = parseFloat(String(av).replace(/[%,$,—]/g, ""));
-            const bn = parseFloat(String(bv).replace(/[%,$,—]/g, ""));
-            cmp = !isNaN(an) && !isNaN(bn)
-              ? an - bn
-              : String(av).localeCompare(String(bv));
-          }
-          return sortDir === "asc" ? cmp : -cmp;
-        });
+  // ── Sort (separate so filter changes don't re-sort and vice versa) ──────────
+  const sorted = useMemo(() => {
+    if (!sortKey) return filtered;
+    const col = COLS.find(c => c.label === sortKey);
+    if (!col) return filtered;
+    return [...filtered].sort((a, b) => {
+      const av = col.get(a);
+      const bv = col.get(b);
+      let cmp;
+      if (sortKey === "Ht") {
+        cmp = heightToInches(av) - heightToInches(bv);
+      } else {
+        const an = parseFloat(String(av).replace(/[%,$,—]/g, ""));
+        const bn = parseFloat(String(bv).replace(/[%,$,—]/g, ""));
+        cmp = !isNaN(an) && !isNaN(bn)
+          ? an - bn
+          : String(av).localeCompare(String(bv));
       }
-    }
-
-    return out;
-  }, [players, search, posFilter, confFilter, stateFilter, sortKey, sortDir, hideNoNil, showProgram, advcFilters]);
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+  }, [filtered, sortKey, sortDir]);
 
   // ── Roster state helpers (delegated to shared useRosterBoard hook) ──────────
   function inRoster(id)    { return board.inRoster(id); }
@@ -284,7 +261,15 @@ export function BoardPage() {
         <div className="app-top">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
             <h1 style={{ margin: 0 }}>Full Board</h1>
-            <div style={{ display: "flex", gap: 8 }}>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              {isAdmin && (
+                <TeamAutocomplete
+                  value={selectedTeam}
+                  onChange={setSelectedTeam}
+                  teams={allTeams}
+                  placeholder="Select team…"
+                />
+              )}
               <button className="btn btn-ghost" style={{ position: "relative" }}
                 onClick={() => setShowAdvanced(v => !v)}>
                 Advanced Filters
@@ -300,7 +285,7 @@ export function BoardPage() {
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
             <input className="input" type="search" placeholder="Search players…"
               style={{ flex: 1, minWidth: 160 }}
-              value={search} onChange={e => setSearch(e.target.value)} />
+              value={searchInput} onChange={e => setSearchInput(e.target.value)} />
             <select className="input" style={{ width: 150 }} value={posFilter} onChange={e => setPosFilter(e.target.value)}>
               <option value="all">All positions</option>
               <option value="Guard">Guard</option>
@@ -316,12 +301,12 @@ export function BoardPage() {
               {STATE_OPTIONS.map(o => <option key={o.label} value={o.label}>{o.label}</option>)}
             </select>
             <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, opacity: .7, cursor: "pointer", userSelect: "none" }}>
-              <input type="checkbox" checked={hideNoNil} onChange={e => setHideNoNil(e.target.checked)} />
-              Evaluated players only
+              <input type="checkbox" checked={portalOnly} onChange={e => setPortalOnly(e.target.checked)} />
+              Portal players only
             </label>
             <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, opacity: .7, cursor: "pointer", userSelect: "none" }}>
-              <input type="checkbox" checked={showProgram} onChange={e => setShowProgram(e.target.checked)} />
-              Include all players
+              <input type="checkbox" checked={includeUnevaluated} onChange={e => setIncludeUnevaluated(e.target.checked)} />
+              Include unevaluated
             </label>
           </div>
 
@@ -359,7 +344,7 @@ export function BoardPage() {
           )}
 
           <div style={{ fontSize: 12, opacity: .45, marginBottom: 10 }}>
-            {loading ? "Loading…" : `${filtered.length} of ${players.length} players`}
+            {loading ? "Loading…" : `${sorted.length} of ${players.length} players`}
             {viewMode === "table" && !loading && " · click header to sort"}
           </div>
 
@@ -368,9 +353,9 @@ export function BoardPage() {
         {/* Card view */}
         {viewMode === "cards" && !loading && (
           <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
-            {filtered.length === 0
+            {sorted.length === 0
               ? <div className="empty">No players match your filters.</div>
-              : filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE).map(p => {
+              : sorted.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE).map(p => {
                   return (
                     <div key={p.id} className="row row-click"
                       style={{ background: "var(--panel)", borderRadius: 8, marginBottom: 2 }}
@@ -424,7 +409,7 @@ export function BoardPage() {
         {/* Table view */}
         {viewMode === "table" && !loading && (
           <div style={{ overflowX: "auto" }}>
-            {filtered.length === 0
+            {sorted.length === 0
               ? <div className="empty">No players match your filters.</div>
               : (
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
@@ -443,7 +428,7 @@ export function BoardPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE).map(p => (
+                    {sorted.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE).map(p => (
                       <tr key={p.id} className="row-click"
                         onClick={e => { if (!e.target.closest("button,select")) setModal(p); }}
                         style={{ borderBottom: "1px solid var(--border)" }}>
@@ -472,15 +457,15 @@ export function BoardPage() {
         )}
 
         {/* ── Pagination ── */}
-        {!loading && filtered.length > PAGE_SIZE && (
+        {!loading && sorted.length > PAGE_SIZE && (
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12, marginTop: 20 }}>
             <button className="btn btn-ghost" disabled={page === 0} onClick={() => setPage(p => p - 1)}>
               ← Prev
             </button>
             <span style={{ fontSize: 13, opacity: .55 }}>
-              Page {page + 1} of {Math.ceil(filtered.length / PAGE_SIZE)}
+              Page {page + 1} of {Math.ceil(sorted.length / PAGE_SIZE)}
             </span>
-            <button className="btn btn-ghost" disabled={(page + 1) * PAGE_SIZE >= filtered.length} onClick={() => setPage(p => p + 1)}>
+            <button className="btn btn-ghost" disabled={(page + 1) * PAGE_SIZE >= sorted.length} onClick={() => setPage(p => p + 1)}>
               Next →
             </button>
           </div>

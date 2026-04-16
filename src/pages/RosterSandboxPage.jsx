@@ -5,14 +5,9 @@ import { useAuth }        from "@/hooks/useAuth";
 import { useRosterBoard } from "@/hooks/useRosterBoard";
 import { useAdminTeam }       from "@/hooks/useAdminTeam";
 import { TeamAutocomplete }   from "@/components/TeamAutocomplete";
-import { supabase }       from "@/lib/supabase";
-import { exportRosterPDF } from "@/lib/exportRoster";
-
-function money(n) {
-  return Number(n || 0).toLocaleString(undefined, {
-    style: "currency", currency: "USD", maximumFractionDigits: 0,
-  });
-}
+import { supabase }        from "@/lib/supabase";
+import { exportRosterPDF }  from "@/lib/exportRoster";
+import { money }            from "@/lib/display";
 
 function fmtDate(iso) {
   return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
@@ -29,6 +24,15 @@ const COLS = [
   { label: "RPG",      get: p => p.stats?.rpg ?? "—" },
   { label: "APG",      get: p => p.stats?.apg ?? "—" },
   { label: "NIL",      get: p => p.nilOffer ?? 0, isNil: true },
+];
+
+const RETENTION_OPTIONS = [
+  { value: "returning",       label: "Returning" },
+  { value: "undecided",       label: "Undecided" },
+  { value: "entering_portal", label: "Entering Portal" },
+  { value: "graduating",      label: "Graduating" },
+  { value: "entering_draft",  label: "Entering Draft" },
+  { value: "transferred",     label: "Transferred" },
 ];
 
 const TYPE_COLOR = {
@@ -62,7 +66,7 @@ export function RosterSandboxPage() {
   const { profile, user } = useAuth();
   const userId = user?.id || "";
   const { isAdmin, isNonAffiliate, activeTeam, selectedTeam, setSelectedTeam, allTeams } = useAdminTeam(profile);
-  const board  = useRosterBoard(activeTeam);
+  const board  = useRosterBoard(activeTeam, userId);
 
   const [modal,          setModal]          = useState(null);
   const [drawerOpen,     setDrawerOpen]     = useState(false);
@@ -79,10 +83,11 @@ export function RosterSandboxPage() {
   const [sortKey, setSortKey] = useState(null);
   const [sortDir, setSortDir] = useState("asc");
 
-  // Load portal board + returning roster on mount / when active team changes
+  // Load portal board + returning roster in parallel on mount / when active team changes
   useEffect(() => {
-    board.loadPortalBoard();
-    if (activeTeam) board.loadReturningRoster(activeTeam);
+    const fetches = [board.loadPortalBoard()];
+    if (activeTeam) fetches.push(board.loadReturningRoster(activeTeam));
+    Promise.all(fetches);
   }, [activeTeam]);
 
   // Load saved rosters + coaches whenever drawer opens
@@ -350,20 +355,33 @@ export function RosterSandboxPage() {
                         {col.label}{sortKey === col.label ? (sortDir === "asc" ? " ▲" : " ▼") : ""}
                       </th>
                     ))}
+                    {!activeRoster && <th style={thStyle} />}
                   </tr>
                 </thead>
                 <tbody>
                   {sorted.map((p, i) => (
                     <tr key={p.id ?? i} className="row-click"
                       style={{ borderBottom: "1px solid var(--border)" }}
-                      onClick={e => { if (!e.target.closest("input")) setModal(p); }}>
+                      onClick={e => { if (!e.target.closest("input,select,button")) setModal(p); }}>
                       {COLS.map(col => (
                         <td key={col.label} style={{
                           ...tdStyle,
                           color:      col.label === "Status" ? TYPE_COLOR[p._type] || "inherit" : "inherit",
                           fontWeight: col.label === "Status" ? 500 : "inherit",
                         }}>
-                          {col.isNil && !activeRoster ? (
+                          {col.label === "Status" && !activeRoster && p._typeKey !== "transfer" ? (
+                            <select
+                              className="input"
+                              value={p._typeKey}
+                              style={{ fontSize: 12, padding: "2px 6px", color: TYPE_COLOR[p._type] || "inherit" }}
+                              onClick={e => e.stopPropagation()}
+                              onChange={e => board.setRetention(p.id, e.target.value)}
+                            >
+                              {RETENTION_OPTIONS.map(o => (
+                                <option key={o.value} value={o.value}>{o.label}</option>
+                              ))}
+                            </select>
+                          ) : col.isNil && !activeRoster ? (
                             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                               <input
                                 className="input"
@@ -386,6 +404,19 @@ export function RosterSandboxPage() {
                           )}
                         </td>
                       ))}
+                      {!activeRoster && (
+                        <td style={{ ...tdStyle, textAlign: "right" }}>
+                          {p._typeKey === "transfer" && (
+                            <button
+                              className="btn btn-ghost"
+                              style={{ fontSize: 11, padding: "2px 8px", color: "#f77", borderColor: "rgba(220,70,70,.3)" }}
+                              onClick={e => { e.stopPropagation(); board.removeFromRoster(p.id); }}
+                            >
+                              Remove
+                            </button>
+                          )}
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
