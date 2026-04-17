@@ -27,7 +27,7 @@ const SORT_COLS = [
 ];
 
 export function PortalPage() {
-  const { profile } = useAuth();
+  useAuth();
 
   const [transfers,  setTransfers]  = useState([]);
   const [playerMap,  setPlayerMap]  = useState({});
@@ -40,6 +40,8 @@ export function PortalPage() {
   const [posFilter,     setPosFilter]     = useState("all");
   const [sortKey,       setSortKey]       = useState("player_name");
   const [sortDir,       setSortDir]       = useState("asc");
+  const [page,          setPage]          = useState(0);
+  const PAGE_SIZE = 50;
 
   // Debounce search
   useEffect(() => {
@@ -55,6 +57,7 @@ export function PortalPage() {
       const { data: txData, error } = await supabase
         .from("portal_transfers")
         .select("*")
+        .eq("season_year", 2026)
         .order("player_name");
 
       if (error) { console.error("portal_transfers fetch:", error); setLoading(false); return; }
@@ -69,12 +72,19 @@ export function PortalPage() {
       } else {
         const ids = (txData || []).map(t => t.player_id).filter(Boolean);
         if (ids.length > 0) {
-          const { data: pData } = await supabase
-            .from("vw_players")
-            .select("*")
-            .in("id", ids);
+          // Batch in chunks of 500 to avoid URL length limits with .in()
+          const CHUNK = 500;
+          const allRows = [];
+          for (let i = 0; i < ids.length; i += CHUNK) {
+            const { data: chunk } = await supabase
+              .from("vw_players")
+              .select("*")
+              .in("id", ids.slice(i, i + CHUNK));
+            allRows.push(...(chunk || []));
+          }
+          const pData = allRows;
           const map = {};
-          (pData || []).forEach(row => {
+          pData.forEach(row => {
             map[row.id] = {
               id:           row.id,
               name:         row.name,
@@ -106,6 +116,7 @@ export function PortalPage() {
           setPlayerMap(map);
         }
       }
+
 
       setLoading(false);
     }
@@ -163,6 +174,9 @@ export function PortalPage() {
     if (av > bv) return sortDir === "asc" ?  1 : -1;
     return 0;
   }), [filtered, sortKey, sortDir]);
+
+  // Reset to page 0 whenever filters or sort change
+  useEffect(() => setPage(0), [search, statusFilter, posFilter, sortKey, sortDir]);
 
   function toggleSort(key) {
     if (!key) return;
@@ -261,7 +275,7 @@ export function PortalPage() {
                 </tr>
               </thead>
               <tbody>
-                {sorted.map((t, i) => {
+                {sorted.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE).map((t, i) => {
                   const p   = t.player;
                   const cfg = STATUS_CONFIG[t.status] || { label: t.status, color: "#64748b", bg: "transparent" };
                   const tier = p ? projectedTier(p.marketHigh) : null;
@@ -320,6 +334,20 @@ export function PortalPage() {
                 )}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {!loading && sorted.length > PAGE_SIZE && (
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12, marginTop: 20 }}>
+            <button className="btn btn-ghost" disabled={page === 0} onClick={() => setPage(p => p - 1)}>
+              ← Prev
+            </button>
+            <span style={{ fontSize: 13, opacity: .55 }}>
+              Page {page + 1} of {Math.ceil(sorted.length / PAGE_SIZE)}
+            </span>
+            <button className="btn btn-ghost" disabled={(page + 1) * PAGE_SIZE >= sorted.length} onClick={() => setPage(p => p + 1)}>
+              Next →
+            </button>
           </div>
         )}
       </main>

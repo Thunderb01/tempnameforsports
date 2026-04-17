@@ -5,6 +5,7 @@ import { TeamAutocomplete } from "@/components/TeamAutocomplete";
 import { useAuth }         from "@/hooks/useAuth";
 import { useAdminTeam }    from "@/hooks/useAdminTeam";
 import { useRosterBoard }  from "@/hooks/useRosterBoard";
+import { supabase }        from "@/lib/supabase";
 import teamConferences     from "@/data/teamConferences.json";
 import { money, heightToInches, tierColor, projectedTier } from "@/lib/display";
 
@@ -46,7 +47,7 @@ export function BoardPage() {
   const [sortDir,   setSortDir]   = useState("desc");
   const [modal,     setModal]     = useState(null);
   const [page,        setPage]        = useState(0);
-  const [portalOnly,        setPortalOnly]        = useState(false);
+  const [portalOnly,        setPortalOnly]        = useState(true);
   const [includeUnevaluated, setIncludeUnevaluated] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [confFilter,  setConfFilter]  = useState("all");
@@ -89,10 +90,23 @@ export function BoardPage() {
 
   const players = board.state.board;
 
+  // IDs of portal players who are committed or withdrawn (excluded when portalOnly is on)
+  const [unavailableIds, setUnavailableIds] = useState(new Set());
+
   // ── Load board via shared hook ───────────────────────────────────────────────
   useEffect(() => {
     setLoading(true);
     board.loadPortalBoard().then(() => setLoading(false));
+
+    supabase
+      .from("portal_transfers")
+      .select("player_id, status")
+      .eq("season_year", 2026)
+      .in("status", ["committed", "withdrawn"])
+      .not("player_id", "is", null)
+      .then(({ data }) => {
+        setUnavailableIds(new Set((data || []).map(r => r.player_id)));
+      });
   }, []);
 
   // ── Tags ────────────────────────────────────────────────────────────────────
@@ -197,6 +211,7 @@ export function BoardPage() {
       if (stateTerms && !matchesState(p.hometown || "", stateTerms)) return false;
       if (!includeUnevaluated && !(p.marketHigh > 0)) return false;
       if (portalOnly && p.source !== "portal") return false;
+      if (portalOnly && unavailableIds.has(p.id)) return false;
       for (const f of ADVC_FIELDS) {
         const val = f.src === "player" ? p[f.key] : p.stats?.[f.key];
         const { min, max } = advcFilters[f.key];
@@ -205,7 +220,7 @@ export function BoardPage() {
       }
       return true;
     });
-  }, [players, search, posFilter, confFilter, stateFilter, portalOnly, includeUnevaluated, advcFilters]);
+  }, [players, search, posFilter, confFilter, stateFilter, portalOnly, includeUnevaluated, advcFilters, unavailableIds]);
 
   // ── Sort (separate so filter changes don't re-sort and vice versa) ──────────
   const sorted = useMemo(() => {

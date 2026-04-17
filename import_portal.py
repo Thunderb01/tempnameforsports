@@ -10,7 +10,8 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 def fetch_portal(year=2026):
     r = httpx.get(
-        f"https://api.collegebasketballdata.com/recruiting/portal?year={year}",
+        f"https://api.collegebasketballdata.com/recruiting/portal",
+        params={"year": year},
         headers={"Authorization": f"Bearer {API_TOKEN}", "accept": "application/json"},
         timeout=30,
     )
@@ -85,7 +86,7 @@ def main():
             "player_id":        mp["id"] if mp else None,
             "from_team":   origin.get("name"),
             "to_team":     dest.get("name") if dest else None,
-            "season_year": 2027,
+            "season_year": 2026,
             "status":      map_status(entry),
         })
 

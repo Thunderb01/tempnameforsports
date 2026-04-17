@@ -36,9 +36,9 @@ export function SiteHeader() {
           <NavLink to="/compare" className={({ isActive }) => "nav-link" + (isActive ? " active" : "")}>
             Compare Players
           </NavLink>
-          <NavLink to="/portal" className={({ isActive }) => "nav-link" + (isActive ? " active" : "")}>
+          {/* <NavLink to="/portal" className={({ isActive }) => "nav-link" + (isActive ? " active" : "")}>
             Portal Tracker
-          </NavLink>
+          </NavLink> */}
           {isSuperAdmin && (
             <NavLink to="/admin" className={({ isActive }) => "nav-link" + (isActive ? " active" : "")}
               style={{ color: "#f5a623" }}>
