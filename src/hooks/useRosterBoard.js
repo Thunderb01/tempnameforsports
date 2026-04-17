@@ -223,16 +223,23 @@ export function useRosterBoard(team, userId) {
     _rosterCache[teamName] = returning;
     setReturningPlayers(returning);
 
-    // Auto-set retention for seniors/graduates and portal players
-    // Auto-set nilById to nilValuation if not already manually set
+    // Fetch which of these players are in the transfer portal this season
+    const returningIds = returning.map(p => p.id);
+    const { data: portalData } = await supabase
+      .from("portal_transfers")
+      .select("player_id")
+      .eq("season_year", 2026)
+      .in("player_id", returningIds);
+    const portalIds = new Set((portalData || []).map(r => r.player_id));
+
+    // Auto-set retention based on portal status, year, and defaults
     const GRADUATING_YEARS = ["Senior", "Graduate", "SR", "GR"];
     setState(s => {
       const autoRetention = {};
       const autoNil = {};
       returning.forEach(p => {
-        // Always write every player's status so it's persisted even if default
         if (!s.retentionById[p.id]) {
-          if (p.source === "portal") {
+          if (portalIds.has(p.id)) {
             autoRetention[p.id] = "entering_portal";
           } else if (GRADUATING_YEARS.includes(p.year)) {
             autoRetention[p.id] = "graduating";

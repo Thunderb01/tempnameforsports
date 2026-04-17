@@ -90,8 +90,8 @@ export function BoardPage() {
 
   const players = board.state.board;
 
-  // IDs of portal players who are committed or withdrawn (excluded when portalOnly is on)
-  const [unavailableIds, setUnavailableIds] = useState(new Set());
+  // IDs of portal players who are currently available (uncommitted)
+  const [availableIds, setAvailableIds] = useState(new Set());
 
   // ── Load board via shared hook ───────────────────────────────────────────────
   useEffect(() => {
@@ -100,12 +100,12 @@ export function BoardPage() {
 
     supabase
       .from("portal_transfers")
-      .select("player_id, status")
+      .select("player_id")
       .eq("season_year", 2026)
-      .in("status", ["committed", "withdrawn"])
+      .eq("status", "uncommitted")
       .not("player_id", "is", null)
       .then(({ data }) => {
-        setUnavailableIds(new Set((data || []).map(r => r.player_id)));
+        setAvailableIds(new Set((data || []).map(r => r.player_id)));
       });
   }, []);
 
@@ -210,8 +210,7 @@ export function BoardPage() {
       }
       if (stateTerms && !matchesState(p.hometown || "", stateTerms)) return false;
       if (!includeUnevaluated && !(p.marketHigh > 0)) return false;
-      if (portalOnly && p.source !== "portal") return false;
-      if (portalOnly && unavailableIds.has(p.id)) return false;
+      if (portalOnly && !availableIds.has(p.id)) return false;
       for (const f of ADVC_FIELDS) {
         const val = f.src === "player" ? p[f.key] : p.stats?.[f.key];
         const { min, max } = advcFilters[f.key];
@@ -220,7 +219,7 @@ export function BoardPage() {
       }
       return true;
     });
-  }, [players, search, posFilter, confFilter, stateFilter, portalOnly, includeUnevaluated, advcFilters, unavailableIds]);
+  }, [players, search, posFilter, confFilter, stateFilter, portalOnly, includeUnevaluated, advcFilters, availableIds]);
 
   // ── Sort (separate so filter changes don't re-sort and vice versa) ──────────
   const sorted = useMemo(() => {
