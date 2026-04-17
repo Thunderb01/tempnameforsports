@@ -9,6 +9,7 @@
   --radius:  14px;
   --max:     1500px;
   --font:    ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+  color-scheme: dark;
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -24,6 +25,14 @@ body {
 a    { color: inherit; text-decoration: none; }
 code { background: rgba(255,255,255,.1); padding: .15rem .35rem; border-radius: 6px; }
 input, select, button, textarea { font: inherit; }
+
+/* Force dark styling on all selects — prevents white-background issue on Windows/non-Apple */
+select {
+  background: #1e2535;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
 
 /* ── Utility ────────────────────────────────────────────────────────────────── */
 .muted { color: var(--muted); }

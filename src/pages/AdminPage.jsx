@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { supabase }   from "@/lib/supabase";
 
-const STATUS_OPTIONS = ["committed", "enrolled", "withdrawn"];
+const STATUS_OPTIONS = ["uncommitted", "committed", "enrolled", "withdrawn"];
 const CURRENT_SEASON = 2027;
 
 const EMPTY_FORM = {

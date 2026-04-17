@@ -12,6 +12,7 @@ import { RosterSandboxPage }   from "@/pages/RosterSandboxPage";
 import { ProtectedRoute, SuperAdminRoute } from "@/components/ProtectedRoute";
 import { AdminPage }          from "@/pages/AdminPage";
 import { ComparePage }        from "@/pages/ComparePage";
+import { PortalPage }         from "@/pages/PortalPage";
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>
@@ -28,6 +29,7 @@ createRoot(document.getElementById("root")).render(
           <Route path="/board"   element={<BoardPage />} />
           <Route path="/sandbox" element={<RosterSandboxPage />} />
           <Route path="/compare" element={<ComparePage />} />
+          <Route path="/portal"  element={<PortalPage />} />
         </Route>
 
         {/* Superadmin only */}
