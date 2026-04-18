@@ -22,7 +22,7 @@ export const TIER_COLORS = {
   "HM All-Conference":                  "#5b9cf6",
   "HM Starter / MM All-Conference":     "#f5c542",
   "HM Rotation / MM Starter":           "#fb923c",
-  "MM Role Player / LM All-Conference": "#e05c5c",
+  "MM Starter / LM All-Conference":     "#e05c5c",
   "LM Rotation":                        "#94a3b8",
 };
 
@@ -32,11 +32,11 @@ export function tierColor(label) {
 
 export function projectedTier(v) {
   v = Number(v) || 0;
-  if (v >= 2_200_000) return "HM All-American / Pre-Draft";
-  if (v >= 1_500_000) return "HM All-Conference";
-  if (v >=   750_000) return "HM Starter / MM All-Conference";
-  if (v >=   400_000) return "HM Rotation / MM Starter";
-  if (v >=   100_000) return "MM Role Player / LM All-Conference";
+  if (v >= 2_000_000) return "HM All-American / Pre-Draft";
+  if (v >= 1_200_000) return "HM All-Conference";
+  if (v >=   400_000) return "HM Starter / MM All-Conference";
+  if (v >=   200_000) return "HM Rotation / MM Starter";
+  if (v >=   100_000) return "MM Starter / LM All-Conference";
   return "LM Rotation";
 }
 

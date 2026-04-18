@@ -3,7 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { SiteHeader }       from "@/components/SiteHeader";
 import { PlayerComparison } from "@/components/PlayerComparison";
 import { supabase }         from "@/lib/supabase";
-import { getBoardCache, setBoardCache } from "@/hooks/useRosterBoard";
+import { getBoardCache, setBoardCache, VW_PLAYERS_COLS } from "@/hooks/useRosterBoard";
 
 export function ComparePage() {
   const [searchParams] = useSearchParams();
@@ -29,7 +29,7 @@ export function ComparePage() {
       while (true) {
         const { data, error } = await supabase
           .from("vw_players")
-          .select("*")
+          .select(VW_PLAYERS_COLS)
           .order("name")
           .range(page * PAGE, (page + 1) * PAGE - 1);
         if (error) { console.error("compare fetch:", error); break; }
