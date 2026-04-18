@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
 import { money } from "@/lib/display";
 
@@ -183,70 +183,61 @@ export function useRosterBoard(team, userId) {
   const loadReturningRoster = useCallback(async (teamName) => {
     if (!teamName) return;
 
+    // Use cached players if available, otherwise fetch
+    let returning;
     if (_rosterCache[teamName]) {
-      setReturningPlayers(_rosterCache[teamName]);
-      return;
+      returning = _rosterCache[teamName];
+      setReturningPlayers(returning);
+    } else {
+      const { data: teamData, error: teamError } = await supabase
+        .from("team_players")
+        .select("player_id")
+        .eq("team", teamName);
+
+      if (teamError) { console.error("team_players fetch:", teamError); return; }
+      const ids = (teamData || []).map(r => r.player_id);
+      if (ids.length === 0) {
+        _rosterCache[teamName] = [];
+        setReturningPlayers([]);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from("vw_players")
+        .select("*")
+        .in("id", ids);
+
+      if (error) { console.error("vw_players roster fetch:", error); return; }
+
+      returning = (data || [])
+        .map(row => ({
+          ...row,
+          team:           row.current_team,
+          pos:            row.primary_position,
+          marketLow:      row.open_market_low  ?? 0,
+          marketHigh:     row.open_market_high ?? 0,
+          nilValuation:   row.nil_valuation    ?? 0,
+          playmakerTags:  row.playmaker_tags  ? row.playmaker_tags.split(",").map(t => t.trim()).filter(Boolean)  : [],
+          specialistTags: row.specialist_tags ? row.specialist_tags.split(",").map(t => t.trim()).filter(Boolean) : [],
+          shootingTags:   row.shooting_tags   ? row.shooting_tags.split(",").map(t => t.trim()).filter(Boolean)   : [],
+          shotmakingTags: row.shotmaking_tags ? row.shotmaking_tags.split(",").map(t => t.trim()).filter(Boolean) : [],
+          interiorTags:   row.interior_tags   ? row.interior_tags.split(",").map(t => t.trim()).filter(Boolean)   : [],
+          defensiveTags:  row.defensive_tags  ? row.defensive_tags.split(",").map(t => t.trim()).filter(Boolean)  : [],
+          stats: {
+            ppg: row.ppg, rpg: row.rpg, apg: row.apg, usg: row.usg,
+            ast_tov: row.ast_tov, fg_pct: row.fg_pct, "3p_pct": row["3p_pct"],
+            ft_pct: row.ft_pct, sei: row.sei, ath: row.ath,
+            ris: row.ris, dds: row.dds, cdi: row.cdi,
+            calendar_year: row.calendar_year,
+          },
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+
+      _rosterCache[teamName] = returning;
+      setReturningPlayers(returning);
     }
 
-    // Step 1: get the player IDs for this team
-    const { data: teamData, error: teamError } = await supabase
-      .from("team_players")
-      .select("player_id")
-      .eq("team", teamName);
-
-    if (teamError) { console.error("team_players fetch:", teamError); return; }
-    const ids = (teamData || []).map(r => r.player_id);
-    if (ids.length === 0) {
-      _rosterCache[teamName] = [];
-      setReturningPlayers([]);
-      return;
-    }
-
-    // Step 2: fetch player data from the optimized view
-    const { data, error } = await supabase
-      .from("vw_players")
-      .select("*")
-      .in("id", ids);
-
-    if (error) { console.error("vw_players roster fetch:", error); return; }
-
-    const returning = (data || [])
-      .map(row => ({
-        ...row,
-        team:           row.current_team,
-        pos:            row.primary_position,
-        marketLow:      row.open_market_low  ?? 0,
-        marketHigh:     row.open_market_high ?? 0,
-        nilValuation:   row.nil_valuation    ?? 0,
-        playmakerTags:  row.playmaker_tags  ? row.playmaker_tags.split(",").map(t => t.trim()).filter(Boolean)  : [],
-        specialistTags: row.specialist_tags ? row.specialist_tags.split(",").map(t => t.trim()).filter(Boolean) : [],
-        shootingTags:   row.shooting_tags   ? row.shooting_tags.split(",").map(t => t.trim()).filter(Boolean)   : [],
-        shotmakingTags: row.shotmaking_tags ? row.shotmaking_tags.split(",").map(t => t.trim()).filter(Boolean) : [],
-        interiorTags:   row.interior_tags   ? row.interior_tags.split(",").map(t => t.trim()).filter(Boolean)   : [],
-        defensiveTags:  row.defensive_tags  ? row.defensive_tags.split(",").map(t => t.trim()).filter(Boolean)  : [],
-        stats: {
-          ppg:          row.ppg,
-          rpg:          row.rpg,
-          apg:          row.apg,
-          usg:          row.usg,
-          ast_tov:      row.ast_tov,
-          fg_pct:       row.fg_pct,
-          "3p_pct":     row["3p_pct"],
-          ft_pct:       row.ft_pct,
-          sei:          row.sei,
-          ath:          row.ath,
-          ris:          row.ris,
-          dds:          row.dds,
-          cdi:          row.cdi,
-          calendar_year: row.calendar_year,
-        },
-      }))
-      .sort((a, b) => a.name.localeCompare(b.name));
-
-    _rosterCache[teamName] = returning;
-    setReturningPlayers(returning);
-
-    // Fetch which of these players are in the transfer portal this season
+    // Always re-evaluate retention — runs on both cache hits and fresh fetches
     const returningIds = returning.map(p => p.id);
     const { data: portalData } = await supabase
       .from("portal_transfers")
@@ -255,20 +246,16 @@ export function useRosterBoard(team, userId) {
       .in("player_id", returningIds);
     const portalIds = new Set((portalData || []).map(r => r.player_id));
 
-    // Auto-set retention based on portal status, year, and defaults
     const GRADUATING_YEARS = ["Senior", "Graduate", "SR", "GR"];
     setState(s => {
-      const autoRetention = {};
+      const portalRetention  = {};  // always overrides saved state
+      const defaultRetention = {};  // only fills missing entries
       const autoNil = {};
       returning.forEach(p => {
-        if (!s.retentionById[p.id]) {
-          if (portalIds.has(p.id)) {
-            autoRetention[p.id] = "entering_portal";
-          } else if (GRADUATING_YEARS.includes(p.year)) {
-            autoRetention[p.id] = "graduating";
-          } else {
-            autoRetention[p.id] = "returning";
-          }
+        if (portalIds.has(p.id)) {
+          portalRetention[p.id] = "entering_portal"; // always wins
+        } else if (!s.retentionById[p.id]) {
+          defaultRetention[p.id] = GRADUATING_YEARS.includes(p.year) ? "graduating" : "returning";
         }
         if (!s.nilById[p.id] && p.nilValuation > 0) {
           autoNil[p.id] = Math.round(p.nilValuation);
@@ -276,17 +263,66 @@ export function useRosterBoard(team, userId) {
       });
       return {
         ...s,
-        retentionById: { ...autoRetention, ...s.retentionById },
-        nilById:       { ...autoNil,       ...s.nilById       },
+        retentionById: { ...defaultRetention, ...s.retentionById, ...portalRetention },
+        nilById:       { ...autoNil, ...s.nilById },
       };
     });
   }, []);
 
+  // ── Custom players (freshmen / redshirts) ──────────────────────────────────
+
+  const [customPlayers, setCustomPlayers] = useState([]);
+
+  const loadCustomPlayers = useCallback(async (teamName, uid) => {
+    if (!teamName || !uid) return;
+    const { data, error } = await supabase
+      .from("custom_roster_players")
+      .select("*")
+      .eq("team", teamName)
+      .eq("user_id", uid)
+      .order("created_at");
+    if (error) { console.error("custom_roster_players fetch:", error); return; }
+    setCustomPlayers(data || []);
+  }, []);
+
+  async function addCustomPlayer({ name, nil_offer = 0, pos = "", year_label = "FR" }, teamName, uid) {
+    if (!name.trim() || !teamName || !uid) return;
+    const { data, error } = await supabase
+      .from("custom_roster_players")
+      .insert({ name: name.trim(), nil_offer: Number(nil_offer) || 0, pos, year_label, team: teamName, user_id: uid })
+      .select()
+      .single();
+    if (error) { console.error("add custom player:", error); return; }
+    setCustomPlayers(prev => [...prev, data]);
+  }
+
+  async function removeCustomPlayer(id) {
+    const { error } = await supabase.from("custom_roster_players").delete().eq("id", id);
+    if (error) { console.error("remove custom player:", error); return; }
+    setCustomPlayers(prev => prev.filter(p => p.id !== id));
+  }
+
+  // Updates local state immediately (fast), call persistCustomPlayerNil onBlur to save to DB
+  function updateCustomPlayerNil(id, nil_offer) {
+    const val = Math.max(0, Number(nil_offer) || 0);
+    setCustomPlayers(prev => prev.map(p => p.id === id ? { ...p, nil_offer: val } : p));
+  }
+
+  async function persistCustomPlayerNil(id, nil_offer) {
+    const val = Math.max(0, Number(nil_offer) || 0);
+    const { error } = await supabase.from("custom_roster_players").update({ nil_offer: val }).eq("id", id);
+    if (error) console.error("persist custom player nil:", error);
+  }
+
   // ── Board actions ───────────────────────────────────────────────────────────
 
-  const byId      = id => state.board.find(p => p.id === id) ?? null;
-  const inRoster  = id => state.roster.some(r => r.id === id);
-  const inShort   = id => state.shortlistIds.includes(id);
+  const _boardById = useMemo(() => new Map(state.board.map(p => [p.id, p])), [state.board]);
+  const _rosterIds = useMemo(() => new Set(state.roster.map(r => r.id)), [state.roster]);
+  const _shortIds  = useMemo(() => new Set(state.shortlistIds), [state.shortlistIds]);
+
+  const byId     = (id) => _boardById.get(id) ?? null;
+  const inRoster = (id) => _rosterIds.has(id);
+  const inShort  = (id) => _shortIds.has(id);
 
   function addToShortlist(id) {
     if (!byId(id) || inShort(id) || inRoster(id)) return;
@@ -381,17 +417,18 @@ export function useRosterBoard(team, userId) {
 
   // ── Calc ────────────────────────────────────────────────────────────────────
 
-  function calc() {
+  const calc = useMemo(() => {
     const { settings, roster, retentionById, nilById } = state;
     const isGraduating = p => retentionById[p.id] === "graduating";
     const committedReturning = returningPlayers.filter(
       p => !isGraduating(p) && (retentionById[p.id] || "returning") === "returning"
     ).length;
-    const totalRoster        = roster.length + committedReturning;
+    const customNil          = customPlayers.reduce((sum, p) => sum + (p.nil_offer || 0), 0);
+    const totalRoster        = roster.length + committedReturning + customPlayers.length;
     const returningNil       = returningPlayers
       .filter(p => !isGraduating(p) && (retentionById[p.id] || "returning") === "returning")
       .reduce((sum, p) => sum + (nilById[p.id] || 0), 0);
-    const nilCommitted       = roster.reduce((sum, r) => sum + (r.nilOffer || 0), 0) + returningNil;
+    const nilCommitted       = roster.reduce((sum, r) => sum + (r.nilOffer || 0), 0) + returningNil + customNil;
     const nilRemaining       = settings.nilTotal - nilCommitted;
     const scholarshipsRemaining = settings.scholarships - totalRoster;
     const maxPerPlayer       = settings.nilTotal * settings.maxPct;
@@ -403,23 +440,26 @@ export function useRosterBoard(team, userId) {
       warnings.push(`Over NIL budget by ${money(Math.abs(nilRemaining))}.`);
     roster.forEach(r => {
       if (r.nilOffer > maxPerPlayer) {
-        const p = byId(r.id);
+        const p = _boardById.get(r.id);
         warnings.push(`${p?.name ?? r.id} exceeds max/player (${money(maxPerPlayer)}).`);
       }
     });
 
     return { totalRoster, nilCommitted, nilRemaining, scholarshipsRemaining, maxPerPlayer, warnings };
-  }
+  }, [state, returningPlayers, customPlayers, _boardById]);
 
   return {
     state,
     returningPlayers,
+    customPlayers,
+    calc,
     loadPortalBoard,
     loadReturningRoster,
+    loadCustomPlayers,
     byId, inRoster, inShort,
     addToShortlist, removeFromShortlist,
     addToRoster, removeFromRoster,
     updateOffer, setStatus, setRetention, updateReturningNil, loadFromSaved, commitSettings, reset,
-    calc,
+    addCustomPlayer, removeCustomPlayer, updateCustomPlayerNil, persistCustomPlayerNil,
   };
 }

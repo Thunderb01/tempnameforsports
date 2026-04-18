@@ -83,12 +83,13 @@ export function RosterSandboxPage() {
   const [sortKey, setSortKey] = useState(null);
   const [sortDir, setSortDir] = useState("asc");
 
-  // Load portal board + returning roster in parallel on mount / when active team changes
+  // Load portal board + returning roster + custom players in parallel on mount / when active team changes
   useEffect(() => {
     const fetches = [board.loadPortalBoard()];
     if (activeTeam) fetches.push(board.loadReturningRoster(activeTeam));
+    if (activeTeam && userId) fetches.push(board.loadCustomPlayers(activeTeam, userId));
     Promise.all(fetches);
-  }, [activeTeam]);
+  }, [activeTeam, userId]);
 
   // Load saved rosters + coaches whenever drawer opens
   useEffect(() => {
@@ -118,7 +119,7 @@ export function RosterSandboxPage() {
     const returning = board.returningPlayers
       .filter(p => {
         const s = retentionById[p.id] || "returning";
-        return !["entering_portal", "graduating", "entering_draft", "transferred"].includes(s);
+        return s === "returning" || s === "undecided";
       })
       .map(p => ({
         ...p,
@@ -134,8 +135,19 @@ export function RosterSandboxPage() {
       })
       .filter(Boolean);
 
-    return [...returning, ...transfers];
-  }, [board.returningPlayers, board.state.board, board.state.roster, board.state.retentionById, board.state.nilById]);
+    const custom = board.customPlayers.map(p => ({
+      id:       p.id,
+      name:     p.name,
+      pos:      p.pos || "—",
+      year:     p.year_label,
+      nilOffer: p.nil_offer || 0,
+      _type:    "FR/RS",
+      _typeKey: "custom",
+      stats:    {},
+    }));
+
+    return [...returning, ...transfers, ...custom];
+  }, [board.returningPlayers, board.state.board, board.state.roster, board.state.retentionById, board.state.nilById, board.customPlayers]);
 
   const displayPlayers = activeRoster ? activeRoster.players : rosterPlayers;
 
@@ -304,7 +316,7 @@ export function RosterSandboxPage() {
 
           {/* ── Summary strip ── */}
           {(() => {
-            const calc = board.calc();
+            const calc = board.calc;
             const settings = board.state.settings;
             return (
               <div style={{ display: "flex", gap: 24, flexWrap: "wrap", marginTop: 14, padding: "10px 16px", background: "rgba(255,255,255,.04)", border: "1px solid var(--border)", borderRadius: 8 }}>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef, memo, useCallback } from "react";
 import { SiteHeader }   from "@/components/SiteHeader";
 import { PlayerCard }   from "@/components/PlayerCard";
 import { PlayerModal }  from "@/components/PlayerModal";
@@ -21,6 +21,57 @@ import { money } from "@/lib/display";
 //   { key: "passed",     label: "Passed" },
 // ];
 
+const CustomPlayersSection = memo(function CustomPlayersSection({ customPlayers, onAdd, onRemove, onNilChange, onNilBlur, activeTeam, userId }) {
+  const nameRef = useRef(); const posRef = useRef(); const yearRef = useRef(); const nilRef = useRef();
+  return (
+    <>
+      <div className="section-divider">Freshmen / Redshirts</div>
+      {customPlayers.map(p => (
+        <div key={p.id} className="row" style={{ opacity: .8 }}>
+          <div className="row-main">
+            <div className="row-title" style={{ fontSize: 13 }}>{p.name}</div>
+            <div className="row-sub" style={{ fontSize: 11 }}>{p.pos || "—"} · {p.year_label}</div>
+            <div className="offer">
+              <label>NIL</label>
+              <input className="input" type="number" min="0" step="1000"
+                value={p.nil_offer || 0}
+                onChange={e => onNilChange(p.id, e.target.value)}
+                onBlur={e => onNilBlur(p.id, e.target.value)} />
+              <span className="muted">{money(p.nil_offer || 0)}</span>
+            </div>
+          </div>
+          <div className="row-actions">
+            <button className="btn btn-ghost" style={{ fontSize: 11 }} onClick={() => onRemove(p.id)}>
+              Remove
+            </button>
+          </div>
+        </div>
+      ))}
+      <div style={{ padding: "10px 14px", display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center", borderTop: "1px solid var(--border)" }}>
+        <input className="input" placeholder="Name" style={{ flex: "1 1 130px", fontSize: 12, padding: "5px 8px" }} ref={nameRef} defaultValue="" />
+        <input className="input" placeholder="Pos"  style={{ width: 54, fontSize: 12, padding: "5px 8px" }} ref={posRef}  defaultValue="" />
+        <select className="input" style={{ fontSize: 12, padding: "5px 8px", width: 72 }} ref={yearRef} defaultValue="FR">
+          <option value="FR">FR</option>
+          <option value="RS FR">RS FR</option>
+          <option value="SO">SO</option>
+          <option value="RS SO">RS SO</option>
+          <option value="JR">JR</option>
+        </select>
+        <input className="input" placeholder="NIL" type="number" min="0" step="1000" style={{ width: 90, fontSize: 12, padding: "5px 8px" }} ref={nilRef} defaultValue="" />
+        <button className="btn btn-ghost" style={{ fontSize: 12 }}
+          onClick={async () => {
+            const name = nameRef.current?.value?.trim();
+            if (!name) return;
+            await onAdd({ name, nil_offer: nilRef.current?.value || 0, pos: posRef.current?.value || "", year_label: yearRef.current?.value || "FR" }, activeTeam, userId);
+            nameRef.current.value = ""; nilRef.current.value = ""; posRef.current.value = ""; yearRef.current.value = "FR";
+          }}>
+          + Add
+        </button>
+      </div>
+    </>
+  );
+});
+
 export function AppPage() {
   
   const { profile, user } = useAuth();
@@ -41,6 +92,9 @@ export function AppPage() {
   const [loadingDrawer, setLoadingDrawer] = useState(false);
   const [saveName,      setSaveName]      = useState("");
   const [saving,        setSaving]        = useState(false);
+  const handleCustomNilChange = useCallback((id, val) => board.updateCustomPlayerNil(id, val), [board.updateCustomPlayerNil]);
+  const handleCustomNilBlur   = useCallback((id, val) => board.persistCustomPlayerNil(id, val), [board.persistCustomPlayerNil]);
+  const handleCustomRemove    = useCallback((id) => board.removeCustomPlayer(id), [board.removeCustomPlayer]);
 
   // Page view tracking — sessionStorage guard prevents double-fires from
   // React Strict Mode and HMR remounts in development.
@@ -51,12 +105,13 @@ export function AppPage() {
     }
   }, []);
 
-  // Load portal board + returning roster in parallel on mount / when active team changes
+  // Load portal board + returning roster + custom players in parallel on mount / when active team changes
   useEffect(() => {
     const fetches = [board.loadPortalBoard()];
     if (activeTeam) fetches.push(board.loadReturningRoster(activeTeam));
+    if (activeTeam && userId) fetches.push(board.loadCustomPlayers(activeTeam, userId));
     Promise.all(fetches);
-  }, [activeTeam]);
+  }, [activeTeam, userId]);
 
   // Sync local settings state
   useEffect(() => {
@@ -208,7 +263,7 @@ export function AppPage() {
       .sort((a, b) => (b.marketHigh || 0) - (a.marketHigh || 0));
   }, [board.state.board, search, posFilter]);
 
-  const calc = board.calc();
+  const calc = board.calc;
 
   const NIL_BY_LEVEL = {
     "High Major": 10_000_000,
@@ -667,6 +722,16 @@ export function AppPage() {
                     );
                   })
               }
+              <CustomPlayersSection
+                customPlayers={board.customPlayers}
+                onAdd={board.addCustomPlayer}
+                onRemove={handleCustomRemove}
+                onNilChange={handleCustomNilChange}
+                onNilBlur={handleCustomNilBlur}
+                activeTeam={activeTeam}
+                userId={userId}
+              />
+
             </div>
           </div>
 

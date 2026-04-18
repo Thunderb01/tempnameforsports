@@ -1,6 +1,7 @@
+import { memo } from "react";
 import { money } from "@/lib/display";
 
-export function PlayerCard({ player, inRoster, inShortlist, onRoster, onShortlist, onClick }) {
+export const PlayerCard = memo(function PlayerCard({ player, inRoster, inShortlist, onRoster, onShortlist, onClick }) {
   const s = player.stats || {};
   const stat = (val, label) => val != null && val !== "" && String(val) !== "NaN"
     ? `${label} ${Number(val).toFixed(1)}`
@@ -39,4 +40,4 @@ export function PlayerCard({ player, inRoster, inShortlist, onRoster, onShortlis
       </div>
     </div>
   );
-}
+});
