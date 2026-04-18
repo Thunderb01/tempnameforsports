@@ -132,7 +132,7 @@ export function useRosterBoard(team, userId) {
     while (true) {
       const { data, error } = await supabase
         .from("vw_players")
-        .select(VW_PLAYERS_COLS)
+        .select("*")
         .order("name")
         .range(page * PAGE, (page + 1) * PAGE - 1);
       if (error) { console.error("players fetch:", error); return; }
@@ -214,7 +214,7 @@ export function useRosterBoard(team, userId) {
     // Step 2: fetch player data from the optimized view
     const { data, error } = await supabase
       .from("vw_players")
-      .select(VW_PLAYERS_COLS)
+      .select("*")
       .in("id", ids);
 
     if (error) { console.error("vw_players roster fetch:", error); return; }
