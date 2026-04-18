@@ -8,20 +8,21 @@ export const VW_PLAYERS_COLS = [
   "height","hometown","espn_id",
   "open_market_low","open_market_high","nil_valuation",
   "playmaker_tags","specialist_tags","shooting_tags","shotmaking_tags","interior_tags","defensive_tags",
-  "ppg","rpg","apg","usg","ast_tov","fg_pct","3p_pct","ft_pct",
+  "ppg","rpg","apg","usg","ast_tov","fg_pct",'"3p_pct"',"ft_pct",
   "sei","ath","ris","dds","cdi","calendar_year",
 ].join(",");
 
 // Module-level caches so data survives page navigation without re-fetching.
 const SESSION_BOARD_KEY = "bp_board_cache";
-const SESSION_BOARD_TTL = 4 * 60 * 60 * 1000; // 4 hours
+const SESSION_BOARD_TTL  = 4 * 60 * 60 * 1000; // 4 hours
+const SESSION_BOARD_VER  = 2; // bump to invalidate all cached sessions
 
 function loadSessionCache() {
   try {
     const raw = sessionStorage.getItem(SESSION_BOARD_KEY);
     if (!raw) return [];
-    const { players, ts } = JSON.parse(raw);
-    if (Date.now() - ts > SESSION_BOARD_TTL) {
+    const { players, ts, v } = JSON.parse(raw);
+    if (v !== SESSION_BOARD_VER || Date.now() - ts > SESSION_BOARD_TTL) {
       sessionStorage.removeItem(SESSION_BOARD_KEY);
       return [];
     }
@@ -30,7 +31,7 @@ function loadSessionCache() {
 }
 
 function saveSessionCache(players) {
-  try { sessionStorage.setItem(SESSION_BOARD_KEY, JSON.stringify({ players, ts: Date.now() })); } catch {}
+  try { sessionStorage.setItem(SESSION_BOARD_KEY, JSON.stringify({ players, ts: Date.now(), v: SESSION_BOARD_VER })); } catch {}
 }
 
 let _boardCache = loadSessionCache(); // warm from sessionStorage on module load
