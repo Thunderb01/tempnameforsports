@@ -2,15 +2,6 @@ import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { money } from "@/lib/display";
 
-// Exact columns fetched from vw_players — avoids SELECT * egress cost
-export const VW_PLAYERS_COLS = [
-  "id","source","name","current_team","conference","primary_position","year",
-  "height","hometown","espn_id",
-  "open_market_low","open_market_high","nil_valuation",
-  "playmaker_tags","specialist_tags","shooting_tags","shotmaking_tags","interior_tags","defensive_tags",
-  "ppg","rpg","apg","usg","ast_tov","fg_pct",'"3p_pct"',"ft_pct",
-  "sei","ath","ris","dds","cdi","calendar_year",
-].join(",");
 
 // Module-level caches so data survives page navigation without re-fetching.
 const SESSION_BOARD_KEY = "bp_board_cache";

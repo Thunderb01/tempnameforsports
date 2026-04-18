@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { SiteHeader }  from "@/components/SiteHeader";
 import { PlayerModal } from "@/components/PlayerModal";
 import { useAuth }     from "@/hooks/useAuth";
-import { getBoardCache, VW_PLAYERS_COLS } from "@/hooks/useRosterBoard";
+import { getBoardCache } from "@/hooks/useRosterBoard";
 import { supabase }    from "@/lib/supabase";
 import { money, projectedTier, tierColor } from "@/lib/display";
 
@@ -78,7 +78,7 @@ export function PortalPage() {
           for (let i = 0; i < ids.length; i += CHUNK) {
             const { data: chunk } = await supabase
               .from("vw_players")
-              .select(VW_PLAYERS_COLS)
+              .select("*")
               .in("id", ids.slice(i, i + CHUNK));
             allRows.push(...(chunk || []));
           }
