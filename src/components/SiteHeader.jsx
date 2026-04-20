@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
@@ -9,7 +10,8 @@ export function SiteHeader() {
   const { profile } = useAuth();
   const { isSuperAdmin } = useAdminTeam(profile);
   const teamLogos = useTeamLogos();
-  const navigate    = useNavigate();
+  const navigate  = useNavigate();
+  const [bannerDismissed, setBannerDismissed] = useState(false);
 
   async function handleSignOut() {
     await supabase.auth.signOut();
@@ -18,6 +20,12 @@ export function SiteHeader() {
 
   return (
     <div className="site-header-wrap">
+      {!bannerDismissed && (
+        <div style={{ background: "#1e3a5f", borderBottom: "1px solid rgba(91,156,246,.25)", padding: "6px 40px 6px 16px", textAlign: "center", fontSize: 12, color: "rgba(255,255,255,.75)", letterSpacing: ".01em", position: "relative" }}>
+          Remember to regularly refresh the site by hitting Ctrl+Shift+R or Command+Shift+R. We are constantly making changes to improve the user experience.
+          <button onClick={() => setBannerDismissed(true)} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: "rgba(255,255,255,.5)", cursor: "pointer", fontSize: 16, lineHeight: 1, padding: "0 4px" }}>✕</button>
+        </div>
+      )}
       <header className="site-header">
         <NavLink to="/app" className="brand">
           <img className="brand-logo" src={logo} alt="Beyond the Portal" />
