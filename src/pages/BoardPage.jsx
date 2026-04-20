@@ -7,7 +7,7 @@ import { useAdminTeam }    from "@/hooks/useAdminTeam";
 import { useRosterBoard }  from "@/hooks/useRosterBoard";
 import { supabase }        from "@/lib/supabase";
 import teamConferences from "@/data/teamConferences.json";
-import teamLogos       from "@/data/teamLogos.json";
+import { useTeamLogos } from "@/hooks/useTeamLogos";
 import { money, heightToInches, tierColor, projectedTier } from "@/lib/display";
 
 // label → getter(player)
@@ -31,6 +31,7 @@ export function BoardPage() {
   const userId = user?.id || "";
   const { isAdmin, activeTeam, selectedTeam, setSelectedTeam, allTeams } = useAdminTeam(profile);
   const board = useRosterBoard(activeTeam, userId);
+  const teamLogos = useTeamLogos();
 
   const [loading,      setLoading]     = useState(true);
   const [searchInput,  setSearchInput] = useState("");
@@ -406,7 +407,7 @@ export function BoardPage() {
                           const { from_team, to_team } = portalInfo[p.id];
                           const fromLogo = teamLogos[from_team];
                           const toLogo   = to_team ? teamLogos[to_team] : null;
-                          const logoStyle = { width: 32, height: 32, borderRadius: "50%", objectFit: "contain", background: "rgba(255,255,255,.07)" };
+                          const logoStyle = { width: 48, height: 48, borderRadius: "50%", objectFit: "contain", background: "rgba(255,255,255,.07)" };
                           const placeholderStyle = { ...logoStyle, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, opacity: .35, flexShrink: 0 };
                           return (
                             <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 5 }}>

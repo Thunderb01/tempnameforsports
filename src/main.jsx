@@ -13,7 +13,6 @@ import { ResetPasswordPage } from "@/pages/ResetPasswordPage";
 // Lazy-loaded — each becomes its own JS chunk, only downloaded when visited
 const AppPage          = lazy(() => import("@/pages/AppPage").then(m => ({ default: m.AppPage })));
 const BoardPage        = lazy(() => import("@/pages/BoardPage").then(m => ({ default: m.BoardPage })));
-const RosterSandboxPage= lazy(() => import("@/pages/RosterSandboxPage").then(m => ({ default: m.RosterSandboxPage })));
 const AdminPage        = lazy(() => import("@/pages/AdminPage").then(m => ({ default: m.AdminPage })));
 const ComparePage      = lazy(() => import("@/pages/ComparePage").then(m => ({ default: m.ComparePage })));
 const PortalPage       = lazy(() => import("@/pages/PortalPage").then(m => ({ default: m.PortalPage })));
@@ -32,7 +31,7 @@ createRoot(document.getElementById("root")).render(
           <Route element={<ProtectedRoute />}>
             <Route path="/app"     element={<AppPage />} />
             <Route path="/board"   element={<BoardPage />} />
-            <Route path="/sandbox" element={<RosterSandboxPage />} />
+            <Route path="/sandbox" element={<Navigate to="/app" replace />} />
             <Route path="/compare" element={<ComparePage />} />
             <Route path="/portal"  element={<PortalPage />} />
           </Route>

@@ -54,7 +54,7 @@ ESPN_HEADERS = {
 }
 CSV_OUT = "team_espn.csv"
 
-# DB team name → ESPN displayName (add entries here when names don't match)
+# DB team name -> ESPN displayName (add entries here when names don't match)
 ALIASES = {
     "UConn":                    "Connecticut",
     "UMass":                    "Massachusetts",
@@ -62,8 +62,7 @@ ALIASES = {
     "FIU":                      "Florida International",
     "UCSB":                     "UC Santa Barbara",
     "UT Arlington":             "UT Arlington",
-    "SIU Edwardsville":         "SIU-Edwardsville",
-    "SIUE":                     "SIU-Edwardsville",
+    "SIUE":                     "SIU Edwardsville",
     "LIU":                      "Long Island University",
     "UIW":                      "Incarnate Word",
     "IUPUI":                    "IUPUI",
@@ -96,9 +95,35 @@ ALIASES = {
     "Albany":                   "UAlbany",
     "Hawaii":                   "Hawai'i",
     "Connecticut":              "UConn",
-    "Sam Houston":              "Sam Houston State",
-    "St. John's":               "St. John's (NY)",
-    "St. Thomas":               "St. Thomas (MN)",
+    "Sam Houston":              "Sam Houston",
+    "St. John's":               "St. John's",
+    "St. Thomas":               "St. Thomas-Minnesota",
+    "Arkansas Pine Bluff":      "Arkansas-Pine Bluff",
+    "Bethune Cookman":          "Bethune-Cookman",
+    "Cal St. Bakersfield":      "Cal State Bakersfield",
+    "Cal St. Fullerton":        "Cal State Fullerton",
+    "Cal St. Northridge":       "Cal State Northridge",
+    "Central Connecticut St.":  "Central Connecticut",
+    "Delaware St.":             "Delaware State",
+    "Gardner Webb":             "Gardner-Webb",
+    "Jackson St.":              "Jackson State",
+    "Kennesaw St.":             "Kennesaw State",
+    "Lindenwood":               "Lindenwood",
+    "Mississippi Valley St.":   "Mississippi Valley State",
+    "Nebraska Omaha":           "Omaha",
+    "Northwestern St.":         "Northwestern State",
+    "Portland St.":             "Portland State",
+    "Queens":                   "Queens (NC)",
+    "San Jose State":           "San Jose State",
+    "Seattle":                  "Seattle U",
+    "Southeast Missouri St.":   "Southeast Missouri State",
+    "Southeastern Louisiana":   "SE Louisiana",
+    "Southern Indiana":         "Southern Indiana",
+    "Tennessee Martin":         "UT Martin",
+    "Texas A&M Corpus Chris":   "Texas A&M-Corpus Christi",
+    "USC Upstate":              "USC Upstate",
+    "Wright St.":               "Wright State",
+    "Youngstown St.":           "Youngstown State",
     "UT Martin":                "Tennessee-Martin",
 }
 
@@ -179,7 +204,7 @@ def build_lookup(espn_teams: list[dict]) -> dict[str, dict]:
 def fetch_db_teams(sb) -> list[dict]:
     rows, page, PAGE = [], 0, 1000
     while True:
-        res = sb.table("teams").select("id, name, espn_id, logo_url") \
+        res = sb.table("teams").select("name, espn_id, logo_url") \
                 .range(page * PAGE, (page + 1) * PAGE - 1).execute()
         batch = res.data or []
         rows.extend(batch)
@@ -204,7 +229,7 @@ def main():
         writer = csv.DictWriter(f, fieldnames=["espn_id", "display_name", "short_name", "location", "abbreviation", "logo_url"])
         writer.writeheader()
         writer.writerows(espn_teams)
-    print(f"  CSV written → {CSV_OUT}")
+    print(f"  CSV written -> {CSV_OUT}")
 
     if args.csv_only:
         return
@@ -232,12 +257,12 @@ def main():
             unmatched.append(db_name)
             continue
 
-        print(f"  ✓ {db_name!r:40s} → espn_id={team['espn_id']}  {team['display_name']}")
+        print(f"  OK{db_name!r:40s} -> espn_id={team['espn_id']}  {team['display_name']}")
         if not args.dry_run:
             sb.table("teams").update({
                 "espn_id":  team["espn_id"],
                 "logo_url": team["logo_url"],
-            }).eq("id", row["id"]).execute()
+            }).eq("name", db_name).execute()
         matched += 1
 
     print(f"\nMatched  : {matched}")
