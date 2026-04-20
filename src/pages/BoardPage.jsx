@@ -23,6 +23,7 @@ const COLS = [
   { label: "APG",       get: p => p.stats?.apg    ?? "—" },
   { label: "Mkt Low",   get: p => money(p.marketLow) },
   { label: "Mkt High",  get: p => money(p.marketHigh) },
+  { label: "To Team",   get: p => p._toTeam || "—" },
 ];
 
 
@@ -52,6 +53,7 @@ export function BoardPage() {
   const [portalOnly,        setPortalOnly]        = useState(true);
   const [includeCommitted,  setIncludeCommitted]  = useState(false);
   const [includeUnevaluated, setIncludeUnevaluated] = useState(false);
+  const [toTeamFilter,      setToTeamFilter]      = useState("");
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [confFilter,  setConfFilter]  = useState("all");
   const conferences = [
@@ -207,7 +209,7 @@ export function BoardPage() {
 
 
   // Reset to page 0 whenever filters or sort change
-  useEffect(() => setPage(0), [search, posFilter, stateFilter, confFilter, sortKey, sortDir, portalOnly, includeCommitted, includeUnevaluated, advcFilters]);
+  useEffect(() => setPage(0), [search, posFilter, stateFilter, confFilter, sortKey, sortDir, portalOnly, includeCommitted, includeUnevaluated, advcFilters, toTeamFilter]);
 
   // ── Filter ──────────────────────────────────────────────────────────────────
   const filtered = useMemo(() => {
@@ -227,6 +229,10 @@ export function BoardPage() {
       }
       if (stateTerms && !matchesState(p.hometown || "", stateTerms)) return false;
       if (!includeUnevaluated && !(p.marketHigh > 0)) return false;
+      if (toTeamFilter.trim()) {
+        const dest = (portalInfo[p.id]?.to_team || "").toLowerCase();
+        if (!dest.includes(toTeamFilter.trim().toLowerCase())) return false;
+      }
       if (portalOnly) {
         const portalSet = includeCommitted ? allPortalIds : availableIds;
         if (!portalSet.has(p.id)) return false;
@@ -239,7 +245,7 @@ export function BoardPage() {
       }
       return true;
     });
-  }, [players, search, posFilter, confFilter, stateFilter, portalOnly, includeCommitted, includeUnevaluated, advcFilters, availableIds, allPortalIds]);
+  }, [players, search, posFilter, confFilter, stateFilter, portalOnly, includeCommitted, includeUnevaluated, advcFilters, toTeamFilter, availableIds, allPortalIds, portalInfo]);
 
   // ── Sort (separate so filter changes don't re-sort and vice versa) ──────────
   const sorted = useMemo(() => {
@@ -316,36 +322,43 @@ export function BoardPage() {
           </div>
 
           {/* Filters */}
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
-            <input className="input" type="search" placeholder="Search players…"
-              style={{ flex: 1, minWidth: 160 }}
-              value={searchInput} onChange={e => setSearchInput(e.target.value)} />
-            <select className="input" style={{ width: 150 }} value={posFilter} onChange={e => setPosFilter(e.target.value)}>
-              <option value="all">All positions</option>
-              <option value="Guard">Guard</option>
-              <option value="Wing">Wing</option>
-              <option value="Big">Big</option>
-            </select>
-            <select className="input" style={{ width: 150 }} value={confFilter} onChange={e => setConfFilter(e.target.value)}>
-              <option value="all">All conferences</option>
-              {conferences.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
-            <select className="input" style={{ width: 180 }} value={stateFilter} onChange={e => setStateFilter(e.target.value)}>
-              <option value="all">All locations</option>
-              {STATE_OPTIONS.map(o => <option key={o.label} value={o.label}>{o.label}</option>)}
-            </select>
-            <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, opacity: .7, cursor: "pointer", userSelect: "none" }}>
-              <input type="checkbox" checked={portalOnly} onChange={e => setPortalOnly(e.target.checked)} />
-              Available in portal
-            </label>
-            <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, opacity: portalOnly ? .7 : .3, cursor: portalOnly ? "pointer" : "default", userSelect: "none", paddingLeft: 10, borderLeft: "2px solid rgba(255,255,255,.1)" }}>
-              <input type="checkbox" checked={includeCommitted} disabled={!portalOnly} onChange={e => setIncludeCommitted(e.target.checked)} />
-              + already committed
-            </label>
-            <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, opacity: .7, cursor: "pointer", userSelect: "none" }}>
-              <input type="checkbox" checked={includeUnevaluated} onChange={e => setIncludeUnevaluated(e.target.checked)} />
-              Show unevaluated
-            </label>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 }}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+              <input className="input" type="search" placeholder="Search players…"
+                style={{ flex: 1, minWidth: 160 }}
+                value={searchInput} onChange={e => setSearchInput(e.target.value)} />
+              <input className="input" type="search" placeholder="Transferring to…"
+                style={{ flex: 1, minWidth: 160 }}
+                value={toTeamFilter} onChange={e => setToTeamFilter(e.target.value)} />
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+              <select className="input" style={{ width: 150 }} value={posFilter} onChange={e => setPosFilter(e.target.value)}>
+                <option value="all">All positions</option>
+                <option value="Guard">Guard</option>
+                <option value="Wing">Wing</option>
+                <option value="Big">Big</option>
+              </select>
+              <select className="input" style={{ width: 150 }} value={confFilter} onChange={e => setConfFilter(e.target.value)}>
+                <option value="all">All conferences</option>
+                {conferences.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+              <select className="input" style={{ width: 180 }} value={stateFilter} onChange={e => setStateFilter(e.target.value)}>
+                <option value="all">All locations</option>
+                {STATE_OPTIONS.map(o => <option key={o.label} value={o.label}>{o.label}</option>)}
+              </select>
+              <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, opacity: .7, cursor: "pointer", userSelect: "none" }}>
+                <input type="checkbox" checked={portalOnly} onChange={e => setPortalOnly(e.target.checked)} />
+                Available in portal
+              </label>
+              <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, opacity: portalOnly ? .7 : .3, cursor: portalOnly ? "pointer" : "default", userSelect: "none", paddingLeft: 10, borderLeft: "2px solid rgba(255,255,255,.1)" }}>
+                <input type="checkbox" checked={includeCommitted} disabled={!portalOnly} onChange={e => setIncludeCommitted(e.target.checked)} />
+                + already committed
+              </label>
+              <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, opacity: .7, cursor: "pointer", userSelect: "none" }}>
+                <input type="checkbox" checked={includeUnevaluated} onChange={e => setIncludeUnevaluated(e.target.checked)} />
+                Show unevaluated
+              </label>
+            </div>
           </div>
 
           {/* Advanced filter panel */}
@@ -407,19 +420,23 @@ export function BoardPage() {
                           const { from_team, to_team } = portalInfo[p.id];
                           const fromLogo = teamLogos[from_team];
                           const toLogo   = to_team ? teamLogos[to_team] : null;
-                          const circleStyle = { width: 48, height: 48, borderRadius: "50%", background: "rgba(255,255,255,.07)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, overflow: "hidden" };
+                          const circleStyle = { width: 32, height: 32, borderRadius: "50%", background: "rgba(255,255,255,.07)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, overflow: "hidden" };
                           const imgStyle = { width: "70%", height: "70%", objectFit: "contain" };
-                          const placeholderStyle = { ...circleStyle, fontSize: 13, opacity: .35 };
                           return (
-                            <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 5 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 5 }}>
                               {fromLogo
                                 ? <div style={circleStyle}><img src={fromLogo} alt={from_team} style={imgStyle} onError={e => { e.target.style.display = "none"; }} /></div>
-                                : <div style={placeholderStyle}>?</div>
+                                : <div style={{ ...circleStyle, fontSize: 10, opacity: .35 }}>?</div>
                               }
-                              <span style={{ fontSize: 10, opacity: .35 }}>→</span>
+                              <span style={{ fontSize: 11, opacity: .35 }}>{from_team || "?"}</span>
+                              <span style={{ fontSize: 11, opacity: .3, margin: "0 2px" }}>→</span>
                               {toLogo
                                 ? <div style={circleStyle}><img src={toLogo} alt={to_team} style={imgStyle} onError={e => { e.target.style.display = "none"; }} /></div>
-                                : <div style={placeholderStyle}>?</div>
+                                : <div style={{ ...circleStyle, fontSize: 10, opacity: .35 }}>?</div>
+                              }
+                              {to_team
+                                ? <span style={{ fontSize: 11, fontWeight: 600, color: "#5b9cf6" }}>{to_team}</span>
+                                : <span style={{ fontSize: 11, opacity: .3 }}>Undecided</span>
                               }
                             </div>
                           );
@@ -487,27 +504,30 @@ export function BoardPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {sorted.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE).map(p => (
-                      <tr key={p.id} className="row-click"
-                        onClick={e => { if (!e.target.closest("button,select")) setModal(p); }}
-                        style={{ borderBottom: "1px solid var(--border)" }}>
-                        <td style={tdStyle}>
-                          <button className="btn btn-primary" style={{ fontSize: 11, padding: "3px 8px" }}
-                            disabled={inRoster(p.id)}
-                            onClick={e => { e.stopPropagation(); addToRoster(p.id); }}>
-                            Roster
-                          </button>{" "}
-                          <button className="btn btn-ghost" style={{ fontSize: 11, padding: "3px 8px" }}
-                            disabled={inShortlist(p.id) || inRoster(p.id)}
-                            onClick={e => { e.stopPropagation(); addToShortlist(p.id); }}>
-                            Shortlist
-                          </button>
-                        </td>
-                        {COLS.map(col => (
-                          <td key={col.label} style={tdStyle}>{col.get(p)}</td>
-                        ))}
-                      </tr>
-                    ))}
+                    {sorted.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE).map(p => {
+                      const row = { ...p, _toTeam: portalInfo[p.id]?.to_team || "—" };
+                      return (
+                        <tr key={p.id} className="row-click"
+                          onClick={e => { if (!e.target.closest("button,select")) setModal(p); }}
+                          style={{ borderBottom: "1px solid var(--border)" }}>
+                          <td style={tdStyle}>
+                            <button className="btn btn-primary" style={{ fontSize: 11, padding: "3px 8px" }}
+                              disabled={inRoster(p.id)}
+                              onClick={e => { e.stopPropagation(); addToRoster(p.id); }}>
+                              Roster
+                            </button>{" "}
+                            <button className="btn btn-ghost" style={{ fontSize: 11, padding: "3px 8px" }}
+                              disabled={inShortlist(p.id) || inRoster(p.id)}
+                              onClick={e => { e.stopPropagation(); addToShortlist(p.id); }}>
+                              Shortlist
+                            </button>
+                          </td>
+                          {COLS.map(col => (
+                            <td key={col.label} style={tdStyle}>{col.get(row)}</td>
+                          ))}
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               )

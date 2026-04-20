@@ -491,6 +491,10 @@ export function useRosterBoard(team, userId) {
     const scholarshipsRemaining = settings.scholarships - totalRoster;
     const maxPerPlayer       = settings.nilTotal * settings.maxPct;
 
+    // All returners not definitively leaving — includes undecided/portal/returning
+    const LEAVING_STATUSES = new Set(["graduating", "transferred", "transferring"]);
+    const activeRosterReturners = returningPlayers.filter(p => !LEAVING_STATUSES.has(retentionById[p.id] || "returning"));
+
     const rosterPlayers      = [
       ...activeReturning,
       ...roster.map(r => _boardById.get(r.id)).filter(Boolean),
@@ -498,6 +502,35 @@ export function useRosterBoard(team, userId) {
     ];
     const projectedLow       = rosterPlayers.reduce((sum, p) => sum + (p.marketLow  || 0), 0);
     const projectedHigh      = rosterPlayers.reduce((sum, p) => sum + (p.marketHigh || 0), 0);
+
+    // BTP Roster Score — same formula as Portal Rankings, adapted to p.stats shape
+    const SLOT_WEIGHTS = [1.0, 0.55, 0.30, 0.15, 0.08];
+    function btpPlayerScore(p) {
+      const s = p.stats || {};
+      const sei    = (s.sei || 0) * 15000;
+      const ath    = (s.ath || 0) * 5000;
+      const ris    = (s.ris || 0) * 4000;
+      const dds    = (s.dds || 0) * 4000;
+      const cdi    = (s.cdi || 0) * 4000;
+      const market = (p.marketHigh || 0);
+      return sei * 0.50 + market * 0.15 + ath * 0.13 + ris * 0.08 + dds * 0.08 + cdi * 0.06;
+    }
+    const scoringPool = [
+      ...activeRosterReturners,
+      ...roster.map(r => _boardById.get(r.id)).filter(Boolean),
+      ...incomingTransfers.filter(p => !_rosterIds.has(p.id)),
+    ];
+    const byPos = {};
+    scoringPool.forEach(p => {
+      const pos = p.pos || "Wing";
+      if (!byPos[pos]) byPos[pos] = [];
+      byPos[pos].push(p);
+    });
+    let rosterScore = 0;
+    Object.values(byPos).forEach(group => {
+      group.sort((a, b) => btpPlayerScore(b) - btpPlayerScore(a))
+           .forEach((p, i) => { rosterScore += btpPlayerScore(p) * (SLOT_WEIGHTS[i] ?? 0.05); });
+    });
 
     const warnings           = [];
 
@@ -512,7 +545,7 @@ export function useRosterBoard(team, userId) {
       }
     });
 
-    return { totalRoster, nilCommitted, nilRemaining, scholarshipsRemaining, maxPerPlayer, projectedLow, projectedHigh, warnings };
+    return { totalRoster, nilCommitted, nilRemaining, scholarshipsRemaining, maxPerPlayer, projectedLow, projectedHigh, rosterScore, scoringPool, warnings };
   }, [state, returningPlayers, incomingTransfers, customPlayers, _boardById, _rosterIds]);
 
   return {
