@@ -407,17 +407,18 @@ export function BoardPage() {
                           const { from_team, to_team } = portalInfo[p.id];
                           const fromLogo = teamLogos[from_team];
                           const toLogo   = to_team ? teamLogos[to_team] : null;
-                          const logoStyle = { width: 48, height: 48, borderRadius: "50%", objectFit: "contain", background: "rgba(255,255,255,.07)" };
-                          const placeholderStyle = { ...logoStyle, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, opacity: .35, flexShrink: 0 };
+                          const circleStyle = { width: 48, height: 48, borderRadius: "50%", background: "rgba(255,255,255,.07)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, overflow: "hidden" };
+                          const imgStyle = { width: "70%", height: "70%", objectFit: "contain" };
+                          const placeholderStyle = { ...circleStyle, fontSize: 13, opacity: .35 };
                           return (
                             <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 5 }}>
                               {fromLogo
-                                ? <img src={fromLogo} alt={from_team} style={{ ...logoStyle, flexShrink: 0 }} onError={e => { e.target.style.display = "none"; }} />
+                                ? <div style={circleStyle}><img src={fromLogo} alt={from_team} style={imgStyle} onError={e => { e.target.style.display = "none"; }} /></div>
                                 : <div style={placeholderStyle}>?</div>
                               }
                               <span style={{ fontSize: 10, opacity: .35 }}>→</span>
                               {toLogo
-                                ? <img src={toLogo} alt={to_team} style={{ ...logoStyle, flexShrink: 0 }} onError={e => { e.target.style.display = "none"; }} />
+                                ? <div style={circleStyle}><img src={toLogo} alt={to_team} style={imgStyle} onError={e => { e.target.style.display = "none"; }} /></div>
                                 : <div style={placeholderStyle}>?</div>
                               }
                             </div>
