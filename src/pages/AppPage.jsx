@@ -223,9 +223,13 @@ export function AppPage() {
   }, [activeTeam, userId]);
 
   useEffect(() => {
-    supabase.from("portal_transfers").select("player_id")
-      .eq("season_year", 2026).eq("status", "uncommitted").not("player_id", "is", null)
-      .then(({ data }) => setAvailableIds(new Set((data || []).map(r => r.player_id))));
+    supabase.from("portal_transfers").select("player_id, status")
+      .eq("season_year", 2026).neq("status", "withdrawn").not("player_id", "is", null)
+      .then(({ data }) => {
+        const uncommitted = new Set();
+        (data || []).forEach(r => { if (r.status === "uncommitted") uncommitted.add(r.player_id); });
+        setAvailableIds(uncommitted);
+      });
   }, []);
 
   useEffect(() => { setSettings(board.state.settings); }, [board.state.settings]);
