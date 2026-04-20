@@ -1,6 +1,31 @@
+"""
+import_portal.py — Sync transfer portal entries from CBD API → Supabase portal_transfers table
+==============================================================================================
+
+Steps to run:
+    1. Set environment variables:
+           $env:SUPABASE_URL="https://YOUR_PROJECT.supabase.co"
+           $env:SUPABASE_SERVICE_KEY="your-service-role-key"
+           $env:CBD_API_TOKEN="your-collegebasketballdata-token"
+
+    2. (One-time) Make sure the portal_transfers table exists in Supabase with
+       columns: api_id, player_name, player_id, from_team, to_team, season_year, status
+       and a UNIQUE constraint on api_id so upserts are safe.
+
+    3. Install dependencies if needed:
+           pip install httpx supabase
+
+    4. Run:
+           python import_portal.py
+
+    The script will print matched/unmatched counts and upsert all rows.
+    Re-running is safe — existing rows are updated via api_id upsert.
+"""
+
 import os
 import httpx
 from supabase import create_client
+from match_utils import build_lookup, match_player as mu_match
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_SERVICE_KEY"]  # needs service role to bypass RLS
@@ -32,21 +57,6 @@ def load_players():
         page += 1
     return all_rows
 
-def build_indexes(players):
-    by_nameteam = {}
-    for p in players:
-        key = (
-            p["name"].lower().strip(),
-            (p["current_team"] or "").lower().strip(),
-        )
-        by_nameteam[key] = p
-    return by_nameteam
-
-def match_player(entry, by_nameteam):
-    # Match by full name + origin school (sourceId is 247 Sports ID — not stored in players table)
-    origin = (entry.get("origin") or {}).get("name", "")
-    name   = f"{entry['firstName']} {entry['lastName']}"
-    return by_nameteam.get((name.lower().strip(), origin.lower().strip()))
 
 def map_status(entry):
     elig = entry.get("eligibility", "Immediate")
@@ -66,25 +76,27 @@ def main():
     players = load_players()
     print(f"  {len(players)} players loaded")
 
-    by_nameteam = build_indexes(players)
+    player_lookup = build_lookup(players)
 
     rows, matched, unmatched_names = [], 0, []
     for entry in portal:
         origin = entry.get("origin") or {}
         dest   = entry.get("destination") or {}
-        full_name = f"{entry['firstName']} {entry['lastName']}"
-        mp = match_player(entry, by_nameteam)
+        full_name   = f"{entry['firstName']} {entry['lastName']}"
+        origin_team = origin.get("name", "")
+        mr          = mu_match(full_name, origin_team, player_lookup)
+        player_id   = mr.player_id
 
-        if mp:
+        if player_id:
             matched += 1
         else:
-            unmatched_names.append(f"{full_name} ({origin.get('name', '?')})")
+            unmatched_names.append(f"{full_name} ({origin_team or '?'})")
 
         rows.append({
             "api_id":      entry["id"],
             "player_name": full_name,
-            "player_id":        mp["id"] if mp else None,
-            "from_team":   origin.get("name"),
+            "player_id":   player_id,
+            "from_team":   origin_team or None,
             "to_team":     dest.get("name") if dest else None,
             "season_year": 2026,
             "status":      map_status(entry),

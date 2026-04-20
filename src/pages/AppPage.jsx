@@ -80,8 +80,10 @@ export function AppPage() {
 
   const board = useRosterBoard(activeTeam, userId);
 
-  const [search,   setSearch]   = useState("");
-  const [posFilter,setPosFilter]= useState("all");
+  const [search,      setSearch]      = useState("");
+  const [posFilter,   setPosFilter]   = useState("all");
+  const [portalOnly,  setPortalOnly]  = useState(true);
+  const [availableIds, setAvailableIds] = useState(new Set());
   const [modal,         setModal]         = useState(null);
   const [settings,      setSettings]      = useState(null);
   const [drawerOpen,    setDrawerOpen]    = useState(false);
@@ -112,6 +114,17 @@ export function AppPage() {
     if (activeTeam && userId) fetches.push(board.loadCustomPlayers(activeTeam, userId));
     Promise.all(fetches);
   }, [activeTeam, userId]);
+
+  // Fetch available (uncommitted) portal player IDs
+  useEffect(() => {
+    supabase
+      .from("portal_transfers")
+      .select("player_id")
+      .eq("season_year", 2026)
+      .eq("status", "uncommitted")
+      .not("player_id", "is", null)
+      .then(({ data }) => setAvailableIds(new Set((data || []).map(r => r.player_id))));
+  }, []);
 
   // Sync local settings state
   useEffect(() => {
@@ -255,13 +268,14 @@ export function AppPage() {
     const q = search.trim().toLowerCase();
     return board.state.board
       .filter(p => {
+        if (portalOnly && !availableIds.has(p.id)) return false;
         if (q && !p.name.toLowerCase().includes(q) &&
                  !(p.team||"").toLowerCase().includes(q)) return false;
         if (posFilter !== "all" && p.pos !== posFilter) return false;
         return true;
       })
       .sort((a, b) => (b.marketHigh || 0) - (a.marketHigh || 0));
-  }, [board.state.board, search, posFilter]);
+  }, [board.state.board, search, posFilter, portalOnly, availableIds]);
 
   const calc = board.calc;
 
@@ -455,6 +469,10 @@ export function AppPage() {
                   <option value="Wing">Wing</option>
                   <option value="Big">Big</option>
                 </select>
+                <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, opacity: .7, cursor: "pointer", userSelect: "none", whiteSpace: "nowrap" }}>
+                  <input type="checkbox" checked={portalOnly} onChange={e => setPortalOnly(e.target.checked)} />
+                  Portal only
+                </label>
               </div>
             </div>
             <div className="list">
@@ -689,8 +707,35 @@ export function AppPage() {
                 </>
               )}
 
+              {/* Incoming committed transfers */}
+              {board.incomingTransfers.length > 0 && (
+                <>
+                  <div className="sub-label" style={{ color: "#34d399" }}>
+                    Incoming Transfers ({board.incomingTransfers.length})
+                  </div>
+                  {board.incomingTransfers.map(p => (
+                    <div key={p.id} className="row row-click"
+                      onClick={e => { if (!e.target.closest("button")) handleOpenModal(p); }}>
+                      <div className="row-main">
+                        <div className="row-title" style={{ fontSize: 13 }}>{p.name}</div>
+                        <div className="row-sub" style={{ fontSize: 11 }}>
+                          from {p.team} · {p.pos} · {p.year}
+                        </div>
+                      </div>
+                      <div className="row-actions">
+                        <button className="btn btn-primary" style={{ fontSize: 11 }}
+                          disabled={board.inRoster(p.id)}
+                          onClick={e => { e.stopPropagation(); board.addToRoster(p.id); }}>
+                          {board.inRoster(p.id) ? "Added" : "Add to Roster"}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </>
+              )}
+
               {/* Portal adds */}
-              {board.state.roster.length > 0 && board.returningPlayers.length > 0 && (
+              {board.state.roster.length > 0 && (board.returningPlayers.length > 0 || board.incomingTransfers.length > 0) && (
                 <div className="section-divider">Portal Adds</div>
               )}
               {board.state.roster.length === 0 && board.returningPlayers.length === 0

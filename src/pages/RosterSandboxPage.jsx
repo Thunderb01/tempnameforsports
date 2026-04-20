@@ -128,12 +128,18 @@ export function RosterSandboxPage() {
         nilOffer: nilById[p.id] || 0,
       }));
 
+    const rosteredIds = new Set(board.state.roster.map(e => e.id));
+
     const transfers = board.state.roster
       .map(entry => {
         const p = board.byId(entry.id);
         return p ? { ...p, _type: "Transfer In", _typeKey: "transfer", nilOffer: entry.nilOffer } : null;
       })
       .filter(Boolean);
+
+    const incoming = board.incomingTransfers
+      .filter(p => !rosteredIds.has(p.id))
+      .map(p => ({ ...p, _type: "Transfer In", _typeKey: "incoming", nilOffer: 0 }));
 
     const custom = board.customPlayers.map(p => ({
       id:       p.id,
@@ -146,8 +152,8 @@ export function RosterSandboxPage() {
       stats:    {},
     }));
 
-    return [...returning, ...transfers, ...custom];
-  }, [board.returningPlayers, board.state.board, board.state.roster, board.state.retentionById, board.state.nilById, board.customPlayers]);
+    return [...returning, ...transfers, ...incoming, ...custom];
+  }, [board.returningPlayers, board.incomingTransfers, board.state.board, board.state.roster, board.state.retentionById, board.state.nilById, board.customPlayers]);
 
   const displayPlayers = activeRoster ? activeRoster.players : rosterPlayers;
 
@@ -426,6 +432,9 @@ export function RosterSandboxPage() {
                             >
                               Remove
                             </button>
+                          )}
+                          {p._typeKey === "incoming" && (
+                            <span style={{ fontSize: 11, opacity: .35 }}>committed</span>
                           )}
                         </td>
                       )}

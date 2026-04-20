@@ -64,6 +64,11 @@ try:
 except ImportError:
     sys.exit("Run: pip install supabase")
 
+try:
+    from match_utils import build_lookup, match_player as mu_match
+except ImportError:
+    sys.exit("match_utils.py not found — make sure it's in the same directory.")
+
 SUPABASE_URL         = os.environ.get("SUPABASE_URL", "")
 SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")
 
@@ -987,11 +992,8 @@ def main():
 
         print(f"  {len(players)} players in Supabase")
 
-        # Build lookup: (norm_name, norm_team) → player_id
-        player_lookup = {
-            (normalise(p["name"]), normalise_team(p["current_team"])): p["id"]
-            for p in players
-        }
+        # Build lookup: (norm_name, norm_team) → player_id  (via match_utils)
+        player_lookup = build_lookup(players)
         # Build PID lookup: torvik_pid (int) → player_id
         pid_lookup = {
             p["torvik_pid"]: p["id"]
@@ -1126,10 +1128,12 @@ def main():
             continue
 
         # ── Match to Supabase ─────────────────────────────────────────────────
-        # Prefer torvik_pid (exact) over name+team (fuzzy)
+        # Prefer torvik_pid (exact) over name+team (fuzzy via match_utils)
         torvik_pid_val = int(row["pid"]) if str(row.get("pid", "")).strip().isdigit() else None
-        player_id = (pid_lookup.get(torvik_pid_val) if torvik_pid_val else None) \
-                    or player_lookup.get((normalise(name), normalise_team(team)))
+        player_id = pid_lookup.get(torvik_pid_val) if torvik_pid_val else None
+        if not player_id:
+            _mr = mu_match(name, team, player_lookup)
+            player_id = _mr.player_id
 
         if not player_id:
             unmatched += 1
@@ -1235,8 +1239,10 @@ def main():
             name = str(row.get("player_name", "")).strip()
             team = str(row.get("team", "")).strip()
             torvik_pid_val = int(row["pid"]) if str(row.get("pid", "")).strip().isdigit() else None
-            player_id = (pid_lookup.get(torvik_pid_val) if torvik_pid_val else None) \
-                        or player_lookup.get((normalise(name), normalise_team(team)))
+            player_id = pid_lookup.get(torvik_pid_val) if torvik_pid_val else None
+            if not player_id:
+                _mr = mu_match(name, team, player_lookup)
+                player_id = _mr.player_id
             if not player_id:
                 continue
 

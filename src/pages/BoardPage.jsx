@@ -6,7 +6,8 @@ import { useAuth }         from "@/hooks/useAuth";
 import { useAdminTeam }    from "@/hooks/useAdminTeam";
 import { useRosterBoard }  from "@/hooks/useRosterBoard";
 import { supabase }        from "@/lib/supabase";
-import teamConferences     from "@/data/teamConferences.json";
+import teamConferences from "@/data/teamConferences.json";
+import teamLogos       from "@/data/teamLogos.json";
 import { money, heightToInches, tierColor, projectedTier } from "@/lib/display";
 
 // label → getter(player)
@@ -48,6 +49,7 @@ export function BoardPage() {
   const [modal,     setModal]     = useState(null);
   const [page,        setPage]        = useState(0);
   const [portalOnly,        setPortalOnly]        = useState(true);
+  const [includeCommitted,  setIncludeCommitted]  = useState(false);
   const [includeUnevaluated, setIncludeUnevaluated] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [confFilter,  setConfFilter]  = useState("all");
@@ -92,6 +94,10 @@ export function BoardPage() {
 
   // IDs of portal players who are currently available (uncommitted)
   const [availableIds, setAvailableIds] = useState(new Set());
+  // IDs of all portal players (uncommitted + committed)
+  const [allPortalIds, setAllPortalIds] = useState(new Set());
+  // from_team / to_team keyed by player_id
+  const [portalInfo, setPortalInfo] = useState({});
 
   // ── Load board via shared hook ───────────────────────────────────────────────
   useEffect(() => {
@@ -100,12 +106,22 @@ export function BoardPage() {
 
     supabase
       .from("portal_transfers")
-      .select("player_id")
+      .select("player_id, from_team, to_team, status")
       .eq("season_year", 2026)
-      .eq("status", "uncommitted")
+      .neq("status", "withdrawn")
       .not("player_id", "is", null)
       .then(({ data }) => {
-        setAvailableIds(new Set((data || []).map(r => r.player_id)));
+        const uncommitted = new Set();
+        const all = new Set();
+        const info = {};
+        (data || []).forEach(r => {
+          all.add(r.player_id);
+          info[r.player_id] = { from_team: r.from_team, to_team: r.to_team };
+          if (r.status === "uncommitted") uncommitted.add(r.player_id);
+        });
+        setAvailableIds(uncommitted);
+        setAllPortalIds(all);
+        setPortalInfo(info);
       });
   }, []);
 
@@ -190,7 +206,7 @@ export function BoardPage() {
 
 
   // Reset to page 0 whenever filters or sort change
-  useEffect(() => setPage(0), [search, posFilter, stateFilter, confFilter, sortKey, sortDir, portalOnly, includeUnevaluated, advcFilters]);
+  useEffect(() => setPage(0), [search, posFilter, stateFilter, confFilter, sortKey, sortDir, portalOnly, includeCommitted, includeUnevaluated, advcFilters]);
 
   // ── Filter ──────────────────────────────────────────────────────────────────
   const filtered = useMemo(() => {
@@ -210,7 +226,10 @@ export function BoardPage() {
       }
       if (stateTerms && !matchesState(p.hometown || "", stateTerms)) return false;
       if (!includeUnevaluated && !(p.marketHigh > 0)) return false;
-      if (portalOnly && !availableIds.has(p.id)) return false;
+      if (portalOnly) {
+        const portalSet = includeCommitted ? allPortalIds : availableIds;
+        if (!portalSet.has(p.id)) return false;
+      }
       for (const f of ADVC_FIELDS) {
         const val = f.src === "player" ? p[f.key] : p.stats?.[f.key];
         const { min, max } = advcFilters[f.key];
@@ -219,7 +238,7 @@ export function BoardPage() {
       }
       return true;
     });
-  }, [players, search, posFilter, confFilter, stateFilter, portalOnly, includeUnevaluated, advcFilters, availableIds]);
+  }, [players, search, posFilter, confFilter, stateFilter, portalOnly, includeCommitted, includeUnevaluated, advcFilters, availableIds, allPortalIds]);
 
   // ── Sort (separate so filter changes don't re-sort and vice versa) ──────────
   const sorted = useMemo(() => {
@@ -316,11 +335,15 @@ export function BoardPage() {
             </select>
             <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, opacity: .7, cursor: "pointer", userSelect: "none" }}>
               <input type="checkbox" checked={portalOnly} onChange={e => setPortalOnly(e.target.checked)} />
-              Portal players only
+              Available in portal
+            </label>
+            <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, opacity: portalOnly ? .7 : .3, cursor: portalOnly ? "pointer" : "default", userSelect: "none", paddingLeft: 10, borderLeft: "2px solid rgba(255,255,255,.1)" }}>
+              <input type="checkbox" checked={includeCommitted} disabled={!portalOnly} onChange={e => setIncludeCommitted(e.target.checked)} />
+              + already committed
             </label>
             <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, opacity: .7, cursor: "pointer", userSelect: "none" }}>
               <input type="checkbox" checked={includeUnevaluated} onChange={e => setIncludeUnevaluated(e.target.checked)} />
-              Include unevaluated
+              Show unevaluated
             </label>
           </div>
 
@@ -379,6 +402,26 @@ export function BoardPage() {
                         <div className="row-sub">
                           {[p.team, p.pos, p.year, p.height, p.hometown].filter(Boolean).join(" · ")}
                         </div>
+                        {portalInfo[p.id] && (() => {
+                          const { from_team, to_team } = portalInfo[p.id];
+                          const fromLogo = teamLogos[from_team];
+                          const toLogo   = to_team ? teamLogos[to_team] : null;
+                          const logoStyle = { width: 32, height: 32, borderRadius: "50%", objectFit: "contain", background: "rgba(255,255,255,.07)" };
+                          const placeholderStyle = { ...logoStyle, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, opacity: .35, flexShrink: 0 };
+                          return (
+                            <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 5 }}>
+                              {fromLogo
+                                ? <img src={fromLogo} alt={from_team} style={{ ...logoStyle, flexShrink: 0 }} onError={e => { e.target.style.display = "none"; }} />
+                                : <div style={placeholderStyle}>?</div>
+                              }
+                              <span style={{ fontSize: 10, opacity: .35 }}>→</span>
+                              {toLogo
+                                ? <img src={toLogo} alt={to_team} style={{ ...logoStyle, flexShrink: 0 }} onError={e => { e.target.style.display = "none"; }} />
+                                : <div style={placeholderStyle}>?</div>
+                              }
+                            </div>
+                          );
+                        })()}
                         <div className="row-sub">Market: {money(p.marketLow)} – {money(p.marketHigh)}</div>
                         {(() => {
                           const s = p.stats || {};

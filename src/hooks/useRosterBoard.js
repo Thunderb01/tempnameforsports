@@ -26,7 +26,8 @@ function saveSessionCache(players) {
 }
 
 let _boardCache = loadSessionCache(); // warm from sessionStorage on module load
-const _rosterCache = {}; // keyed by teamName
+const _rosterCache   = {}; // keyed by teamName
+const _incomingCache = {}; // keyed by teamName
 
 export function getBoardCache() { return _boardCache; }
 export function setBoardCache(players) { _boardCache = players; }
@@ -178,7 +179,8 @@ export function useRosterBoard(team, userId) {
 
   // ── Returning roster ────────────────────────────────────────────────────────
 
-  const [returningPlayers, setReturningPlayers] = useState([]);
+  const [returningPlayers,  setReturningPlayers]  = useState([]);
+  const [incomingTransfers, setIncomingTransfers] = useState([]);
 
   const loadReturningRoster = useCallback(async (teamName) => {
     if (!teamName) return;
@@ -214,6 +216,7 @@ export function useRosterBoard(team, userId) {
           ...row,
           team:           row.current_team,
           pos:            row.primary_position,
+          espn_id:        row.espn_id  ?? null,
           marketLow:      row.open_market_low  ?? 0,
           marketHigh:     row.open_market_high ?? 0,
           nilValuation:   row.nil_valuation    ?? 0,
@@ -237,14 +240,69 @@ export function useRosterBoard(team, userId) {
       setReturningPlayers(returning);
     }
 
-    // Always re-evaluate retention — runs on both cache hits and fresh fetches
-    const returningIds = returning.map(p => p.id);
-    const { data: portalData } = await supabase
-      .from("portal_transfers")
-      .select("player_id")
-      .eq("season_year", 2026)
-      .in("player_id", returningIds);
-    const portalIds = new Set((portalData || []).map(r => r.player_id));
+    // Always re-evaluate retention + incoming — runs on both cache hits and fresh fetches
+    const returningIds   = returning.map(p => p.id);
+    const returningIdSet = new Set(returningIds);
+
+    const [{ data: portalData }, { data: incomingPortalData }] = await Promise.all([
+      supabase
+        .from("portal_transfers")
+        .select("player_id, status")
+        .eq("season_year", 2026)
+        .neq("status", "withdrawn")
+        .in("player_id", returningIds),
+      supabase
+        .from("portal_transfers")
+        .select("player_id")
+        .eq("season_year", 2026)
+        .eq("status", "committed")
+        .ilike("to_team", teamName)
+        .not("player_id", "is", null),
+    ]);
+
+    // Fetch full player data for incoming transfers not already on this roster
+    const incomingIds = (incomingPortalData || [])
+      .map(r => r.player_id)
+      .filter(id => id && !returningIdSet.has(id));
+
+    if (_incomingCache[teamName]) {
+      setIncomingTransfers(_incomingCache[teamName]);
+    } else if (incomingIds.length > 0) {
+      const { data: incomingData } = await supabase
+        .from("vw_players")
+        .select("*")
+        .in("id", incomingIds);
+      const mapped = (incomingData || []).map(row => ({
+        id:             row.id,
+        name:           row.name,
+        team:           row.current_team,
+        pos:            row.primary_position,
+        year:           row.year,
+        height:         row.height   ?? null,
+        hometown:       row.hometown ?? null,
+        espn_id:        row.espn_id  ?? null,
+        marketLow:      row.open_market_low  ?? 0,
+        marketHigh:     row.open_market_high ?? 0,
+        nilValuation:   row.nil_valuation    ?? 0,
+        stats: {
+          ppg: row.ppg, rpg: row.rpg, apg: row.apg, usg: row.usg,
+          sei: row.sei, ath: row.ath, ris: row.ris, dds: row.dds, cdi: row.cdi,
+        },
+      })).sort((a, b) => a.name.localeCompare(b.name));
+      _incomingCache[teamName] = mapped;
+      setIncomingTransfers(mapped);
+    } else {
+      _incomingCache[teamName] = [];
+      setIncomingTransfers([]);
+    }
+
+    // Map player_id → portal retention bucket:
+    //   uncommitted = still in portal looking
+    //   committed   = already committed to a new school (show as transferred)
+    const portalRetentionMap = {};
+    (portalData || []).forEach(r => {
+      portalRetentionMap[r.player_id] = r.status === "committed" ? "transferred" : "entering_portal";
+    });
 
     const GRADUATING_YEARS = ["Senior", "Graduate", "SR", "GR"];
     setState(s => {
@@ -252,8 +310,8 @@ export function useRosterBoard(team, userId) {
       const defaultRetention = {};  // only fills missing entries
       const autoNil = {};
       returning.forEach(p => {
-        if (portalIds.has(p.id)) {
-          portalRetention[p.id] = "entering_portal"; // always wins
+        if (portalRetentionMap[p.id]) {
+          portalRetention[p.id] = portalRetentionMap[p.id]; // always wins
         } else if (!s.retentionById[p.id]) {
           defaultRetention[p.id] = GRADUATING_YEARS.includes(p.year) ? "graduating" : "returning";
         }
@@ -424,7 +482,8 @@ export function useRosterBoard(team, userId) {
       p => !isGraduating(p) && (retentionById[p.id] || "returning") === "returning"
     ).length;
     const customNil          = customPlayers.reduce((sum, p) => sum + (p.nil_offer || 0), 0);
-    const totalRoster        = roster.length + committedReturning + customPlayers.length;
+    const incomingNotRostered = incomingTransfers.filter(p => !_rosterIds.has(p.id)).length;
+    const totalRoster        = roster.length + committedReturning + customPlayers.length + incomingNotRostered;
     const returningNil       = returningPlayers
       .filter(p => !isGraduating(p) && (retentionById[p.id] || "returning") === "returning")
       .reduce((sum, p) => sum + (nilById[p.id] || 0), 0);
@@ -446,11 +505,12 @@ export function useRosterBoard(team, userId) {
     });
 
     return { totalRoster, nilCommitted, nilRemaining, scholarshipsRemaining, maxPerPlayer, warnings };
-  }, [state, returningPlayers, customPlayers, _boardById]);
+  }, [state, returningPlayers, incomingTransfers, customPlayers, _boardById, _rosterIds]);
 
   return {
     state,
     returningPlayers,
+    incomingTransfers,
     customPlayers,
     calc,
     loadPortalBoard,
