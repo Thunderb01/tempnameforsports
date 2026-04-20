@@ -14,7 +14,8 @@ import { ResetPasswordPage } from "@/pages/ResetPasswordPage";
 const AppPage          = lazy(() => import("@/pages/AppPage").then(m => ({ default: m.AppPage })));
 const BoardPage        = lazy(() => import("@/pages/BoardPage").then(m => ({ default: m.BoardPage })));
 const AdminPage        = lazy(() => import("@/pages/AdminPage").then(m => ({ default: m.AdminPage })));
-const ComparePage      = lazy(() => import("@/pages/ComparePage").then(m => ({ default: m.ComparePage })));
+const ComparePage           = lazy(() => import("@/pages/ComparePage").then(m => ({ default: m.ComparePage })));
+const PortalRankingsPage    = lazy(() => import("@/pages/PortalRankingsPage").then(m => ({ default: m.PortalRankingsPage })));
 const PortalPage       = lazy(() => import("@/pages/PortalPage").then(m => ({ default: m.PortalPage })));
 
 createRoot(document.getElementById("root")).render(
@@ -32,8 +33,9 @@ createRoot(document.getElementById("root")).render(
             <Route path="/app"     element={<AppPage />} />
             <Route path="/board"   element={<BoardPage />} />
             <Route path="/sandbox" element={<Navigate to="/app" replace />} />
-            <Route path="/compare" element={<ComparePage />} />
-            <Route path="/portal"  element={<PortalPage />} />
+            <Route path="/compare"  element={<ComparePage />} />
+            <Route path="/rankings" element={<PortalRankingsPage />} />
+            <Route path="/portal"   element={<PortalPage />} />
           </Route>
 
           {/* Superadmin only */}

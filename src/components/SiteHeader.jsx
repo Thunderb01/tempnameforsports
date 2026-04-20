@@ -39,7 +39,10 @@ export function SiteHeader() {
           <NavLink to="/board" className={({ isActive }) => "nav-link" + (isActive ? " active" : "")}>
             Full Board
           </NavLink>
-<NavLink to="/compare" className={({ isActive }) => "nav-link" + (isActive ? " active" : "")}>
+          <NavLink to="/rankings" className={({ isActive }) => "nav-link" + (isActive ? " active" : "")}>
+            Portal Rankings (beta)
+          </NavLink>
+          <NavLink to="/compare" className={({ isActive }) => "nav-link" + (isActive ? " active" : "")}>
             Compare Players
           </NavLink>
           {/* <NavLink to="/portal" className={({ isActive }) => "nav-link" + (isActive ? " active" : "")}>
