@@ -429,7 +429,7 @@ export function AppPage() {
                 const ret = board.state.retentionById || {}, nil = board.state.nilById || {};
                 const returning = board.returningPlayers.filter(p => (ret[p.id] || "returning") === "returning").map(p => ({ ...p, _type: "Returning", nilOffer: nil[p.id] || 0 }));
                 const transfers = board.state.roster.map(r => { const p = board.byId(r.id); return p ? { ...p, _type: "Transfer In", nilOffer: r.nilOffer } : null; }).filter(Boolean);
-                exportRosterPDF({ team: activeTeam, settings: board.state.settings, players: [...returning, ...transfers] });
+                exportRosterPDF({ team: activeTeam, settings: board.state.settings, players: [...returning, ...transfers], projectedLow: calc.projectedLow, projectedHigh: calc.projectedHigh });
               }}>Export as PDF</button>
               <button className="btn btn-ghost" onClick={() => { setFinderOpen(true); track("finder_opened", {}); }}>Find Players</button>
               <button className="btn btn-ghost" onClick={() => setDrawerOpen(true)}>Saved Rosters</button>
@@ -446,6 +446,10 @@ export function AppPage() {
                 <div style={valueStyle}>{calc.totalRoster} / {settings.scholarships}</div>
               </div>
               <div>
+                <div style={labelStyle}>NIL Budget</div>
+                <div style={valueStyle}>{money(settings.nilTotal)}</div>
+              </div>
+              <div>
                 <div style={labelStyle}>NIL Committed</div>
                 <div style={valueStyle}>{money(calc.nilCommitted)}</div>
               </div>
@@ -456,6 +460,10 @@ export function AppPage() {
               <div>
                 <div style={labelStyle}>Max NIL / Player</div>
                 <div style={valueStyle}>{money(calc.maxPerPlayer)}</div>
+              </div>
+              <div>
+                <div style={labelStyle}>Projected Roster Value</div>
+                <div style={valueStyle}>{money(calc.projectedLow)} – {money(calc.projectedHigh)}</div>
               </div>
               {calc.warnings.length > 0 && (
                 <div style={{ fontSize: 12, color: "#f87171" }}>

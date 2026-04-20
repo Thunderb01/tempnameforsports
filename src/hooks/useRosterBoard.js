@@ -484,13 +484,21 @@ export function useRosterBoard(team, userId) {
     const customNil          = customPlayers.reduce((sum, p) => sum + (p.nil_offer || 0), 0);
     const incomingNotRostered = incomingTransfers.filter(p => !_rosterIds.has(p.id)).length;
     const totalRoster        = roster.length + committedReturning + customPlayers.length + incomingNotRostered;
-    const returningNil       = returningPlayers
-      .filter(p => !isGraduating(p) && (retentionById[p.id] || "returning") === "returning")
-      .reduce((sum, p) => sum + (nilById[p.id] || 0), 0);
+    const activeReturning    = returningPlayers.filter(p => !isGraduating(p) && (retentionById[p.id] || "returning") === "returning");
+    const returningNil       = activeReturning.reduce((sum, p) => sum + (nilById[p.id] || 0), 0);
     const nilCommitted       = roster.reduce((sum, r) => sum + (r.nilOffer || 0), 0) + returningNil + customNil;
     const nilRemaining       = settings.nilTotal - nilCommitted;
     const scholarshipsRemaining = settings.scholarships - totalRoster;
     const maxPerPlayer       = settings.nilTotal * settings.maxPct;
+
+    const rosterPlayers      = [
+      ...activeReturning,
+      ...roster.map(r => _boardById.get(r.id)).filter(Boolean),
+      ...incomingTransfers.filter(p => !_rosterIds.has(p.id)),
+    ];
+    const projectedLow       = rosterPlayers.reduce((sum, p) => sum + (p.marketLow  || 0), 0);
+    const projectedHigh      = rosterPlayers.reduce((sum, p) => sum + (p.marketHigh || 0), 0);
+
     const warnings           = [];
 
     if (scholarshipsRemaining < 0)
@@ -504,7 +512,7 @@ export function useRosterBoard(team, userId) {
       }
     });
 
-    return { totalRoster, nilCommitted, nilRemaining, scholarshipsRemaining, maxPerPlayer, warnings };
+    return { totalRoster, nilCommitted, nilRemaining, scholarshipsRemaining, maxPerPlayer, projectedLow, projectedHigh, warnings };
   }, [state, returningPlayers, incomingTransfers, customPlayers, _boardById, _rosterIds]);
 
   return {

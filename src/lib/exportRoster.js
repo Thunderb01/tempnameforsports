@@ -15,7 +15,7 @@ function fmtStat(val, key) {
  *   Each player must have: name, pos, year, height, nilOffer, stats, _type
  *   _type is one of "Returning" | "Undecided" | "Transfer In"
  */
-export function exportRosterPDF({ team, settings, players }) {
+export function exportRosterPDF({ team, settings, players, projectedLow, projectedHigh }) {
   const returning  = players.filter(p => p._type !== "Transfer In");
   const transfers  = players.filter(p => p._type === "Transfer In");
   const totalNil   = players.reduce((s, p) => s + (p.nilOffer || 0), 0);
@@ -85,6 +85,7 @@ export function exportRosterPDF({ team, settings, players }) {
     <div class="sum-item"><div class="lbl">Transfers In</div><div class="val">${transfers.length}</div></div>
     <div class="sum-item"><div class="lbl">NIL Committed</div><div class="val">$${totalNil.toLocaleString()}</div></div>
     <div class="sum-item"><div class="lbl">NIL Budget</div><div class="val">$${Number(settings?.nilTotal || 0).toLocaleString()}</div></div>
+    ${projectedLow || projectedHigh ? `<div class="sum-item"><div class="lbl">Projected Roster Value</div><div class="val">$${Number(projectedLow || 0).toLocaleString()} – $${Number(projectedHigh || 0).toLocaleString()}</div></div>` : ""}
   </div>
   <table>
     <thead>
