@@ -4,37 +4,42 @@ import { supabase }   from "@/lib/supabase";
 import { useTeamLogos } from "@/hooks/useTeamLogos";
 import { money }      from "@/lib/display";
 
-const SLOT_WEIGHTS = [1.0, 0.55, 0.30, 0.15, 0.08];
+// ── Previous BTP scoring formula (kept for reference) ─────────────────────
+// const SLOT_WEIGHTS = [1.0, 0.55, 0.30, 0.15, 0.08];
+// function playerScore(p) {
+//   const sei    = (p.sei || 0) * 15000;
+//   const ath    = (p.ath || 0) * 5000;
+//   const ris    = (p.ris || 0) * 4000;
+//   const dds    = (p.dds || 0) * 4000;
+//   const cdi    = (p.cdi || 0) * 4000;
+//   const market = (p.open_market_high || 0);
+//   return sei * 0.50 + market * 0.15 + ath * 0.13 + ris * 0.08 + dds * 0.08 + cdi * 0.06;
+// }
+// function scoreTeam(players) {
+//   const byPos = {};
+//   players.forEach(p => {
+//     const pos = p.primary_position || "Wing";
+//     if (!byPos[pos]) byPos[pos] = [];
+//     byPos[pos].push(p);
+//   });
+//   let total = 0;
+//   Object.values(byPos).forEach(group => {
+//     group.sort((a, b) => playerScore(b) - playerScore(a))
+//          .forEach((p, i) => { total += playerScore(p) * (SLOT_WEIGHTS[i] ?? 0.05); });
+//   });
+//   return total;
+// }
+// ──────────────────────────────────────────────────────────────────────────────
 
-// SEI is the primary quality signal; ath/ris/dds/cdi add secondary texture;
-// market anchors against real-world valuation. All BTP indexes are ~0-100 scale.
+// Individual player score used only for sorting within the expand row
 function playerScore(p) {
-  const sei    = (p.sei || 0) * 15000;   // primary driver
-  const ath    = (p.ath || 0) * 5000;
-  const ris    = (p.ris || 0) * 4000;    // rim impact / rebounding
-  const dds    = (p.dds || 0) * 4000;    // defensive disruption
-  const cdi    = (p.cdi || 0) * 4000;    // creation / decision-making
-  const market = (p.open_market_high || 0);
-  return sei * 0.50 + market * 0.15 + ath * 0.13 + ris * 0.08 + dds * 0.08 + cdi * 0.06;
+  return p.open_market_high || 0;
 }
 
+// Team score = average NIL valuation across all portal commits
 function scoreTeam(players) {
-  const byPos = {};
-  players.forEach(p => {
-    const pos = p.primary_position || "Wing";
-    if (!byPos[pos]) byPos[pos] = [];
-    byPos[pos].push(p);
-  });
-
-  let total = 0;
-  Object.values(byPos).forEach(group => {
-    group
-      .sort((a, b) => playerScore(b) - playerScore(a))
-      .forEach((p, i) => {
-        total += playerScore(p) * (SLOT_WEIGHTS[i] ?? 0.05);
-      });
-  });
-  return total;
+  if (!players.length) return 0;
+  return players.reduce((sum, p) => sum + (p.open_market_high || 0), 0) / players.length;
 }
 
 function grade(percentile) {
@@ -186,7 +191,7 @@ export function PortalRankingsPage() {
         teamMap[r.to_team].push(p);
       });
 
-      const scored = Object.entries(teamMap).map(([team, players]) => ({
+      const scored = Object.entries(teamMap).filter(([, players]) => players.length >= 3).map(([team, players]) => ({
         team,
         players,
         raw: scoreTeam(players),
@@ -259,7 +264,7 @@ export function PortalRankingsPage() {
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                 <thead>
                   <tr>
-                    {["", "Rank", "Team", "Grade", "Score", "Commits", "Guard", "Wing", "Big", "Est. Market", "Top Commit"].map(h => (
+                    {["", "Rank", "Team", "Grade", "Avg Value / Player", "Commits", "Guard", "Wing", "Big", "Proj. Transfer Value", "Top Commit"].map(h => (
                       <th key={h} style={thStyle}>{h}</th>
                     ))}
                   </tr>
@@ -307,7 +312,7 @@ export function PortalRankingsPage() {
                               {g.label}
                             </span>
                           </td>
-                          <td style={{ ...tdStyle, fontWeight: 600 }}>{(r.raw / 1000).toFixed(0)}k</td>
+                          <td style={{ ...tdStyle, fontWeight: 600 }}>{money(r.raw)}</td>
                           <td style={tdStyle}>{r.commits}</td>
                           <td style={tdStyle}>{posScore("Guard")}</td>
                           <td style={tdStyle}>{posScore("Wing")}</td>
