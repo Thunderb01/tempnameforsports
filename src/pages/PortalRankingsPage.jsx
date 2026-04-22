@@ -42,18 +42,24 @@ function scoreTeam(players) {
   return players.reduce((sum, p) => sum + (p.open_market_high || 0), 0) / players.length;
 }
 
-function grade(percentile) {
-  if (percentile >= 97) return { label: "A+", color: "#4ade80" };
-  if (percentile >= 93) return { label: "A",  color: "#4ade80" };
-  if (percentile >= 90) return { label: "A-", color: "#86efac" };
-  if (percentile >= 87) return { label: "B+", color: "#a3e635" };
-  if (percentile >= 83) return { label: "B",  color: "#bef264" };
-  if (percentile >= 80) return { label: "B-", color: "#d9f99d" };
-  if (percentile >= 77) return { label: "C+", color: "#fde68a" };
-  if (percentile >= 73) return { label: "C",  color: "#fcd34d" };
-  if (percentile >= 70) return { label: "C-", color: "#fbbf24" };
-  if (percentile >= 60) return { label: "D",  color: "#fb923c" };
-  return { label: "F", color: "#f87171" };
+// Grade cutoffs mirror projected NIL tiers (HM All-American = A+, HM All-Conference = A, etc.)
+function grade(nilValue) {
+  const v = Number(nilValue) || 0;
+  if (v >= 2_000_000) return { label: "A+", color: "#4ade80" };  // HM All-American / Pre-Draft
+  if (v >= 1_600_000) return { label: "A",  color: "#4ade80" };  // HM All-Conference (high)
+  if (v >= 1_200_000) return { label: "A-", color: "#86efac" };  // HM All-Conference
+  if (v >=   700_000) return { label: "B+", color: "#a3e635" };  // HM Starter (high)
+  if (v >=   550_000) return { label: "B",  color: "#bef264" };  // HM Starter
+  if (v >=   400_000) return { label: "B-", color: "#d9f99d" };  // HM Starter / MM All-Conference
+  if (v >=   300_000) return { label: "C+", color: "#fde68a" };  // HM Rotation (high)
+  if (v >=   200_000) return { label: "C",  color: "#fcd34d" };  // HM Rotation / MM Starter
+  if (v >=   150_000) return { label: "C-", color: "#fbbf24" };  // HM Rotation (low)
+  if (v >=   100_000) return { label: "D",  color: "#fb923c" };  // MM Starter / LM All-Conference
+  return { label: "F", color: "#f87171" };                        // LM Rotation
+}
+
+function displayName(name) {
+  return (name || "").replace(/\s+(II|III|IV|V|Jr\.?|Sr\.?)$/i, "").trim();
 }
 
 const POS_ORDER = ["Guard", "Wing", "Big"];
@@ -80,19 +86,18 @@ function TeamExpandRow({ r, colCount }) {
           {/* Position group bars */}
           <div style={{ display: "flex", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
             {posCounts.map(({ pos, players }) => {
-              const maxScore = playerScore(players[0]);
               return (
                 <div key={pos} style={{ flex: "1 1 200px", minWidth: 180, background: "rgba(255,255,255,.04)", borderRadius: 8, padding: "10px 14px" }}>
                   <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".06em", opacity: .5, marginBottom: 8 }}>{pos}s</div>
                   {players.map((p, i) => {
-                    const pct = maxScore > 0 ? (playerScore(p) / maxScore) * 100 : 0;
-                    const g = grade(Math.round(100 - (i / (players.length)) * 60));
+                    const pct = Math.min(((p.open_market_high || 0) / 2_000_000) * 100, 100);
+                    const g = grade(p.open_market_high);
                     return (
                       <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
                         <span style={{ background: g.color, color: "#0e1521", fontWeight: 700, fontSize: 10, padding: "1px 6px", borderRadius: 8, minWidth: 26, textAlign: "center" }}>{g.label}</span>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 4 }}>
-                            <span style={{ fontWeight: 600, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</span>
+                            <span style={{ fontWeight: 600, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{displayName(p.name)}</span>
                             <span style={{ fontSize: 11, opacity: .45, whiteSpace: "nowrap" }}>{p.year || "—"}</span>
                           </div>
                           <div style={{ height: 3, background: "rgba(255,255,255,.08)", borderRadius: 2, marginTop: 3 }}>
@@ -112,19 +117,16 @@ function TeamExpandRow({ r, colCount }) {
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
             <thead>
               <tr style={{ opacity: .45 }}>
-                {["Player", "Pos", "Yr", "Market High", "SEI", "ATH", "RIS", "DDS", "CDI", "BTP Score"].map(h => (
+                {["Player", "Pos", "Yr", "Market High", "SEI", "ATH", "RIS", "DDS", "CDI"].map(h => (
                   <th key={h} style={{ padding: "4px 10px", textAlign: "left", fontWeight: 600, fontSize: 11, borderBottom: "1px solid var(--border)" }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {sortedPlayers.map(p => {
-                const score = playerScore(p);
-                const maxPossible = 2000000;
-                const barPct = Math.min((score / maxPossible) * 100, 100);
                 return (
                   <tr key={p.id} style={{ borderBottom: "1px solid rgba(255,255,255,.04)" }}>
-                    <td style={{ padding: "6px 10px", fontWeight: 500 }}>{p.name}</td>
+                    <td style={{ padding: "6px 10px", fontWeight: 500 }}>{displayName(p.name)}</td>
                     <td style={{ padding: "6px 10px", opacity: .6 }}>{p.primary_position || "—"}</td>
                     <td style={{ padding: "6px 10px", opacity: .6 }}>{p.year || "—"}</td>
                     <td style={{ padding: "6px 10px" }}>{money(p.open_market_high)}</td>
@@ -133,14 +135,6 @@ function TeamExpandRow({ r, colCount }) {
                     <td style={{ padding: "6px 10px", opacity: .7 }}>{p.ris != null ? Number(p.ris).toFixed(1) : "—"}</td>
                     <td style={{ padding: "6px 10px", opacity: .7 }}>{p.dds != null ? Number(p.dds).toFixed(1) : "—"}</td>
                     <td style={{ padding: "6px 10px", opacity: .7 }}>{p.cdi != null ? Number(p.cdi).toFixed(1) : "—"}</td>
-                    <td style={{ padding: "6px 10px" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <div style={{ width: 60, height: 4, background: "rgba(255,255,255,.08)", borderRadius: 2 }}>
-                          <div style={{ height: "100%", width: `${barPct}%`, background: "#5b9cf6", borderRadius: 2 }} />
-                        </div>
-                        <span style={{ fontSize: 11, opacity: .5 }}>{(score / 1000).toFixed(0)}k</span>
-                      </div>
-                    </td>
                   </tr>
                 );
               })}
@@ -271,14 +265,14 @@ export function PortalRankingsPage() {
                 </thead>
                 <tbody>
                   {filtered.map(r => {
-                    const g = grade(r.percentile);
+                    const g = grade(r.raw);
                     const isOpen = expanded === r.team;
                     const posScore = pos => {
                       const players = (r.byPos[pos] || []).sort((a, b) => playerScore(b) - playerScore(a));
                       if (!players.length) return <span style={{ opacity: .25 }}>—</span>;
                       return (
                         <div>
-                          <span style={{ fontWeight: 600 }}>{players[0].name?.split(" ").pop()}</span>
+                          <span style={{ fontWeight: 600 }}>{displayName(players[0].name).split(" ").pop()}</span>
                           {players.length > 1 && <span style={{ opacity: .4, fontSize: 11 }}> +{players.length - 1}</span>}
                         </div>
                       );
@@ -321,7 +315,7 @@ export function PortalRankingsPage() {
                           <td style={tdStyle}>
                             {r.topCommit
                               ? <div>
-                                  <div style={{ fontWeight: 500 }}>{r.topCommit.name}</div>
+                                  <div style={{ fontWeight: 500 }}>{displayName(r.topCommit.name)}</div>
                                   <div style={{ fontSize: 11, opacity: .45 }}>{r.topCommit.primary_position} · {money(r.topCommit.open_market_high)}</div>
                                 </div>
                               : "—"
