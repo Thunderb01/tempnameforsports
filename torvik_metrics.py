@@ -65,7 +65,7 @@ except ImportError:
     sys.exit("Run: pip install supabase")
 
 try:
-    from match_utils import build_lookup, match_player as mu_match
+    from match_utils import build_lookup, match_player as mu_match, norm_name
 except ImportError:
     sys.exit("match_utils.py not found — make sure it's in the same directory.")
 
@@ -924,7 +924,7 @@ def main():
                 # caused by player_stats.school diverging from players.current_team
                 school = pl.get("current_team", "") or r.get("school", "")
                 _sb_stats.append({
-                    "_sb_name": normalise(pl["name"]),
+                    "_sb_name": norm_name(pl["name"]),
                     "_sb_team": normalise_team(school),
                     "sb_height": pl.get("height"),
                     "sb_weight": pl.get("weight"),
@@ -933,7 +933,7 @@ def main():
 
         if _sb_stats:
             _sb_df = pd.DataFrame(_sb_stats).drop_duplicates(subset=["_sb_name", "_sb_team"])
-            df["_sb_name"] = df["player_name"].apply(normalise)
+            df["_sb_name"] = df["player_name"].apply(norm_name)
             df["_sb_team"] = df["team"].apply(normalise_team)
             df = df.merge(_sb_df, on=["_sb_name", "_sb_team"], how="left")
             # Show teams from Supabase that don't appear in Torvik CSV after normalisation
