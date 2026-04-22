@@ -202,6 +202,15 @@ const BTP_METRICS = [
   { key: "cdi", label: "CDI", desc: "Playmaking" },
 ];
 
+// Players with prior-year-only stats (didn't play enough this year but had meaningful
+// minutes the year before) get an 80% market discount to reflect the uncertainty.
+const CURRENT_STATS_YEAR = 2025;
+const MIN_PPG_MEANINGFUL  = 5;
+function isPriorYearEval(p) {
+  const s = p.stats || {};
+  const cy = s.calendar_year || 0;
+  return cy > 0 && cy < CURRENT_STATS_YEAR && (s.ppg ?? 0) >= MIN_PPG_MEANINGFUL;
+}
 function btpPlayerScoreDisplay(p) {
   const s = p.stats || {};
   const sei    = (s.sei || 0) * 15000;
@@ -209,7 +218,7 @@ function btpPlayerScoreDisplay(p) {
   const ris    = (s.ris || 0) * 4000;
   const dds    = (s.dds || 0) * 4000;
   const cdi    = (s.cdi || 0) * 4000;
-  const market = (p.marketHigh || 0);
+  const market = (p.marketHigh || 0) * (p._priorYearEval ?? isPriorYearEval(p) ? 0.8 : 1.0);
   return sei * 0.50 + market * 0.15 + ath * 0.13 + ris * 0.08 + dds * 0.08 + cdi * 0.06;
 }
 
@@ -298,16 +307,24 @@ function RosterStrengthPanel({ calc, onOpenModal }) {
               const barPct = (score / maxPlayerScore) * 100;
               const s = p.stats || {};
               return (
-                <div key={p.id} style={{ display: "flex", gap: 12, alignItems: "flex-start", paddingBottom: 12, borderBottom: i < byPos[pos].length - 1 ? "1px solid rgba(255,255,255,.05)" : "none" }}>
+                <div key={p.id} onClick={() => onOpenModal && onOpenModal(p)}
+                  style={{ display: "flex", gap: 12, alignItems: "flex-start", paddingBottom: 12, borderBottom: i < byPos[pos].length - 1 ? "1px solid rgba(255,255,255,.05)" : "none", cursor: "pointer", borderRadius: 6, padding: "8px 4px" }}
+                  onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,.03)"}
+                  onMouseLeave={e => e.currentTarget.style.background = ""}>
                   {/* Slot indicator */}
                   <div style={{ width: 28, height: 28, borderRadius: "50%", background: i === 0 ? "rgba(91,156,246,.2)" : "rgba(255,255,255,.05)", border: `1px solid ${i === 0 ? "rgba(91,156,246,.4)" : "rgba(255,255,255,.1)"}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, flexShrink: 0, color: i === 0 ? "#5b9cf6" : "rgba(255,255,255,.4)" }}>
                     {i + 1}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
-                      <div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                         <span style={{ fontWeight: 600, fontSize: 14 }}>{p.name}</span>
-                        <span style={{ fontSize: 11, opacity: .4, marginLeft: 8 }}>{p.year} · {p.team}</span>
+                        <span style={{ fontSize: 11, opacity: .4 }}>{p.year} · {p.team}</span>
+                        {p._priorYearEval && (
+                          <span title="Stats from prior season — NIL valued at 80% of prior year market" style={{ fontSize: 10, fontWeight: 700, color: "#f5a623", background: "rgba(245,166,35,.12)", border: "1px solid rgba(245,166,35,.35)", borderRadius: 6, padding: "1px 6px", letterSpacing: ".03em" }}>
+                            PY 80%
+                          </span>
+                        )}
                       </div>
                       <div style={{ textAlign: "right", flexShrink: 0 }}>
                         <span style={{ fontSize: 12, fontWeight: 600, opacity: .7 }}>{(contribution / 1000).toFixed(0)}k</span>

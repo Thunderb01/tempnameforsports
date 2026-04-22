@@ -505,6 +505,15 @@ export function useRosterBoard(team, userId) {
 
     // BTP Roster Score — same formula as Portal Rankings, adapted to p.stats shape
     const SLOT_WEIGHTS = [1.0, 0.55, 0.30, 0.15, 0.08];
+    // Players whose most recent stats are from a prior season (didn't play enough this year)
+    // but had meaningful minutes that year get an 80% NIL discount to reflect uncertainty.
+    const CURRENT_STATS_YEAR = 2025;  // most recently completed season's calendar_year
+    const MIN_PPG_MEANINGFUL  = 5;    // PPG threshold for "meaningful minutes" in prior year
+    function isPriorYearEval(p) {
+      const s = p.stats || {};
+      const cy = s.calendar_year || 0;
+      return cy > 0 && cy < CURRENT_STATS_YEAR && (s.ppg ?? 0) >= MIN_PPG_MEANINGFUL;
+    }
     function btpPlayerScore(p) {
       const s = p.stats || {};
       const sei    = (s.sei || 0) * 15000;
@@ -512,13 +521,13 @@ export function useRosterBoard(team, userId) {
       const ris    = (s.ris || 0) * 4000;
       const dds    = (s.dds || 0) * 4000;
       const cdi    = (s.cdi || 0) * 4000;
-      const market = (p.marketHigh || 0);
+      const market = (p.marketHigh || 0) * (isPriorYearEval(p) ? 0.8 : 1.0);
       return sei * 0.50 + market * 0.15 + ath * 0.13 + ris * 0.08 + dds * 0.08 + cdi * 0.06;
     }
     const scoringPool = [
-      ...activeRosterReturners,
-      ...roster.map(r => _boardById.get(r.id)).filter(Boolean),
-      ...incomingTransfers.filter(p => !_rosterIds.has(p.id)),
+      ...activeRosterReturners.map(p => ({ ...p, _priorYearEval: isPriorYearEval(p) })),
+      ...roster.map(r => { const p = _boardById.get(r.id); return p ? { ...p, _priorYearEval: isPriorYearEval(p) } : null; }).filter(Boolean),
+      ...incomingTransfers.filter(p => !_rosterIds.has(p.id)).map(p => ({ ...p, _priorYearEval: isPriorYearEval(p) })),
     ];
     const byPos = {};
     scoringPool.forEach(p => {

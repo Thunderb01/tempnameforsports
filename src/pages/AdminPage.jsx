@@ -3,7 +3,7 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { supabase }   from "@/lib/supabase";
 import { money, letterGrade, gradeColor } from "@/lib/display";
 
-// Self-contained team search — queries Supabase directly, no pre-loaded array needed
+// Self-contained team search — queries vw_players.current_team (avoids teams table RLS)
 function TeamSearch({ value, onChange, placeholder = "Search team…" }) {
   const [query,       setQuery]       = useState(value || "");
   const [suggestions, setSuggestions] = useState([]);
@@ -19,12 +19,13 @@ function TeamSearch({ value, onChange, placeholder = "Search team…" }) {
     if (!q.trim()) { setSuggestions([]); setOpen(false); onChange(""); return; }
     timeoutRef.current = setTimeout(async () => {
       const { data } = await supabase
-        .from("teams")
-        .select("name")
-        .ilike("name", `%${q.trim()}%`)
-        .order("name")
-        .limit(12);
-      setSuggestions((data || []).map(t => t.name));
+        .from("vw_players")
+        .select("current_team")
+        .ilike("current_team", `%${q.trim()}%`)
+        .not("current_team", "is", null)
+        .limit(50);
+      const unique = [...new Set((data || []).map(r => r.current_team))].sort();
+      setSuggestions(unique.slice(0, 14));
       setOpen(true);
     }, 180);
   }
@@ -85,13 +86,14 @@ const PENTAGON_METRICS = [
 ];
 
 const EMPTY_FORM = {
-  player_id:   null,
-  player_name: "",
-  torvik_pid:  "",
-  from_team:   "",
-  to_team:     "",
-  season_year: CURRENT_SEASON,
-  status:      "committed",
+  player_id:            null,
+  existing_transfer_id: null,  // if set, Save will UPDATE this row instead of inserting
+  player_name:          "",
+  torvik_pid:           "",
+  from_team:            "",
+  to_team:              "",
+  season_year:          CURRENT_SEASON,
+  status:               "committed",
 };
 
 // ── Shared helpers ─────────────────────────────────────────────────────────
@@ -315,10 +317,10 @@ function TransferForm({ initial = EMPTY_FORM, onSave, onCancel, saving }) {
     }
     setLinkedPlayer(p);
 
-    // Look up their existing transfer record to auto-fill to_team / status
+    // Look up their existing transfer record to auto-fill fields and track the row ID
     const { data: existing } = await supabase
       .from("portal_transfers")
-      .select("to_team, from_team, status, season_year")
+      .select("id, to_team, from_team, status, season_year, torvik_pid")
       .eq("player_id", p.id)
       .order("season_year", { ascending: false })
       .limit(1)
@@ -326,12 +328,14 @@ function TransferForm({ initial = EMPTY_FORM, onSave, onCancel, saving }) {
 
     setForm(f => ({
       ...f,
-      player_id:   p.id,
-      player_name: p.name,
-      from_team:   existing?.from_team || p.current_team || f.from_team,
-      to_team:     existing?.to_team   || f.to_team,
-      status:      existing?.status    || f.status,
-      season_year: existing?.season_year ?? f.season_year,
+      player_id:            p.id,
+      player_name:          p.name,
+      existing_transfer_id: existing?.id ?? null,
+      from_team:            existing?.from_team  || p.current_team || f.from_team,
+      to_team:              existing?.to_team    || f.to_team,
+      status:               existing?.status     || f.status,
+      season_year:          existing?.season_year ?? f.season_year,
+      torvik_pid:           existing?.torvik_pid  || f.torvik_pid,
     }));
   }
 
@@ -387,9 +391,9 @@ function TransferForm({ initial = EMPTY_FORM, onSave, onCancel, saving }) {
 
         <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
           <button className="btn btn-primary" style={{ fontSize: 12 }}
-            disabled={saving || !form.player_name.trim() || !form.from_team.trim() || !form.to_team.trim()}
+            disabled={saving || !form.player_name.trim()}
             onClick={() => onSave(form)}>
-            {saving ? "Saving…" : "Save"}
+            {saving ? "Saving…" : form.existing_transfer_id ? "Update Record" : "Add New Record"}
           </button>
           {onCancel && (
             <button className="btn btn-ghost" style={{ fontSize: 12 }} onClick={onCancel}>Cancel</button>
@@ -469,15 +473,23 @@ function TransfersTab() {
 
   async function handleAdd(form) {
     setSaving(true);
-    const { error } = await supabase.from("portal_transfers").insert({
-      player_id:   form.player_id   || null,
+    const payload = {
+      player_id:   form.player_id         || null,
       player_name: form.player_name.trim(),
       torvik_pid:  form.torvik_pid.trim() || null,
-      from_team:   form.from_team.trim(),
-      to_team:     form.to_team.trim(),
+      from_team:   form.from_team.trim()  || null,
+      to_team:     form.to_team.trim()    || null,
       season_year: form.season_year,
       status:      form.status,
-    });
+    };
+
+    let error;
+    if (form.existing_transfer_id) {
+      // Update the existing row
+      ({ error } = await supabase.from("portal_transfers").update(payload).eq("id", form.existing_transfer_id));
+    } else {
+      ({ error } = await supabase.from("portal_transfers").insert(payload));
+    }
     if (error) { alert("Error: " + error.message); }
     else { await fetchTransfers(); }
     setSaving(false);
