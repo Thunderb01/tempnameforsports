@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
+import { PlayerModal } from "@/components/PlayerModal";
 import { supabase }   from "@/lib/supabase";
 import { useTeamLogos } from "@/hooks/useTeamLogos";
 import { money }      from "@/lib/display";
@@ -62,9 +63,26 @@ function displayName(name) {
   return (name || "").replace(/\s+(II|III|IV|V|Jr\.?|Sr\.?)$/i, "").trim();
 }
 
+function toModalPlayer(p) {
+  return {
+    id:           p.id,
+    name:         p.name,
+    espn_id:      p.espn_id   ?? null,
+    team:         p.current_team ?? null,
+    conf:         p.conference ?? null,
+    pos:          p.primary_position ?? null,
+    year:         p.year ?? null,
+    height:       p.height   ?? null,
+    hometown:     p.hometown ?? null,
+    marketLow:    p.open_market_low  ?? 0,
+    marketHigh:   p.open_market_high ?? 0,
+    nilValuation: p.nil_valuation    ?? 0,
+  };
+}
+
 const POS_ORDER = ["Guard", "Wing", "Big"];
 
-function TeamExpandRow({ r, colCount }) {
+function TeamExpandRow({ r, colCount, onOpenModal }) {
   const sortedPlayers = useMemo(() => {
     return [...r.players].sort((a, b) => {
       const posA = POS_ORDER.indexOf(a.primary_position || "Wing");
@@ -117,27 +135,28 @@ function TeamExpandRow({ r, colCount }) {
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
             <thead>
               <tr style={{ opacity: .45 }}>
-                {["Player", "Pos", "Yr", "Market High", "SEI", "ATH", "RIS", "DDS", "CDI"].map(h => (
+                {["Player", "Pos", "Yr", "Market High", "PPG", "RPG", "APG"].map(h => (
                   <th key={h} style={{ padding: "4px 10px", textAlign: "left", fontWeight: 600, fontSize: 11, borderBottom: "1px solid var(--border)" }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {sortedPlayers.map(p => {
-                return (
-                  <tr key={p.id} style={{ borderBottom: "1px solid rgba(255,255,255,.04)" }}>
-                    <td style={{ padding: "6px 10px", fontWeight: 500 }}>{displayName(p.name)}</td>
-                    <td style={{ padding: "6px 10px", opacity: .6 }}>{p.primary_position || "—"}</td>
-                    <td style={{ padding: "6px 10px", opacity: .6 }}>{p.year || "—"}</td>
-                    <td style={{ padding: "6px 10px" }}>{money(p.open_market_high)}</td>
-                    <td style={{ padding: "6px 10px", opacity: .7 }}>{p.sei != null ? Number(p.sei).toFixed(1) : "—"}</td>
-                    <td style={{ padding: "6px 10px", opacity: .7 }}>{p.ath != null ? Number(p.ath).toFixed(1) : "—"}</td>
-                    <td style={{ padding: "6px 10px", opacity: .7 }}>{p.ris != null ? Number(p.ris).toFixed(1) : "—"}</td>
-                    <td style={{ padding: "6px 10px", opacity: .7 }}>{p.dds != null ? Number(p.dds).toFixed(1) : "—"}</td>
-                    <td style={{ padding: "6px 10px", opacity: .7 }}>{p.cdi != null ? Number(p.cdi).toFixed(1) : "—"}</td>
-                  </tr>
-                );
-              })}
+              {sortedPlayers.map(p => (
+                <tr key={p.id}
+                  onClick={() => onOpenModal && onOpenModal(p)}
+                  style={{ borderBottom: "1px solid rgba(255,255,255,.04)", cursor: "pointer" }}
+                  onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,.04)"}
+                  onMouseLeave={e => e.currentTarget.style.background = ""}
+                >
+                  <td style={{ padding: "6px 10px", fontWeight: 500 }}>{displayName(p.name)}</td>
+                  <td style={{ padding: "6px 10px", opacity: .6 }}>{p.primary_position || "—"}</td>
+                  <td style={{ padding: "6px 10px", opacity: .6 }}>{p.year || "—"}</td>
+                  <td style={{ padding: "6px 10px" }}>{money(p.open_market_high)}</td>
+                  <td style={{ padding: "6px 10px", opacity: .7 }}>{p.ppg != null ? Number(p.ppg).toFixed(1) : "—"}</td>
+                  <td style={{ padding: "6px 10px", opacity: .7 }}>{p.rpg != null ? Number(p.rpg).toFixed(1) : "—"}</td>
+                  <td style={{ padding: "6px 10px", opacity: .7 }}>{p.apg != null ? Number(p.apg).toFixed(1) : "—"}</td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
@@ -153,6 +172,7 @@ export function PortalRankingsPage() {
   const [search,    setSearch]    = useState("");
   const [posFilter, setPosFilter] = useState("all");
   const [expanded,  setExpanded]  = useState(null);
+  const [modal,     setModal]     = useState(null);
 
   useEffect(() => {
     async function load() {
@@ -170,7 +190,7 @@ export function PortalRankingsPage() {
       const ids = [...new Set(transfers.map(r => r.player_id))];
       const { data: players, error: pErr } = await supabase
         .from("vw_players")
-        .select("id, name, primary_position, open_market_high, open_market_low, sei, ath, ris, dds, cdi, nil_valuation, year")
+        .select("id, name, primary_position, open_market_high, open_market_low, sei, ath, ris, dds, cdi, nil_valuation, year, ppg, rpg, apg, espn_id, current_team, conference, height, hometown")
         .in("id", ids);
 
       if (pErr) { console.error(pErr); setLoading(false); return; }
@@ -228,6 +248,7 @@ export function PortalRankingsPage() {
   return (
     <>
       <SiteHeader />
+      {modal && <PlayerModal player={modal} onClose={() => setModal(null)} />}
       <div className="app-shell">
         <div className="app-top">
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12, marginBottom: 16 }}>
@@ -322,7 +343,7 @@ export function PortalRankingsPage() {
                             }
                           </td>
                         </tr>
-                        {isOpen && <TeamExpandRow key={`${r.team}-expand`} r={r} colCount={COL_COUNT + 1} />}
+                        {isOpen && <TeamExpandRow key={`${r.team}-expand`} r={r} colCount={COL_COUNT + 1} onOpenModal={p => setModal(toModalPlayer(p))} />}
                       </>
                     );
                   })}
