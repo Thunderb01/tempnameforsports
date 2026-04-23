@@ -6,7 +6,7 @@ import { money } from "@/lib/display";
 // Module-level caches so data survives page navigation without re-fetching.
 const SESSION_BOARD_KEY = "bp_board_cache";
 const SESSION_BOARD_TTL  = 4 * 60 * 60 * 1000; // 4 hours
-const SESSION_BOARD_VER  = 3; // bump to invalidate all cached sessions
+const SESSION_BOARD_VER  = 4; // bump to invalidate all cached sessions
 
 function loadSessionCache() {
   try {
