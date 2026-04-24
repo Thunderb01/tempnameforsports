@@ -31,14 +31,18 @@
     "body": "Beyond the Portal gives coaches the valuation tools and global scouting relationships to build rosters with precision and a genuine competitive edge."
   },
   "team": [
-    { "initials": "EM", 
-      "name": "Enaam Maqsood",   
-      "role": "Founder & CEO",        
-      "bio": "Player evaluator specializing in transfer portal and international prospects, with hands-on D1 experience building valuation frameworks at the intersection of film study, data, and NIL-era roster construction." 
+    { "initials": "EM",
+      "image": "/team/enaam.png",
+      "linkedin": "https://www.linkedin.com/in/enaam-maqsood-322458240/",
+      "name": "Enaam Maqsood",
+      "role": "Founder & CEO",
+      "bio": "Player evaluator specializing in transfer portal and international prospects, with hands-on D1 experience building valuation frameworks at the intersection of film study, data, and NIL-era roster construction."
     },
-    { "initials": "AL", 
+    { "initials": "AL",
+      "image": "/team/alex.png",
+      "linkedin": "https://www.linkedin.com/in/alexander-lui-99652122a/",
       "name": "Alex Lui",
-      "role": "Co-Founder & CTO",       
-      "bio": "Computer scientist with a passion for leveraging technology to solve real-world problems in the sports industry." }
+      "role": "Co-Founder & CTO",
+      "bio": "Full-stack engineer and co-founder building the web platform and analytics infrastructure behind Beyond the Portal." }
     ]
 }
