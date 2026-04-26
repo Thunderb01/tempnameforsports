@@ -9,6 +9,7 @@ import { ProtectedRoute, SuperAdminRoute } from "@/components/ProtectedRoute";
 import { LandingPage }       from "@/pages/LandingPage";
 import { LoginPage }         from "@/pages/LoginPage";
 import { ResetPasswordPage } from "@/pages/ResetPasswordPage";
+import { FAQPage }           from "@/pages/FAQPage";
 
 // Lazy-loaded — each becomes its own JS chunk, only downloaded when visited
 const AppPage          = lazy(() => import("@/pages/AppPage").then(m => ({ default: m.AppPage })));
@@ -25,6 +26,7 @@ createRoot(document.getElementById("root")).render(
         <Routes>
           {/* Public */}
           <Route path="/"               element={<LandingPage />} />
+          <Route path="/faq"            element={<FAQPage />} />
           <Route path="/login"          element={<LoginPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
 

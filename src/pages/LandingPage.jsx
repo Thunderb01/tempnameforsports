@@ -8,6 +8,93 @@ const ABOUT_URL = "/about.json";
 
 const AVATAR_CLASSES = ["av-0", "av-1", "av-2", "av-3", "av-4"];
 
+function ContactModal({ onClose }) {
+  const [form,       setForm]       = useState({ name: "", email: "", school: "", subject: "", message: "" });
+  const [submitting, setSubmitting] = useState(false);
+  const [done,       setDone]       = useState(false);
+  const [error,      setError]      = useState("");
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setError("");
+    if (!form.name.trim())    { setError("Please enter your name.");    return; }
+    if (!form.email.trim())   { setError("Please enter your email.");   return; }
+    if (!form.message.trim()) { setError("Please enter a message.");    return; }
+    setSubmitting(true);
+    const { error: err } = await supabase.from("access_requests").insert({
+      name:     form.name.trim(),
+      email:    form.email.trim().toLowerCase(),
+      school:   form.school.trim() || "—",
+      position: `Contact Form${form.subject.trim() ? ` — ${form.subject.trim()}` : ""}: ${form.message.trim()}`,
+    });
+    if (err) console.warn("contact insert error:", err.message);
+    setSubmitting(false);
+    setDone(true);
+  }
+
+  return (
+    <>
+      <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.6)", backdropFilter: "blur(4px)", zIndex: 200 }} />
+      <div style={{
+        position: "fixed", top: "50%", left: "50%", transform: "translate(-50%,-50%)",
+        zIndex: 201, width: "min(92vw, 440px)",
+        background: "#131929", border: "1px solid var(--border)",
+        borderRadius: 16, padding: "32px 28px", boxShadow: "0 24px 64px rgba(0,0,0,.6)",
+      }}>
+        {done ? (
+          <>
+            <h2 style={{ margin: "0 0 10px", fontSize: 20, fontWeight: 600 }}>Message sent!</h2>
+            <p style={{ color: "var(--muted)", fontSize: 14, lineHeight: 1.6, margin: "0 0 24px" }}>
+              Thanks, {form.name.split(" ")[0]}. We'll get back to you at {form.email} shortly.
+            </p>
+            <button className="btn btn-primary" style={{ width: "100%" }} onClick={onClose}>Close</button>
+          </>
+        ) : (
+          <>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", color: "rgba(85,130,255,.8)", marginBottom: 6 }}>Get in touch</div>
+                <h2 style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>Contact Us</h2>
+              </div>
+              <button onClick={onClose} style={{ background: "none", border: "none", color: "var(--muted)", fontSize: 20, cursor: "pointer", lineHeight: 1, padding: 4 }}>×</button>
+            </div>
+            <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              {[
+                { key: "name",    label: "Name",    type: "text",  placeholder: "" },
+                { key: "email",   label: "Email",   type: "email", placeholder: "" },
+                { key: "school",  label: "School / Program", type: "text", placeholder: "" },
+                { key: "subject", label: "Subject", type: "text",  placeholder: "" },
+              ].map(({ key, label, type, placeholder }) => (
+                <div key={key} style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                  <label style={{ fontSize: 12, fontWeight: 600, opacity: .65 }}>{label}</label>
+                  <input
+                    className="input" type={type} placeholder={placeholder}
+                    value={form[key]}
+                    onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
+                  />
+                </div>
+              ))}
+              <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                <label style={{ fontSize: 12, fontWeight: 600, opacity: .65 }}>Message</label>
+                <textarea
+                  className="input" rows={4} placeholder="How can we help?"
+                  value={form.message}
+                  onChange={e => setForm(f => ({ ...f, message: e.target.value }))}
+                  style={{ resize: "vertical", minHeight: 90 }}
+                />
+              </div>
+              {error && <div style={{ fontSize: 13, color: "#f87171" }}>{error}</div>}
+              <button className="btn btn-primary" type="submit" disabled={submitting} style={{ width: "100%", justifyContent: "center", marginTop: 4 }}>
+                {submitting ? "Sending…" : "Send message"}
+              </button>
+            </form>
+          </>
+        )}
+      </div>
+    </>
+  );
+}
+
 function BrowserFrame({ src, alt, label }) {
   return (
     <div style={{
@@ -49,6 +136,7 @@ export function LandingPage() {
   const navigate  = useNavigate();
   const [data,    setData]    = useState(null);
   const [loading, setLoading] = useState(true);
+  const [contact, setContact] = useState(false);
 
   // If already signed in, skip the landing page
   useEffect(() => {
@@ -66,6 +154,8 @@ export function LandingPage() {
 
   return (
     <>
+      {contact && <ContactModal onClose={() => setContact(false)} />}
+
       {/* ── Header ── */}
       <div className="site-header-wrap">
         <header className="site-header">
@@ -73,7 +163,10 @@ export function LandingPage() {
             <img className="brand-logo" src={logo} alt="Beyond the Portal" />
             <span style={{ fontWeight: 800, fontSize: 15 }}>Beyond the Portal</span>
           </Link>
-          <nav className="nav">
+          <nav className="nav" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <button className="btn btn-ghost" style={{ fontSize: 14 }} onClick={() => setContact(true)}>
+              Contact Us
+            </button>
             <Link to="/login" className="btn btn-primary" style={{ fontSize: 14 }}>
               Sign in →
             </Link>
@@ -205,7 +298,9 @@ export function LandingPage() {
       </main>
 
       <footer className="footer">
-        <p>© {new Date().getFullYear()} Beyond the Portal. All rights reserved.</p>
+        <p>© {new Date().getFullYear()} Beyond the Portal. All rights reserved. 
+          {/* · <Link to="/faq" style={{ opacity: .6 }}>FAQ</Link> */}
+        </p>
       </footer>
     </>
   );

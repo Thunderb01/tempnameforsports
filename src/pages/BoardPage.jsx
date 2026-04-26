@@ -71,11 +71,11 @@ export function BoardPage() {
   ];
 
   const ADVC_FIELDS = [
-    { key: "sei",        label: "Scoring Efficiency (SEI)", src: "metric" },
-    { key: "ath",        label: "Athleticism (ATH)",        src: "metric" },
-    { key: "ris",        label: "Rim Impact (RIS)",         src: "metric" },
-    { key: "dds",        label: "Defending (DDS)",          src: "metric" },
-    { key: "cdi",        label: "Playmaking (CDI)",         src: "metric" },
+    { key: "sei",        label: "Scoring Efficiency", src: "metric" },
+    { key: "ath",        label: "Athleticism",        src: "metric" },
+    { key: "ris",        label: "Rim Impact",         src: "metric" },
+    { key: "dds",        label: "Defending",          src: "metric" },
+    { key: "cdi",        label: "Playmaking",         src: "metric" },
     { key: "usg",        label: "USG%",                     src: "stat"   },
     { key: "ppg",        label: "PPG",                      src: "stat"   },
     { key: "rpg",        label: "RPG",                      src: "stat"   },
@@ -378,16 +378,10 @@ export function BoardPage() {
                 {ADVC_FIELDS.map(f => (
                   <div key={f.key}>
                     <div style={{ fontSize: 12, opacity: .6, marginBottom: 4 }}>{f.label}</div>
-                    <div style={{ display: "flex", gap: 6 }}>
-                      <input className="input" type="number" placeholder="Min"
-                        style={{ width: "50%", fontSize: 13 }}
-                        value={advcFilters[f.key].min}
-                        onChange={e => setAdvc(f.key, "min", e.target.value)} />
-                      <input className="input" type="number" placeholder="Max"
-                        style={{ width: "50%", fontSize: 13 }}
-                        value={advcFilters[f.key].max}
-                        onChange={e => setAdvc(f.key, "max", e.target.value)} />
-                    </div>
+                    <input className="input" type="number" placeholder="Min"
+                      style={{ width: "100%", fontSize: 13 }}
+                      value={advcFilters[f.key].min}
+                      onChange={e => setAdvc(f.key, "min", e.target.value)} />
                   </div>
                 ))}
               </div>
