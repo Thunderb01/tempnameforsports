@@ -5,12 +5,7 @@ serve(async (req) => {
     const payload = await req.json();
     const record  = payload.record;
 
-    // Only process contact form submissions, not access requests
-    if (!String(record.position || "").startsWith("Contact Form")) {
-      return new Response("skipped", { status: 200 });
-    }
-
-    const { name, email, school, position } = record;
+    const { name, email, school, subject, message } = record;
 
     const html = `
       <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#1a1a1a">
@@ -22,8 +17,10 @@ serve(async (req) => {
               <td style="padding:8px 0;border-bottom:1px solid #eee"><a href="mailto:${email}">${email}</a></td></tr>
           <tr><td style="padding:8px 0;border-bottom:1px solid #eee;font-weight:600">School</td>
               <td style="padding:8px 0;border-bottom:1px solid #eee">${school || "—"}</td></tr>
+          <tr><td style="padding:8px 0;border-bottom:1px solid #eee;font-weight:600">Subject</td>
+              <td style="padding:8px 0;border-bottom:1px solid #eee">${subject || "—"}</td></tr>
           <tr><td style="padding:8px 0;font-weight:600;vertical-align:top">Message</td>
-              <td style="padding:8px 0;white-space:pre-wrap">${position}</td></tr>
+              <td style="padding:8px 0;white-space:pre-wrap">${message}</td></tr>
         </table>
       </div>
     `;
@@ -45,6 +42,7 @@ serve(async (req) => {
     const data = await res.json();
     return new Response(JSON.stringify(data), { status: res.ok ? 200 : 500 });
   } catch (err) {
-    return new Response(JSON.stringify({ error: err.message }), { status: 500 });
+    const msg = err instanceof Error ? err.message : String(err);
+    return new Response(JSON.stringify({ error: msg }), { status: 500 });
   }
 });

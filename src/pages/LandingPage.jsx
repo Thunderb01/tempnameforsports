@@ -21,11 +21,12 @@ function ContactModal({ onClose }) {
     if (!form.email.trim())   { setError("Please enter your email.");   return; }
     if (!form.message.trim()) { setError("Please enter a message.");    return; }
     setSubmitting(true);
-    const { error: err } = await supabase.from("access_requests").insert({
-      name:     form.name.trim(),
-      email:    form.email.trim().toLowerCase(),
-      school:   form.school.trim() || "—",
-      position: `Contact Form${form.subject.trim() ? ` — ${form.subject.trim()}` : ""}: ${form.message.trim()}`,
+    const { error: err } = await supabase.from("contact_messages").insert({
+      name:    form.name.trim(),
+      email:   form.email.trim().toLowerCase(),
+      school:  form.school.trim()   || null,
+      subject: form.subject.trim()  || null,
+      message: form.message.trim(),
     });
     if (err) console.warn("contact insert error:", err.message);
     setSubmitting(false);
