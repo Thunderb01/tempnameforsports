@@ -35,7 +35,7 @@ serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        from:    "Beyond the Portal <noreply@beyondtheportal.com>",
+        from:    "Beyond the Portal <onboarding@resend.dev>",
         to:      ["beyondtheportalbasketball@gmail.com"],
         subject: `Contact Form: ${name} (${email})`,
         html,
