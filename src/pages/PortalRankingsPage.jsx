@@ -45,6 +45,10 @@ function depthCoeff(zeroIdx) {
 
 // Team score = sum of (MPV * C_i) per position group, players sorted by MPV desc within group.
 function scoreTeam(players) {
+  let numPlayers = players.length;
+  players.forEach((p, i) => {
+    if (p.open_market_high==0) numPlayers--; 
+  });
   if (!players.length) return 0;
   const byPos = {};
   players.forEach(p => {
@@ -58,7 +62,7 @@ function scoreTeam(players) {
       .sort((a, b) => (b.open_market_high || 0) - (a.open_market_high || 0))
       .forEach((p, i) => { total += (p.open_market_high || 0) * depthCoeff(i); });
   });
-  return total / players.length;
+  return total / numPlayers;  // normalize for class size
 }
 
 // Individual player grade — calibrated to single-player NIL market value
