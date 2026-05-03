@@ -84,16 +84,14 @@ function grade(nilValue) {
 //   8 commits @ $1M avg    ≈  $8.4M  →  A+  (elite class)
 function teamGrade(score) {
   const v = Number(score) || 0;
-  if (v >= 9_000_000) return { label: "A+", color: "#4ade80" };
-  if (v >= 6_500_000) return { label: "A",  color: "#4ade80" };
-  if (v >= 4_500_000) return { label: "A-", color: "#86efac" };
-  if (v >= 3_000_000) return { label: "B+", color: "#a3e635" };
-  if (v >= 2_000_000) return { label: "B",  color: "#bef264" };
-  if (v >= 1_400_000) return { label: "B-", color: "#d9f99d" };
-  if (v >=   950_000) return { label: "C+", color: "#fde68a" };
-  if (v >=   650_000) return { label: "C",  color: "#fcd34d" };
-  if (v >=   450_000) return { label: "C-", color: "#fbbf24" };
-  if (v >=   250_000) return { label: "D",  color: "#fb923c" };
+  if (v >= 1_500_000) return { label: "A+", color: "#4ade80" };
+  if (v >= 1_300_000) return { label: "A",  color: "#4ade80" };
+  if (v >= 1_000_000) return { label: "A-", color: "#86efac" };
+  if (v >= 800_000) return { label: "B+", color: "#a3e635" };
+  if (v >= 600_000) return { label: "B",  color: "#bef264" };
+  if (v >= 400_000) return { label: "B-", color: "#d9f99d" };
+  if (v >=   200_000) return { label: "C", color: "#fde68a" };
+
   return { label: "F", color: "#f87171" };
 }
 
