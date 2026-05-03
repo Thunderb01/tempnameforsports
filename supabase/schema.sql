@@ -138,3 +138,55 @@ alter table public.access_requests enable row level security;
 create policy "Anyone can submit an access request"
   on public.access_requests for insert
   with check (true);
+
+
+-- ── International players ──────────────────────────────────────────────────────
+-- One row per player per league. Profile URL links back to RealGM.
+create table if not exists public.international_players (
+  id          uuid primary key default gen_random_uuid(),
+  name        text not null,
+  league      text not null,
+  profile_url text,
+  created_at  timestamp with time zone default now(),
+  unique (name, league)
+);
+
+alter table public.international_players enable row level security;
+
+create policy "Authenticated users can read international players"
+  on public.international_players for select
+  to authenticated
+  using (true);
+
+create policy "Service role can upsert international players"
+  on public.international_players for insert
+  with check (true);
+
+
+-- ── International player stats ─────────────────────────────────────────────────
+-- One row per player / season / stat_type / team.
+-- stats JSONB holds all scraped columns (varies by stat_type: Averages, Advanced_Stats, etc.)
+create table if not exists public.international_players_stats (
+  id          uuid primary key default gen_random_uuid(),
+  player_id   uuid references public.international_players(id) on delete cascade,
+  player_name text not null,
+  league      text not null,
+  season      integer not null,
+  season_type text not null default 'Regular_Season',
+  stat_type   text not null default 'Averages',
+  team        text,
+  stats       jsonb not null default '{}',
+  scraped_at  timestamp with time zone default now(),
+  unique (player_name, league, season, season_type, stat_type, team)
+);
+
+alter table public.international_players_stats enable row level security;
+
+create policy "Authenticated users can read international stats"
+  on public.international_players_stats for select
+  to authenticated
+  using (true);
+
+create policy "Service role can upsert international stats"
+  on public.international_players_stats for insert
+  with check (true);

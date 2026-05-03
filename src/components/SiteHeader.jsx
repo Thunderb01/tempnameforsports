@@ -45,6 +45,9 @@ export function SiteHeader() {
           <NavLink to="/compare" className={({ isActive }) => "nav-link" + (isActive ? " active" : "")}>
             Compare Players
           </NavLink>
+          <NavLink to="/international" className={({ isActive }) => "nav-link" + (isActive ? " active" : "")}>
+            International (coming soon)
+          </NavLink>
           {/* <NavLink to="/portal" className={({ isActive }) => "nav-link" + (isActive ? " active" : "")}>
             Portal Tracker
           </NavLink> */}

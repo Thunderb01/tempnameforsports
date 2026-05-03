@@ -17,7 +17,8 @@ const BoardPage        = lazy(() => import("@/pages/BoardPage").then(m => ({ def
 const AdminPage        = lazy(() => import("@/pages/AdminPage").then(m => ({ default: m.AdminPage })));
 const ComparePage           = lazy(() => import("@/pages/ComparePage").then(m => ({ default: m.ComparePage })));
 const PortalRankingsPage    = lazy(() => import("@/pages/PortalRankingsPage").then(m => ({ default: m.PortalRankingsPage })));
-const PortalPage       = lazy(() => import("@/pages/PortalPage").then(m => ({ default: m.PortalPage })));
+const PortalPage            = lazy(() => import("@/pages/PortalPage").then(m => ({ default: m.PortalPage })));
+const InternationalPage     = lazy(() => import("@/pages/InternationalPage").then(m => ({ default: m.InternationalPage })));
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>
@@ -37,7 +38,8 @@ createRoot(document.getElementById("root")).render(
             <Route path="/sandbox" element={<Navigate to="/app" replace />} />
             <Route path="/compare"  element={<ComparePage />} />
             <Route path="/rankings" element={<PortalRankingsPage />} />
-            <Route path="/portal"   element={<PortalPage />} />
+            <Route path="/portal"        element={<PortalPage />} />
+            <Route path="/international" element={<InternationalPage />} />
           </Route>
 
           {/* Superadmin only */}

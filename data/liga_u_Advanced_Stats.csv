@@ -1,0 +1,197 @@
+player_name,league,season,season_type,stat_type,team,ts%,efg%,total s %,orb%,drb%,trb%,ast%,tov%,stl%,blk%,usg%,ppr,pps,ortg,drtg,ediff,fic,per
+Nikola Dzepina,Spanish Liga U,2026,Regular_Season,Advanced_Stats,VLU,.676,.688,168.9,7.4,15.2,10.9,30.1,9.1,1.5,6.8,25.4,2.0,1.7,134.6,102.4,32.3,22.4,33.1
+Pau Riera,Spanish Liga U,2026,Regular_Season,Advanced_Stats,LLU,.560,.517,137.5,3.1,15.4,9.4,37.3,17.2,6.6,0.7,37.7,-5.1,1.4,103.0,91.1,11.9,241.0,28.6
+Mohamed Dabone,Spanish Liga U,2026,Regular_Season,Advanced_Stats,BLU,.658,.636,161.2,13.4,28.1,21.2,5.6,16.0,2.7,4.2,23.1,-6.9,1.7,121.1,81.5,39.6,293.8,26.6
+Joaquin Taboada,Spanish Liga U,2026,Regular_Season,Advanced_Stats,BLU,.586,.551,160.1,6.9,14.6,10.5,23.8,13.0,2.4,1.7,29.2,-1.1,1.3,116.8,101.5,15.3,286.8,26.3
+Wilfried Arthur Tsafack,Spanish Liga U,2026,Regular_Season,Advanced_Stats,GCLU,.589,.571,134.6,14.4,16.6,15.5,8.9,14.5,2.9,3.0,25.0,-5.7,1.4,114.3,91.2,23.0,342.1,24.7
+Joaquim Boumtje-Boumtje,Spanish Liga U,2026,Regular_Season,Advanced_Stats,BLU,.602,.561,162.2,8.3,18.9,14.0,15.2,17.8,2.4,3.5,28.5,-7.1,1.4,111.2,89.1,22.1,280.5,24.3
+Ilia Frolov,Spanish Liga U,2026,Regular_Season,Advanced_Stats,RMLU,.631,.589,173.5,12.9,21.5,17.3,7.6,15.8,2.3,2.2,23.3,-6.0,1.4,119.8,86.7,33.1,198.5,23.7
+Egor Amosov,Spanish Liga U,2026,Regular_Season,Advanced_Stats,RMLU,.540,.516,145.7,5.6,19.3,12.8,18.8,13.3,4.9,2.1,26.7,-1.3,1.2,110.1,81.0,29.1,318.4,23.5
+Code Mbengue,Spanish Liga U,2026,Regular_Season,Advanced_Stats,GCLU,.651,.658,119.1,17.4,20.9,19.2,5.9,22.8,2.4,7.5,20.3,-9.1,1.5,109.0,87.3,21.7,221.1,23.0
+Dylan Bordon Dri,Spanish Liga U,2026,Regular_Season,Advanced_Stats,CCLU,.530,.469,148.5,2.4,7.3,4.9,28.7,12.1,2.6,0.7,29.2,2.4,1.2,114.9,106.4,8.5,193.5,22.9
+Seydina Faye,Spanish Liga U,2026,Regular_Season,Advanced_Stats,CZLU,.623,.568,144.4,7.8,23.3,15.7,11.1,19.9,2.6,1.3,30.4,-10.7,1.6,105.1,92.4,12.7,121.8,22.9
+Izan Almansa,Spanish Liga U,2026,Regular_Season,Advanced_Stats,RMLU,.558,.517,138.4,10.3,18.6,14.8,14.9,8.4,1.6,2.5,22.1,1.6,1.4,121.5,87.5,34.1,174.5,22.8
+Xabier Lopez,Spanish Liga U,2026,Regular_Season,Advanced_Stats,CCLU,.519,.503,129.1,10.3,22.4,16.5,11.2,11.4,2.4,1.5,25.6,-2.9,1.2,109.1,99.5,9.6,329.3,22.2
+Abdrahamane Kone,Spanish Liga U,2026,Regular_Season,Advanced_Stats,BLU,.628,.628,117.9,15.3,22.5,19.2,4.9,17.2,1.2,2.8,22.8,-7.7,1.6,113.6,88.1,25.5,183.4,22.2
+Lucas Hernandez Langarita,Spanish Liga U,2026,Regular_Season,Advanced_Stats,CZLU,.525,.519,135.3,3.0,10.9,7.0,25.3,10.3,3.4,0.8,28.6,2.0,1.1,109.7,94.6,15.1,94.3,21.7
+Omer Kutluay,Spanish Liga U,2026,Regular_Season,Advanced_Stats,RMLU,.613,.552,171.4,2.6,17.6,10.3,30.4,25.6,3.7,0.3,24.0,-2.4,1.4,107.5,85.4,22.1,151.6,21.2
+Liam Krispin,Spanish Liga U,2026,Regular_Season,Advanced_Stats,BLU,.532,.508,152.8,3.7,8.5,5.9,11.1,7.0,3.1,0.3,27.7,-0.8,1.1,111.5,102.6,8.9,165.8,20.9
+Urko Madariaga,Spanish Liga U,2026,Regular_Season,Advanced_Stats,BLU,.559,.525,111.2,13.4,20.2,16.6,15.2,17.8,2.4,2.0,23.0,-4.9,1.5,108.4,96.1,12.3,233.6,20.8
+Nikola Kusturica,Spanish Liga U,2026,Regular_Season,Advanced_Stats,BLU,.517,.455,140.8,12.5,19.2,16.2,13.5,16.8,3.1,2.7,26.6,-5.5,1.2,107.5,85.4,22.1,197.4,20.7
+Arturas Butajevas,Spanish Liga U,2026,Regular_Season,Advanced_Stats,ULU,.544,.537,131.8,11.4,16.6,14.0,10.5,14.2,1.6,2.4,25.5,-5.5,1.2,104.3,99.5,4.8,228.6,20.4
+Ibrahima Khalilou,Spanish Liga U,2026,Regular_Season,Advanced_Stats,LLU,.565,.553,134.2,13.5,16.6,15.1,16.3,21.2,1.3,6.7,28.2,-9.0,1.4,98.9,98.5,0.4,190.6,20.4
+Joao Gluck,Spanish Liga U,2026,Regular_Season,Advanced_Stats,UMLU,.517,.484,146.7,7.3,14.2,10.6,11.0,10.6,3.3,0.8,27.6,-3.5,1.1,107.2,92.8,14.4,157.5,20.2
+Gaye Khalifa Ababacar,Spanish Liga U,2026,Regular_Season,Advanced_Stats,GLU,.539,.438,142.4,11.7,23.4,17.7,6.7,18.3,2.7,2.4,26.8,-9.7,1.4,102.1,99.1,3.0,236.0,20.1
+Kasekelayi Mervedi Miteo,Spanish Liga U,2026,Regular_Season,Advanced_Stats,GCLU,.513,.493,112.6,13.8,25.1,19.6,8.1,16.5,3.2,3.3,24.8,-7.0,1.2,100.6,85.2,15.4,198.1,20.1
+Anthony Rodriguez Aguila,Spanish Liga U,2026,Regular_Season,Advanced_Stats,CZLU,.633,.613,127.3,15.4,18.2,16.8,9.8,17.4,1.2,4.4,19.2,-4.5,1.5,116.0,97.2,18.8,187.8,20.0
+Wilmer Mejia,Spanish Liga U,2026,Regular_Season,Advanced_Stats,ULU,.548,.502,142.1,4.3,11.0,7.7,19.9,20.5,3.0,1.3,33.9,-10.6,1.3,95.8,98.2,-2.3,141.3,20.0
+Oier De La Heras,Spanish Liga U,2026,Regular_Season,Advanced_Stats,BLU,.568,.500,151.0,1.6,15.7,8.4,22.1,17.4,6.1,0.0,21.3,-1.0,1.4,110.5,94.2,16.3,75.6,19.9
+Farly Nunez,Spanish Liga U,2026,Regular_Season,Advanced_Stats,BLU,.542,.516,140.1,3.5,10.0,6.6,7.0,8.3,4.0,1.3,25.0,-2.2,1.2,110.2,101.4,8.9,136.4,19.9
+Youssouf Traore,Spanish Liga U,2026,Regular_Season,Advanced_Stats,CZLU,.596,.559,121.8,13.2,19.8,16.6,11.1,20.0,1.9,3.2,23.7,-7.4,1.5,107.0,94.4,12.6,178.8,19.9
+Mohamed Namakan Keita,Spanish Liga U,2026,Regular_Season,Advanced_Stats,BLU,.642,.627,171.9,14.3,16.9,15.7,8.0,19.3,1.2,2.6,20.3,-6.4,1.6,116.0,89.5,26.6,177.4,19.6
+Jorge Carot Hernandez,Spanish Liga U,2026,Regular_Season,Advanced_Stats,VLU,.578,.529,147.5,9.8,20.5,15.3,7.0,15.2,1.9,2.3,21.8,-5.4,1.3,111.0,99.3,11.7,276.6,19.5
+Khory Brunot,Spanish Liga U,2026,Regular_Season,Advanced_Stats,GLU,.521,.509,131.8,5.9,16.4,10.9,12.1,11.2,3.8,0.8,23.7,-2.5,1.2,108.3,89.1,19.2,130.8,19.5
+Alexander Savkov,Spanish Liga U,2026,Regular_Season,Advanced_Stats,CZLU,.583,.542,167.0,6.4,18.6,12.6,14.6,15.6,1.9,4.1,21.9,-2.7,1.3,111.5,95.6,15.9,238.1,19.0
+Mohamed Sangare,Spanish Liga U,2026,Regular_Season,Advanced_Stats,CCLU,.575,.554,151.7,10.5,18.8,14.7,1.9,13.8,2.0,1.1,21.1,-6.3,1.4,112.2,102.2,10.0,243.8,18.9
+Ousmane Diarra,Spanish Liga U,2026,Regular_Season,Advanced_Stats,RMLU,.641,.677,111.7,14.5,17.8,16.2,4.4,14.4,1.2,4.7,15.3,-3.5,1.6,121.3,89.5,31.8,206.1,18.6
+Adrian de la Torre,Spanish Liga U,2026,Regular_Season,Advanced_Stats,JLU,.539,.527,130.2,5.3,19.5,12.1,20.3,15.8,3.3,2.2,21.8,-1.7,1.2,101.4,98.8,2.6,246.6,18.5
+Sayon Keita,Spanish Liga U,2026,Regular_Season,Advanced_Stats,BLU,.566,.545,110.1,8.9,13.6,11.4,4.8,16.0,3.2,7.6,19.5,-5.6,1.5,105.7,84.5,21.3,107.6,18.4
+Diosdado Krohnert,Spanish Liga U,2026,Regular_Season,Advanced_Stats,RMLU,.718,.727,159.7,9.9,10.1,10.0,6.9,14.8,2.2,4.9,13.7,-1.9,1.7,132.3,91.7,40.6,81.9,18.4
+Max Gaspa,Spanish Liga U,2026,Regular_Season,Advanced_Stats,BMLU,.592,.560,159.4,5.3,12.3,8.5,25.8,20.0,3.2,0.0,22.7,-3.7,1.3,106.3,96.8,9.5,77.4,18.4
+Brayan Gonzalez,Spanish Liga U,2026,Regular_Season,Advanced_Stats,GCLU,.523,.487,146.0,2.3,13.6,8.1,35.8,20.9,3.3,0.0,22.1,3.7,1.2,107.2,92.9,14.2,228.0,18.0
+Ibai Hendrickx,Spanish Liga U,2026,Regular_Season,Advanced_Stats,GLU,.499,.491,119.9,13.0,18.3,15.7,11.9,17.1,3.0,1.5,24.6,-6.7,1.2,95.5,101.1,-5.6,177.4,17.7
+Oriol Molist,Spanish Liga U,2026,Regular_Season,Advanced_Stats,GLU,.529,.496,155.2,4.4,11.6,7.8,19.1,19.1,4.3,0.2,26.9,-6.2,1.1,100.9,92.4,8.5,156.8,17.3
+Guillem Tazo,Spanish Liga U,2026,Regular_Season,Advanced_Stats,VLU,.619,.554,156.0,5.2,13.5,9.5,20.9,25.0,3.1,0.6,19.2,-3.3,1.6,107.3,100.1,7.3,173.9,17.3
+Octavi Fuentes,Spanish Liga U,2026,Regular_Season,Advanced_Stats,GLU,.440,.448,90.9,9.1,15.7,12.2,16.6,14.8,6.6,0.9,18.1,-0.6,1.0,96.1,85.3,10.8,214.0,17.1
+Aiert Velasco,Spanish Liga U,2026,Regular_Season,Advanced_Stats,BLU,.538,.488,151.8,3.6,11.1,7.2,16.7,14.3,2.0,0.0,25.9,-3.2,1.2,108.0,103.1,4.8,114.6,17.0
+Tomas Talcis,Spanish Liga U,2026,Regular_Season,Advanced_Stats,VLU,.583,.529,153.7,8.3,14.4,11.5,11.4,17.6,1.3,1.6,20.8,-4.4,1.4,110.2,104.1,6.0,194.9,17.0
+Andrej Bjelic,Spanish Liga U,2026,Regular_Season,Advanced_Stats,RMLU,.491,.450,145.6,3.6,11.8,7.9,22.3,11.1,2.0,0.4,23.1,3.4,1.1,109.9,91.4,18.5,155.9,16.8
+Pol Coll Quintanas,Spanish Liga U,2026,Regular_Season,Advanced_Stats,GLU,.499,.483,122.0,9.9,15.6,12.6,25.7,25.4,5.8,0.7,15.9,0.2,1.1,100.4,87.2,13.1,228.5,16.8
+Daniel Rodriguez Ramos,Spanish Liga U,2026,Regular_Season,Advanced_Stats,BLU,.555,.536,136.5,7.6,12.8,10.0,6.7,8.0,2.6,1.4,16.7,-0.3,1.3,119.3,102.1,17.2,201.6,16.8
+Aleksandar Zecevic,Spanish Liga U,2026,Regular_Season,Advanced_Stats,BLU,.592,.590,131.4,10.5,14.5,12.5,9.2,19.6,1.6,0.8,20.1,-6.6,1.3,104.8,102.2,2.6,160.4,16.6
+Zeteny Kurfis,Spanish Liga U,2026,Regular_Season,Advanced_Stats,VLU,.710,.679,183.5,8.5,21.4,15.3,2.6,20.2,0.8,1.4,15.8,-6.7,2.0,119.8,101.3,18.5,21.1,16.3
+Alonso Reyes Abad,Spanish Liga U,2026,Regular_Season,Advanced_Stats,BLU,.509,.434,134.1,7.1,18.8,12.6,3.5,12.5,2.8,2.8,21.8,-5.1,1.3,103.4,98.5,4.9,144.9,16.3
+Bingen Errasti,Spanish Liga U,2026,Regular_Season,Advanced_Stats,BLU,.535,.482,154.3,4.3,12.4,8.3,24.0,23.1,4.6,0.0,23.0,-4.1,1.2,98.1,95.4,2.7,113.6,16.3
+Marcus Engelhardt,Spanish Liga U,2026,Regular_Season,Advanced_Stats,ULU,.501,.463,137.9,8.2,23.1,15.5,9.2,16.5,2.0,7.3,20.6,-4.9,1.1,96.4,96.5,-0.1,139.3,16.3
+David Acosta Moline,Spanish Liga U,2026,Regular_Season,Advanced_Stats,CCLU,.571,.606,110.3,16.0,19.3,17.7,4.8,13.7,0.7,2.6,14.0,-2.6,1.3,117.4,102.6,14.8,202.8,16.1
+Lucas Sanchez,Spanish Liga U,2026,Regular_Season,Advanced_Stats,BMLU,.471,.427,122.0,4.8,14.0,9.2,28.4,16.2,3.2,0.8,24.1,-0.4,1.1,95.9,98.9,-3.0,139.3,15.9
+Diego Niebla,Spanish Liga U,2026,Regular_Season,Advanced_Stats,JLU,.490,.432,134.2,2.7,12.1,7.0,16.7,14.6,3.4,1.6,27.2,-4.5,1.2,93.4,104.7,-11.3,90.4,15.7
+Ludvik Murer Bergseng,Spanish Liga U,2026,Regular_Season,Advanced_Stats,BMLU,.543,.524,150.6,8.5,17.5,12.6,9.1,14.4,1.6,1.7,19.1,-3.7,1.2,104.6,102.6,2.0,176.5,15.6
+Babel Yitu Lipasi,Spanish Liga U,2026,Regular_Season,Advanced_Stats,CCLU,.595,.588,113.0,14.7,17.0,15.9,2.2,18.3,1.8,2.7,16.1,-6.2,1.6,111.6,104.8,6.7,40.3,15.5
+Rodrigo Rioja Achiaga,Spanish Liga U,2026,Regular_Season,Advanced_Stats,RMLU,.620,.614,166.9,6.6,15.4,11.3,8.8,14.2,1.1,0.6,15.7,-1.4,1.3,119.4,89.7,29.7,60.0,15.5
+Erickson Americo Lima Teixeira,Spanish Liga U,2026,Regular_Season,Advanced_Stats,CCLU,.570,.565,109.9,11.3,19.9,15.8,5.8,11.7,0.6,1.8,15.1,-1.8,1.3,118.7,105.2,13.5,51.1,15.4
+Noyan Tolan,Spanish Liga U,2026,Regular_Season,Advanced_Stats,VLU,.500,.500,108.5,10.7,14.7,12.8,7.0,15.1,2.7,3.9,19.3,-4.3,1.1,99.5,99.9,-0.5,86.4,15.3
+Matija Lukic,Spanish Liga U,2026,Regular_Season,Advanced_Stats,CZLU,.552,.549,125.9,5.0,7.6,6.3,20.5,17.7,3.0,0.5,19.8,-0.2,1.4,105.1,99.6,5.5,154.1,15.2
+Jan Pumarola,Spanish Liga U,2026,Regular_Season,Advanced_Stats,BMLU,.529,.502,153.4,8.2,12.2,10.1,12.6,16.6,2.7,2.5,19.2,-3.7,1.1,101.7,99.5,2.2,176.1,15.2
+Aimar Mintegui,Spanish Liga U,2026,Regular_Season,Advanced_Stats,BLU,.476,.454,135.6,15.2,9.1,12.3,9.7,11.8,2.0,1.3,19.4,-2.1,1.0,106.6,102.8,3.9,87.3,15.1
+Alex Blanco,Spanish Liga U,2026,Regular_Season,Advanced_Stats,VLU,.440,.423,109.4,5.1,8.5,6.9,27.7,15.4,3.5,0.6,30.2,-1.5,1.0,92.2,101.7,-9.5,150.3,15.1
+Guillem Naspler,Spanish Liga U,2026,Regular_Season,Advanced_Stats,BMLU,.506,.425,129.9,5.3,14.7,9.7,13.5,17.6,3.5,0.4,23.4,-5.4,1.3,96.3,99.5,-3.2,165.8,15.0
+Marc Gustran,Spanish Liga U,2026,Regular_Season,Advanced_Stats,LLU,.573,.543,148.6,4.0,12.4,8.4,5.8,8.3,1.4,0.3,18.5,-1.6,1.3,115.1,102.2,12.9,94.5,14.9
+Ferran Torreblanca,Spanish Liga U,2026,Regular_Season,Advanced_Stats,BMLU,.489,.432,144.6,6.8,14.3,10.3,19.1,19.4,3.2,0.3,26.2,-6.0,1.1,92.8,100.1,-7.3,160.9,14.9
+Marcos Bella Cabanas,Spanish Liga U,2026,Regular_Season,Advanced_Stats,BLU,.536,.503,140.4,5.2,12.1,8.4,14.2,16.3,3.5,0.0,16.6,-0.4,1.2,108.0,100.4,7.6,180.6,14.8
+Humberto Ruiz,Spanish Liga U,2026,Regular_Season,Advanced_Stats,JLU,.524,.498,134.2,3.5,9.1,6.2,13.4,16.2,3.2,1.4,24.1,-4.9,1.2,95.7,103.8,-8.2,112.3,14.7
+Javier Valero Chica,Spanish Liga U,2026,Regular_Season,Advanced_Stats,ULU,.490,.457,129.2,13.1,16.2,14.6,4.8,14.8,2.1,2.6,20.3,-5.4,1.1,98.7,98.1,0.5,120.9,14.6
+Eetu Mikael Heinonen,Spanish Liga U,2026,Regular_Season,Advanced_Stats,GCLU,.490,.435,147.3,3.1,9.3,6.2,16.6,12.2,2.0,0.3,22.4,0.3,1.1,108.6,98.3,10.3,144.9,14.3
+Pablo Sevilla Navarro,Spanish Liga U,2026,Regular_Season,Advanced_Stats,UMLU,.533,.508,137.1,6.2,11.4,8.8,8.1,13.2,2.0,1.2,18.8,-3.0,1.3,105.5,97.7,7.8,135.5,14.2
+Alvaro Cativiela,Spanish Liga U,2026,Regular_Season,Advanced_Stats,CZLU,.576,.562,142.8,5.4,14.6,10.0,11.0,16.7,4.1,0.0,16.5,-2.2,1.3,107.4,93.7,13.7,101.6,14.1
+Amadou B. Traore,Spanish Liga U,2026,Regular_Season,Advanced_Stats,BLU,.524,.545,110.3,13.3,18.1,15.5,2.9,16.6,2.5,1.9,15.6,-5.0,1.3,102.9,99.9,3.0,155.5,13.8
+Marc Grau,Spanish Liga U,2026,Regular_Season,Advanced_Stats,VLU,.599,.525,156.0,9.7,13.3,11.6,10.9,24.5,2.8,0.5,13.6,-3.3,1.5,109.2,100.6,8.6,120.3,13.7
+Xavier Arredondo,Spanish Liga U,2026,Regular_Season,Advanced_Stats,LLU,.599,.610,107.5,17.8,19.1,18.5,2.6,23.9,0.8,2.2,13.6,-6.7,1.4,103.7,99.3,4.5,120.5,13.4
+Moussa Coulibaly,Spanish Liga U,2026,Regular_Season,Advanced_Stats,GCLU,.558,.611,93.5,12.7,18.0,15.4,3.1,18.8,1.1,2.6,16.1,-6.1,1.4,100.4,95.3,5.0,59.8,13.3
+Fabian Diaz,Spanish Liga U,2026,Regular_Season,Advanced_Stats,GCLU,.465,.452,111.9,3.5,8.8,6.2,19.6,20.4,4.9,0.8,17.7,-0.2,1.1,94.2,91.7,2.5,123.4,13.3
+Izan Soler Valenzuela,Spanish Liga U,2026,Regular_Season,Advanced_Stats,GLU,.543,.515,160.6,15.3,14.3,14.8,8.1,24.9,2.4,3.1,13.6,-5.2,1.3,101.5,94.9,6.6,141.4,13.2
+Alejandro Moreno,Spanish Liga U,2026,Regular_Season,Advanced_Stats,CZLU,.494,.443,132.8,3.0,8.9,6.0,28.6,20.2,2.3,0.3,22.1,1.0,1.2,98.8,99.9,-1.1,147.3,13.1
+Ilan Laville,Spanish Liga U,2026,Regular_Season,Advanced_Stats,VLU,.478,.420,137.8,4.2,5.1,4.7,21.0,14.1,2.1,0.0,22.8,0.5,1.1,101.6,106.2,-4.6,90.3,13.0
+Thibaut Nduku,Spanish Liga U,2026,Regular_Season,Advanced_Stats,UMLU,.591,.590,111.6,9.6,14.4,12.0,9.2,24.9,2.3,4.6,11.0,-2.9,1.3,104.4,95.0,9.4,103.1,12.6
+Gunars Grinvalds,Spanish Liga U,2026,Regular_Season,Advanced_Stats,RMLU,.481,.439,130.7,6.1,13.5,10.0,9.0,15.6,2.8,0.5,21.0,-3.9,1.1,98.3,90.7,7.7,93.5,12.6
+Alejandro Lozano Martinez,Spanish Liga U,2026,Regular_Season,Advanced_Stats,UMLU,.438,.406,97.1,13.5,12.2,12.9,6.2,15.9,4.2,1.0,18.3,-4.6,1.0,91.7,92.1,-0.4,46.9,12.6
+Jose Cazorla,Spanish Liga U,2026,Regular_Season,Advanced_Stats,ULU,.471,.426,129.9,3.8,11.2,7.5,16.6,15.8,3.5,0.8,15.8,0.5,1.1,97.2,96.9,0.3,67.6,12.5
+Izan Martos,Spanish Liga U,2026,Regular_Season,Advanced_Stats,LLU,.446,.431,115.9,5.4,13.5,9.6,11.5,14.4,4.5,0.8,18.0,-1.8,1.0,91.2,93.2,-2.0,84.4,12.4
+Ferran Julia Llamas,Spanish Liga U,2026,Regular_Season,Advanced_Stats,GLU,.564,.500,125.0,11.4,17.7,14.4,7.5,17.0,1.1,0.0,11.0,-1.5,1.4,117.1,93.8,23.3,12.3,12.4
+Samuel Nohel,Spanish Liga U,2026,Regular_Season,Advanced_Stats,UMLU,.476,.414,139.0,9.4,25.0,17.1,3.1,15.0,1.4,2.4,17.0,-4.9,1.1,97.8,96.0,1.8,90.6,12.3
+Louis Riga,Spanish Liga U,2026,Regular_Season,Advanced_Stats,CCLU,.456,.417,123.2,6.5,14.7,10.7,8.5,13.2,2.9,0.6,19.9,-2.7,1.1,98.7,102.0,-3.3,100.6,12.2
+Ramiro Rodriguez,Spanish Liga U,2026,Regular_Season,Advanced_Stats,BLU,.457,.415,122.3,5.1,10.4,7.6,20.3,19.4,3.8,0.1,17.6,0.7,1.1,96.4,100.6,-4.2,142.8,12.0
+Jan Cerdan Palacios,Spanish Liga U,2026,Regular_Season,Advanced_Stats,BLU,.492,.486,127.8,8.6,8.3,8.5,9.1,18.7,2.2,1.3,22.6,-6.5,1.0,93.2,96.6,-3.4,51.1,12.0
+Hugo Alonso,Spanish Liga U,2026,Regular_Season,Advanced_Stats,RMLU,.463,.376,130.0,2.7,10.9,7.0,22.8,21.9,3.4,0.5,15.7,2.6,1.1,99.1,87.9,11.2,115.0,11.9
+Javier Viguer Garcia de la Vega,Spanish Liga U,2026,Regular_Season,Advanced_Stats,VLU,.500,.476,140.0,3.7,13.6,8.8,9.0,16.8,1.9,1.3,20.2,-4.7,1.1,95.1,104.1,-9.0,109.8,11.9
+Joan Llinas Terradas,Spanish Liga U,2026,Regular_Season,Advanced_Stats,GLU,.440,.383,118.9,7.5,9.6,8.5,8.8,14.4,2.3,0.5,25.9,-6.0,1.1,92.6,97.4,-4.8,87.9,11.8
+Emilis Prekevicius,Spanish Liga U,2026,Regular_Season,Advanced_Stats,CCLU,.524,.500,159.7,3.6,7.0,5.3,10.9,17.7,2.1,1.1,16.0,-2.1,1.1,103.9,105.9,-2.1,74.4,11.8
+Daniel Osayi,Spanish Liga U,2026,Regular_Season,Advanced_Stats,VLU,.463,.347,120.7,11.0,15.4,13.3,4.5,17.5,3.4,1.6,16.4,-4.9,1.3,96.8,98.3,-1.5,71.3,11.7
+Jesus Garcia Cerezo,Spanish Liga U,2026,Regular_Season,Advanced_Stats,GLU,.484,.460,138.8,2.7,5.4,4.1,10.5,14.0,3.4,0.2,19.8,-3.3,1.0,97.2,105.8,-8.6,59.0,11.7
+Fernando Ramirez,Spanish Liga U,2026,Regular_Season,Advanced_Stats,UMLU,.501,.459,123.5,3.2,10.5,6.8,32.1,31.9,3.7,0.2,22.9,-5.4,1.2,84.6,94.5,-9.9,120.1,11.7
+Alonso De La Iglesia Galindo,Spanish Liga U,2026,Regular_Season,Advanced_Stats,ULU,.461,.440,122.7,2.1,5.2,3.6,17.9,17.7,3.4,0.5,22.9,-3.4,1.0,88.0,101.5,-13.6,66.9,11.7
+Ignacio Ruperez Nunez-Morgades,Spanish Liga U,2026,Regular_Season,Advanced_Stats,RMLU,.475,.445,116.4,11.1,4.1,7.4,7.4,15.4,2.6,0.3,16.9,-2.9,1.1,100.9,93.9,6.9,66.8,11.7
+Jose Tomas Martinez Sanchez,Spanish Liga U,2026,Regular_Season,Advanced_Stats,UMLU,.443,.436,104.4,8.4,13.8,11.1,11.9,15.9,3.6,0.6,19.6,-3.0,1.0,90.8,92.8,-2.0,102.4,11.6
+Kepa de Castro Hurtado,Spanish Liga U,2026,Regular_Season,Advanced_Stats,BLU,.432,.394,119.2,5.1,9.0,7.0,24.4,20.3,4.0,0.0,20.4,-0.3,1.0,92.2,98.6,-6.4,106.8,11.6
+Roger Villarejo,Spanish Liga U,2026,Regular_Season,Advanced_Stats,VLU,.509,.492,125.7,3.8,13.4,8.7,5.9,13.8,2.5,0.4,14.9,-2.5,1.2,100.5,97.4,3.0,51.5,11.6
+Joan Esqueu Porras,Spanish Liga U,2026,Regular_Season,Advanced_Stats,GLU,.488,.429,132.8,3.8,8.5,6.0,14.1,16.9,3.0,0.3,17.6,-1.7,1.2,101.6,96.6,5.0,73.3,11.5
+Daniel Gonzalez,Spanish Liga U,2026,Regular_Season,Advanced_Stats,BLU,.531,.467,148.8,4.7,12.2,8.7,21.8,33.5,3.5,0.0,11.3,0.9,1.2,99.1,89.6,9.5,171.9,11.3
+Ferran Mauri Guillen,Spanish Liga U,2026,Regular_Season,Advanced_Stats,JLU,.425,.378,129.5,3.5,7.1,5.2,22.5,12.9,2.3,0.1,26.7,-0.9,1.0,88.5,106.9,-18.4,99.4,11.3
+Osaretin Cerda Freire,Spanish Liga U,2026,Regular_Season,Advanced_Stats,GLU,.491,.475,98.3,13.3,19.3,16.4,5.6,28.3,1.2,7.0,18.4,-10.6,1.2,82.2,102.0,-19.8,134.6,11.3
+Eneko Fraco,Spanish Liga U,2026,Regular_Season,Advanced_Stats,BLU,.592,.554,122.0,8.2,14.6,11.2,4.1,23.3,2.0,0.4,16.6,-7.5,1.5,101.4,102.8,-1.4,37.8,11.3
+Diego Fernandez Trujillo,Spanish Liga U,2026,Regular_Season,Advanced_Stats,CCLU,.502,.453,136.0,2.7,7.2,5.0,15.3,17.1,1.6,0.2,18.4,-0.8,1.2,102.7,109.2,-6.5,88.9,11.2
+Rafael Rodriguez Galvan,Spanish Liga U,2026,Regular_Season,Advanced_Stats,CCLU,.448,.418,139.8,1.7,7.0,4.4,20.6,14.3,1.4,0.5,19.9,1.9,1.0,100.0,108.6,-8.7,132.1,11.1
+Fabian Kayser,Spanish Liga U,2026,Regular_Season,Advanced_Stats,RMLU,.461,.396,150.3,4.1,12.7,8.7,13.2,19.1,2.5,1.0,22.8,-4.6,1.0,91.7,87.8,3.9,79.4,11.1
+Roy Ikponmwosa Bozano,Spanish Liga U,2026,Regular_Season,Advanced_Stats,ULU,.430,.409,98.1,11.0,17.0,14.0,5.4,15.3,2.0,5.1,12.8,-2.5,0.9,92.7,96.8,-4.1,77.0,11.1
+Eduard Galatanu,Spanish Liga U,2026,Regular_Season,Advanced_Stats,LLU,.528,.500,111.1,9.5,14.5,12.0,1.0,18.9,2.8,0.5,15.2,-6.4,1.2,95.2,97.6,-2.4,38.0,11.0
+Matej Buben,Spanish Liga U,2026,Regular_Season,Advanced_Stats,JLU,.480,.448,122.4,6.8,12.3,9.4,10.5,17.5,2.2,1.5,18.0,-3.7,1.1,91.9,103.0,-11.0,81.9,10.9
+Nil Poza Cervantes,Spanish Liga U,2026,Regular_Season,Advanced_Stats,BLU,.492,.454,143.8,1.3,6.6,4.2,25.4,21.0,2.5,0.0,15.1,3.6,1.1,104.9,94.7,10.2,134.0,10.9
+Axel Serkan,Spanish Liga U,2026,Regular_Season,Advanced_Stats,GLU,.569,.542,126.4,8.9,15.0,11.8,3.9,27.3,2.2,2.8,14.1,-8.1,1.3,93.3,93.8,-0.5,66.8,10.6
+Hugo Diaz Guillen,Spanish Liga U,2026,Regular_Season,Advanced_Stats,GCLU,.548,.574,101.5,7.7,8.3,8.0,6.2,17.0,2.8,0.0,11.7,-2.2,1.2,105.5,94.9,10.6,26.4,10.6
+Shalev Lederman,Spanish Liga U,2026,Regular_Season,Advanced_Stats,BMLU,.525,.511,140.9,4.6,9.8,6.9,10.7,19.1,1.2,0.0,19.6,-5.1,1.1,93.8,109.9,-16.1,20.3,10.5
+Enric Sanmartin,Spanish Liga U,2026,Regular_Season,Advanced_Stats,GLU,.443,.434,108.2,5.0,15.1,9.8,8.9,21.3,4.2,0.2,23.0,-8.9,1.0,82.1,90.3,-8.2,84.1,10.3
+Tariq Thomas,Spanish Liga U,2026,Regular_Season,Advanced_Stats,JLU,.469,.422,133.4,6.8,14.6,10.6,3.8,20.3,3.3,3.1,18.7,-7.7,1.1,83.7,100.7,-17.0,39.5,10.2
+Bru Pallas,Spanish Liga U,2026,Regular_Season,Advanced_Stats,LLU,.511,.481,130.9,6.7,8.5,7.6,9.5,16.8,2.5,0.8,13.7,-1.8,1.2,100.3,102.4,-2.1,62.4,10.2
+Dario Lozano,Spanish Liga U,2026,Regular_Season,Advanced_Stats,UMLU,.466,.434,121.0,5.8,9.4,7.6,5.3,17.1,3.0,0.4,18.8,-5.7,1.1,89.2,97.4,-8.3,37.6,10.2
+Kevin Macias Book,Spanish Liga U,2026,Regular_Season,Advanced_Stats,JLU,.437,.420,103.9,12.3,16.0,14.1,5.7,18.3,1.6,1.0,15.4,-4.6,0.9,87.9,104.5,-16.5,136.0,10.1
+Antonio Martinez Sancho,Spanish Liga U,2026,Regular_Season,Advanced_Stats,ULU,.501,.490,120.1,3.5,7.4,5.5,21.6,32.2,4.0,0.4,13.8,-1.8,1.2,85.7,99.3,-13.6,57.8,10.1
+Eric del Castillo Lindo,Spanish Liga U,2026,Regular_Season,Advanced_Stats,JLU,.435,.400,125.6,6.0,12.5,9.1,14.6,17.1,2.0,1.6,17.8,-2.1,1.0,87.3,104.5,-17.2,131.3,10.0
+Torres Ferrer R.,Spanish Liga U,2026,Regular_Season,Advanced_Stats,JLU,.536,.466,144.2,7.2,9.5,8.3,5.9,25.0,1.8,0.0,22.5,-11.1,1.3,88.0,105.0,-17.0,16.9,9.8
+Gavin Baez,Spanish Liga U,2026,Regular_Season,Advanced_Stats,GCLU,.436,.399,127.8,5.2,10.6,8.0,8.5,15.0,3.3,0.8,16.2,-2.1,1.0,94.8,93.9,0.9,80.9,9.8
+Gabriel Tavier,Spanish Liga U,2026,Regular_Season,Advanced_Stats,RMLU,.480,.469,113.5,6.6,9.0,7.9,12.0,15.3,2.8,0.0,9.0,2.6,1.0,111.4,88.0,23.3,38.9,9.7
+Javier Rodriguez Laguna,Spanish Liga U,2026,Regular_Season,Advanced_Stats,BLU,.388,.321,131.0,9.2,16.4,12.8,15.7,17.7,2.1,1.8,17.5,-0.8,0.9,90.9,99.5,-8.7,55.4,9.6
+Osagioduwa Hadi Adegbite,Spanish Liga U,2026,Regular_Season,Advanced_Stats,RMLU,.559,.536,126.7,2.6,10.8,6.9,13.8,32.5,3.2,0.8,15.8,-6.0,1.3,87.9,88.1,-0.2,43.6,9.4
+Aner Sardui,Spanish Liga U,2026,Regular_Season,Advanced_Stats,BLU,.490,.480,133.0,4.3,7.5,5.8,8.2,16.3,1.6,0.5,19.0,-4.5,1.0,96.4,104.7,-8.3,49.5,9.2
+Francisco Romero Garcia,Spanish Liga U,2026,Regular_Season,Advanced_Stats,GLU,.630,.638,116.0,12.0,11.4,11.7,3.8,35.2,1.9,0.9,12.1,-8.8,1.5,90.2,106.7,-16.5,53.9,9.0
+Luca Medal Coppini,Spanish Liga U,2026,Regular_Season,Advanced_Stats,GLU,.432,.376,126.4,1.8,9.0,5.5,27.5,25.7,2.7,0.1,23.4,-5.6,1.0,80.0,106.2,-26.2,88.0,8.8
+Sergi Juher Valdayo,Spanish Liga U,2026,Regular_Season,Advanced_Stats,GLU,.421,.389,120.0,4.4,8.3,6.3,14.2,18.4,3.1,0.3,20.5,-3.8,0.9,87.9,96.3,-8.4,38.4,8.8
+Carlos Alias,Spanish Liga U,2026,Regular_Season,Advanced_Stats,CZLU,.380,.365,94.9,4.5,13.7,9.2,19.7,16.2,2.5,0.1,18.7,1.0,0.8,85.3,97.5,-12.2,122.9,8.7
+Marc Rosell,Spanish Liga U,2026,Regular_Season,Advanced_Stats,BMLU,.402,.385,124.4,4.8,11.1,7.7,8.7,11.8,2.3,0.7,18.0,-2.0,0.8,86.0,103.3,-17.3,98.9,8.6
+Jordi Salo,Spanish Liga U,2026,Regular_Season,Advanced_Stats,BMLU,.541,.578,90.1,8.6,9.2,8.9,8.2,24.4,3.0,0.5,9.0,-2.2,1.3,98.6,102.2,-3.6,82.1,8.6
+Roger Fernandez,Spanish Liga U,2026,Regular_Season,Advanced_Stats,LLU,.479,.465,133.6,4.8,15.7,10.6,14.3,29.0,2.1,1.7,16.5,-5.8,1.2,80.3,99.7,-19.3,59.6,8.4
+Jakob Siftar,Spanish Liga U,2026,Regular_Season,Advanced_Stats,BLU,.439,.376,137.7,4.2,11.3,8.0,13.9,23.1,2.2,1.0,21.4,-5.9,1.0,85.5,91.4,-5.9,60.5,8.4
+Alex Muncunill,Spanish Liga U,2026,Regular_Season,Advanced_Stats,BMLU,.397,.380,120.2,7.3,10.9,8.9,14.7,15.1,1.4,0.8,14.3,0.0,0.8,89.4,105.0,-15.6,65.1,8.3
+Manuel Trujillo,Spanish Liga U,2026,Regular_Season,Advanced_Stats,ULU,.388,.348,119.4,3.0,14.6,8.8,25.1,23.0,1.7,0.1,13.6,3.3,0.9,86.9,101.1,-14.3,144.3,8.3
+Miguel Martinez Lopez,Spanish Liga U,2026,Regular_Season,Advanced_Stats,ULU,.368,.346,113.8,3.4,11.2,7.2,11.7,11.3,2.5,1.0,17.8,-0.3,0.8,82.4,101.3,-19.0,79.9,8.2
+Albert Marva,Spanish Liga U,2026,Regular_Season,Advanced_Stats,LLU,.404,.372,148.8,3.8,9.0,6.4,11.6,15.9,2.7,0.2,21.4,-3.9,0.9,81.1,102.2,-21.1,45.0,8.1
+Gregory Graae Barbosa,Spanish Liga U,2026,Regular_Season,Advanced_Stats,JLU,.541,.514,110.3,8.8,17.6,13.0,5.1,28.6,1.6,1.8,9.0,-4.1,1.3,93.4,103.6,-10.2,57.4,8.1
+Victor Iglesias,Spanish Liga U,2026,Regular_Season,Advanced_Stats,VLU,.436,.397,115.0,3.1,6.8,5.0,19.4,26.3,2.8,0.0,12.5,0.7,1.1,88.8,105.2,-16.3,55.6,8.0
+Soumalia Keita,Spanish Liga U,2026,Regular_Season,Advanced_Stats,CZLU,.473,.422,98.7,11.7,16.0,13.9,0.9,24.0,1.3,3.1,18.5,-10.3,1.2,84.4,97.6,-13.2,49.0,8.0
+Jason Mettes,Spanish Liga U,2026,Regular_Season,Advanced_Stats,UMLU,.494,.458,98.5,7.1,10.2,8.6,1.2,21.8,2.6,0.7,13.0,-6.2,1.3,88.2,95.0,-6.8,18.4,8.0
+Alfonso Rodriguez,Spanish Liga U,2026,Regular_Season,Advanced_Stats,ULU,.435,.414,107.2,10.0,18.9,14.5,5.2,22.1,1.2,1.6,21.8,-9.5,1.0,79.3,99.2,-19.9,52.8,7.9
+Aleksandr Panasiuk,Spanish Liga U,2026,Regular_Season,Advanced_Stats,GCLU,.417,.306,112.3,2.7,10.2,6.6,17.3,22.5,1.7,0.6,20.0,-3.0,1.1,86.6,92.1,-5.5,35.6,7.8
+Sergi Mestre,Spanish Liga U,2026,Regular_Season,Advanced_Stats,LLU,.460,.379,137.9,2.8,9.7,6.4,21.6,33.0,3.4,0.5,17.5,-5.4,1.1,77.7,100.2,-22.5,56.9,7.7
+Diego Ferreras,Spanish Liga U,2026,Regular_Season,Advanced_Stats,BLU,.379,.361,102.1,5.2,8.4,6.9,10.9,15.7,3.3,0.2,20.8,-3.2,0.8,84.2,90.9,-6.7,51.4,7.6
+Anton Alana Umzue,Spanish Liga U,2026,Regular_Season,Advanced_Stats,BLU,.391,.378,94.5,9.2,12.7,10.9,9.9,18.4,2.3,1.2,16.2,-3.3,0.9,84.9,100.4,-15.5,55.4,7.4
+Marc Ros Marimon,Spanish Liga U,2026,Regular_Season,Advanced_Stats,LLU,.439,.378,113.2,3.4,10.1,6.9,16.3,27.8,3.7,0.0,18.5,-5.6,1.1,77.6,99.5,-21.9,39.0,7.3
+Jorge Arteaga Giner,Spanish Liga U,2026,Regular_Season,Advanced_Stats,GCLU,.436,.385,138.3,7.8,11.9,9.9,5.2,15.7,1.1,0.0,13.7,-2.8,1.0,97.1,98.0,-1.0,43.5,7.3
+Haritz Mateo,Spanish Liga U,2026,Regular_Season,Advanced_Stats,BLU,.412,.392,123.8,7.6,14.8,11.1,5.2,13.2,1.6,0.0,15.0,-2.7,0.9,93.0,101.2,-8.2,41.3,7.3
+Aksel Laso,Spanish Liga U,2026,Regular_Season,Advanced_Stats,BLU,.383,.344,112.4,2.3,10.7,6.2,26.3,32.7,3.4,0.6,15.1,0.6,0.9,79.6,101.2,-21.6,84.0,7.2
+Matus Rybar,Spanish Liga U,2026,Regular_Season,Advanced_Stats,UMLU,.484,.435,150.9,1.9,8.5,5.1,12.4,24.5,1.9,0.0,22.0,-8.3,1.1,83.3,99.0,-15.7,28.5,7.2
+Manuel Garcia Varona,Spanish Liga U,2026,Regular_Season,Advanced_Stats,BLU,.304,.304,40.8,9.3,13.9,11.5,8.7,15.2,2.8,0.0,11.0,0.3,0.6,85.3,100.3,-15.0,24.3,7.2
+Juan Garcia Sanchez,Spanish Liga U,2026,Regular_Season,Advanced_Stats,CZLU,.393,.363,125.7,4.2,9.6,6.9,21.8,29.0,3.6,0.0,15.8,-1.4,0.8,79.3,96.9,-17.6,82.1,7.1
+Ivan Montull,Spanish Liga U,2026,Regular_Season,Advanced_Stats,LLU,.485,.398,131.9,2.1,8.8,5.6,15.1,25.7,1.5,0.0,16.7,-4.0,1.2,86.6,104.3,-17.6,57.0,7.1
+Bruno Jekabsons,Spanish Liga U,2026,Regular_Season,Advanced_Stats,BMLU,.428,.411,123.7,2.2,4.4,3.2,7.3,12.8,1.6,0.0,19.9,-3.6,0.9,84.0,108.8,-24.9,13.9,7.0
+Jorge Zamora,Spanish Liga U,2026,Regular_Season,Advanced_Stats,GLU,.455,.413,128.2,4.0,12.9,8.5,15.8,38.0,3.8,1.1,17.2,-10.3,1.0,68.6,97.9,-29.4,46.3,7.0
+Ruben Valero Lopez,Spanish Liga U,2026,Regular_Season,Advanced_Stats,CZLU,.419,.420,91.4,4.8,8.5,6.7,10.5,17.8,2.0,0.3,18.1,-3.4,0.9,82.5,100.0,-17.4,33.3,6.9
+Manuel Perez Gundin,Spanish Liga U,2026,Regular_Season,Advanced_Stats,BLU,.500,.500,50.0,6.6,7.2,6.9,2.9,9.1,1.0,0.0,9.4,-0.7,1.0,109.2,106.0,3.2,5.3,6.8
+Marc Julia,Spanish Liga U,2026,Regular_Season,Advanced_Stats,JLU,.508,.410,130.4,1.7,7.0,4.2,14.8,32.9,2.9,0.4,16.3,-7.2,1.5,78.9,103.8,-24.9,21.4,6.7
+Manuel Crujeiras,Spanish Liga U,2026,Regular_Season,Advanced_Stats,CCLU,.420,.435,76.8,11.1,14.8,13.0,0.0,16.3,1.1,1.1,17.1,-6.8,1.1,84.5,99.5,-15.0,7.0,6.5
+Rafael Diaz Morales,Spanish Liga U,2026,Regular_Season,Advanced_Stats,GLU,.434,.381,118.8,2.3,5.8,4.1,6.9,18.8,2.3,0.5,20.4,-6.9,1.0,82.1,103.4,-21.3,6.6,6.4
+Eloy Suarez Bollen,Spanish Liga U,2026,Regular_Season,Advanced_Stats,ULU,.402,.340,145.6,9.3,7.1,8.2,7.8,19.0,1.5,0.0,12.0,-2.4,1.0,86.9,106.3,-19.5,16.4,6.4
+Oriol Filba,Spanish Liga U,2026,Regular_Season,Advanced_Stats,BLU,.450,.432,128.7,1.3,6.8,4.3,19.5,30.5,2.1,0.0,13.0,-0.7,1.0,85.4,94.9,-9.4,58.3,6.4
+Diego Berruga Saez,Spanish Liga U,2026,Regular_Season,Advanced_Stats,UMLU,.450,.407,112.9,4.1,8.3,6.2,14.5,29.2,2.1,0.3,19.9,-8.2,1.1,76.6,98.7,-22.1,27.3,6.4
+Dario Parra Gomez,Spanish Liga U,2026,Regular_Season,Advanced_Stats,UMLU,.365,.335,109.0,4.2,11.6,7.9,4.3,12.7,2.6,0.9,16.2,-3.1,0.8,78.8,95.5,-16.8,30.8,6.2
+Adolfo Nuno,Spanish Liga U,2026,Regular_Season,Advanced_Stats,ULU,.405,.390,106.6,3.5,10.4,6.9,12.8,22.0,2.4,0.0,18.4,-4.7,0.9,76.3,102.4,-26.1,20.9,5.9
+Pau Bermejo,Spanish Liga U,2026,Regular_Season,Advanced_Stats,JLU,.461,.469,84.9,4.7,17.6,11.0,6.6,26.5,1.2,0.5,17.5,-8.7,0.9,74.1,101.8,-27.7,17.5,5.9
+Pedro Pasqua,Spanish Liga U,2026,Regular_Season,Advanced_Stats,GCLU,.388,.375,101.3,4.5,6.8,5.7,7.5,18.4,2.5,0.0,14.7,-3.1,0.9,81.2,98.8,-17.6,13.4,5.7
+Miguel Leitao Ribeiro,Spanish Liga U,2026,Regular_Season,Advanced_Stats,VLU,.472,.444,102.8,5.5,11.8,8.7,0.0,21.0,1.1,1.7,12.2,-6.1,1.1,84.7,101.7,-17.0,15.5,5.5
+Gonzalo Cabera Mujica,Spanish Liga U,2026,Regular_Season,Advanced_Stats,GCLU,.350,.318,143.9,0.0,12.7,6.8,8.8,8.0,1.3,0.0,12.8,0.9,0.7,93.1,99.3,-6.2,2.6,5.0
+Guillermo Bravo,Spanish Liga U,2026,Regular_Season,Advanced_Stats,BLU,.440,.325,115.7,5.3,7.5,6.4,9.3,25.6,2.6,0.0,12.5,-3.7,1.2,85.2,101.9,-16.7,6.3,5.0
+Juan Garcia Correa,Spanish Liga U,2026,Regular_Season,Advanced_Stats,GLU,.360,.332,103.5,4.4,9.1,6.8,4.8,19.7,2.8,0.0,14.3,-5.0,0.8,71.6,106.4,-34.8,34.8,4.8
+Marti Gil,Spanish Liga U,2026,Regular_Season,Advanced_Stats,JLU,.453,.436,115.0,1.3,7.2,4.1,26.4,38.4,1.7,0.9,16.9,-5.8,1.2,69.8,112.3,-42.5,23.6,4.4
+Jorge Prieto,Spanish Liga U,2026,Regular_Season,Advanced_Stats,CZLU,.351,.338,110.3,4.6,10.8,7.8,8.8,16.2,1.0,0.4,8.7,0.6,0.7,85.4,100.4,-15.0,24.9,4.2
+Manuel Veintimilla Comes,Spanish Liga U,2026,Regular_Season,Advanced_Stats,VLU,.327,.316,96.3,6.7,6.7,6.7,0.0,20.1,4.4,0.0,13.0,-6.3,0.7,67.3,103.8,-36.6,4.3,4.1
+Cristobal Vivanco,Spanish Liga U,2026,Regular_Season,Advanced_Stats,GLU,.403,.369,142.3,1.0,7.6,4.4,18.2,28.7,2.1,0.7,22.3,-9.0,0.9,70.0,111.8,-41.8,8.8,3.8
+Julen Gascon,Spanish Liga U,2026,Regular_Season,Advanced_Stats,BLU,.443,.333,132.8,3.5,13.2,8.1,5.9,26.8,0.6,0.0,21.8,-12.3,1.1,79.6,101.8,-22.2,-0.6,3.4
+Ivan Gonzalez,Spanish Liga U,2026,Regular_Season,Advanced_Stats,GLU,.363,.333,83.3,5.7,8.9,7.3,6.8,26.7,2.4,2.1,13.9,-6.5,0.8,67.0,106.8,-39.9,6.0,3.4
+Antonio Perez Lopez,Spanish Liga U,2026,Regular_Season,Advanced_Stats,CCLU,.322,.250,102.1,2.4,5.8,4.1,10.2,21.2,1.7,1.0,10.9,-0.4,0.8,77.7,109.7,-32.0,4.0,3.0
+Pau Batlle,Spanish Liga U,2026,Regular_Season,Advanced_Stats,JLU,.287,.263,105.9,3.3,11.8,7.4,11.5,16.1,1.0,0.6,14.7,-1.4,0.6,63.9,103.3,-39.5,5.5,2.4
+Eric Montaner Garcia,Spanish Liga U,2026,Regular_Season,Advanced_Stats,BLU,.312,.200,103.3,1.2,3.8,2.7,4.3,18.5,2.9,0.0,9.0,-2.0,0.7,70.8,90.9,-20.1,0.5,2.2
+Marti Ibars,Spanish Liga U,2026,Regular_Season,Advanced_Stats,LLU,.353,.300,92.5,3.7,7.4,5.6,7.8,26.8,1.3,0.2,11.3,-3.9,0.8,68.0,105.2,-37.1,10.0,2.0
+Victor Puertollano,Spanish Liga U,2026,Regular_Season,Advanced_Stats,GLU,.379,.384,75.1,1.4,4.5,3.0,9.2,21.0,0.6,0.4,17.2,-5.5,0.8,72.2,111.8,-39.6,-6.1,1.5
+Marc Oliver,Spanish Liga U,2026,Regular_Season,Advanced_Stats,GCLU,.315,.313,77.6,1.6,3.8,2.7,3.1,10.8,0.7,0.7,14.1,-2.2,0.7,72.4,99.4,-27.0,-5.9,0.7
+Ise Christain Francisco,Spanish Liga U,2026,Regular_Season,Advanced_Stats,BMLU,.347,.297,98.7,2.2,8.9,5.3,22.6,30.7,2.3,0.2,25.5,-10.5,0.8,61.6,103.6,-41.9,-21.3,0.6
+Guillem Ecker Albert,Spanish Liga U,2026,Regular_Season,Advanced_Stats,BMLU,.246,.222,93.9,1.5,15.9,8.1,3.6,15.5,1.3,0.5,15.3,-4.3,0.5,52.3,103.5,-51.2,-9.6,-0.5
+Max Olvera Gimenez,Spanish Liga U,2026,Regular_Season,Advanced_Stats,BMLU,.237,.237,32.2,8.7,4.6,6.7,4.7,29.6,2.7,0.0,15.5,-9.1,0.5,49.0,105.1,-56.1,-6.0,-1.8
+David Delgado Saura,Spanish Liga U,2026,Regular_Season,Advanced_Stats,CCLU,.255,.250,57.5,3.7,8.9,6.3,7.7,37.3,0.9,0.0,14.2,-9.3,0.6,47.2,107.8,-60.6,-6.3,-3.7

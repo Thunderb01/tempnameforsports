@@ -7,7 +7,7 @@ function fmt(val, key) {
   if (val === null || val === undefined || val === "" || (typeof val === "number" && isNaN(val)) || val === "NaN") return "—";
   const str = ["school"];
   if (str.includes(key)) return val;
-  const pct = ["fg_pct","ft_pct","3p_pct"];
+  const pct = ["fg_pct","ft_pct","3p_pct","usg","torvik_usg","torvik_ts","torvik_efg","torvik_to_pct","torvik_ast_pct","torvik_blk_pct","torvik_stl_pct","torvik_orb_pct","torvik_drb_pct"];
   if (pct.includes(key)) return `${Number(val).toFixed(1)}%`;
   if (key === "torvik_rim_pct") return `${(Number(val) * 100).toFixed(1)}%`;
   return Number(val) % 1 === 0 ? Number(val).toFixed(0) : Number(val).toFixed(1);
@@ -16,14 +16,27 @@ function fmt(val, key) {
 const STAT_ROWS = [
   { key: "school",        label: "School" },
   { key: "calendar_year", label: "Season" },
-  { key: "usg",           label: "USG" },
-  { key: "ppg",           label: "PPG" },
-  { key: "rpg",           label: "RPG" },
-  { key: "apg",           label: "APG" },
+  { key: "ppg",           label: "PTS/G" },
+  { key: "rpg",           label: "REB/G" },
+  { key: "apg",           label: "AST/G" },
   { key: "ast_tov",       label: "AST/TOV" },
   { key: "fg_pct",        label: "FG%" },
   { key: "3p_pct",        label: "3P%" },
   { key: "ft_pct",        label: "FT%" },
+];
+
+const ADV_ROWS = [
+  { key: "school",          label: "School" },
+  { key: "calendar_year",   label: "Season" },
+  { key: "torvik_usg",      label: "USG%" },
+  { key: "torvik_ts",       label: "TS%" },
+  { key: "torvik_efg",      label: "eFG%" },
+  { key: "torvik_to_pct",   label: "TO%" },
+  { key: "torvik_ast_pct",  label: "AST%" },
+  { key: "torvik_blk_pct",  label: "BLK%" },
+  { key: "torvik_stl_pct",  label: "STL%" },
+  { key: "torvik_orb_pct",  label: "ORB%" },
+  { key: "torvik_drb_pct",  label: "DRB%" },
 ];
 
 // const ADV_ROWS = [
@@ -137,6 +150,7 @@ export function PlayerModal({ player, onClose }) {
   const [stats, setStats] = useState(null);
   const [loadingStats, setLoadingStats] = useState(true);
   const [profileIdx, setProfileIdx] = useState(0);
+  const [showAdv, setShowAdv] = useState(false);
 
   useEffect(() => {
     function onKey(e) { if (e.key === "Escape") onClose(); }
@@ -218,13 +232,40 @@ export function PlayerModal({ player, onClose }) {
           </div>
 
           <div className="modal-section">
-            <h4>Stats</h4>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+              <h4 style={{ margin: 0 }}>Stats</h4>
+              {stats && (
+                <button
+                  onClick={() => setShowAdv(v => !v)}
+                  style={{
+                    fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 20, cursor: "pointer", border: "1px solid",
+                    background: showAdv ? "rgba(91,156,246,.2)" : "transparent",
+                    color:      showAdv ? "#5b9cf6" : "rgba(255,255,255,.4)",
+                    borderColor: showAdv ? "rgba(91,156,246,.5)" : "rgba(255,255,255,.15)",
+                    transition: "all .15s",
+                  }}
+                >
+                  Advanced
+                </button>
+              )}
+            </div>
+            {stats && stats[0]?.torvik_min_pct != null && stats[0].torvik_min_pct < 30 && (
+              <div style={{
+                display: "flex", alignItems: "flex-start", gap: 8,
+                background: "rgba(251,191,36,.07)", border: "1px solid rgba(251,191,36,.25)",
+                borderRadius: 8, padding: "8px 12px", marginBottom: 10, fontSize: 12,
+              }}>
+                <span style={{ color: "#fbbf24", flexShrink: 0, marginTop: 1 }}>⚠</span>
+                <span style={{ color: "rgba(255,255,255,.6)", lineHeight: 1.5 }}>
+                  Small sample — this player logged under 30% of team minutes ({stats[0].torvik_min_pct?.toFixed(1)}%). Stats and metrics may not be inconsistent.
+                </span>
+              </div>
+            )}
             {loadingStats ? (
               <div style={{ opacity: .4, fontSize: 13 }}>Loading…</div>
             ) : !stats ? (
               <div style={{ opacity: .4, fontSize: 13 }}>No stats on file.</div>
             ) : (
-              <>
               <div style={{ overflowX: "auto" }}>
                 <table style={{ borderCollapse: "collapse", fontSize: 12, whiteSpace: "nowrap" }}>
                   <thead>
@@ -246,36 +287,34 @@ export function PlayerModal({ player, onClose }) {
                         ))}
                       </tr>
                     ))}
+                    {showAdv && (
+                      <>
+                        <tr>
+                          <td colSpan={STAT_ROWS.length} style={{ padding: "10px 10px 4px", opacity: .35, fontSize: 11, fontWeight: 600, letterSpacing: ".06em", textTransform: "uppercase" }}>
+                            Advanced
+                          </td>
+                        </tr>
+                        <tr>
+                          {ADV_ROWS.map(({ key, label }) => (
+                            <th key={key} style={{ padding: "4px 10px", opacity: .5, fontWeight: 600, textAlign: "center", borderBottom: "1px solid rgba(255,255,255,.1)" }}>
+                              {label}
+                            </th>
+                          ))}
+                        </tr>
+                        {stats.map((row, i) => (
+                          <tr key={`adv-${row.calendar_year ?? i}`} style={i > 0 ? { opacity: 0.55 } : {}}>
+                            {ADV_ROWS.map(({ key }) => (
+                              <td key={key} style={{ padding: "6px 10px", textAlign: "center", fontVariantNumeric: "tabular-nums", fontWeight: 600 }}>
+                                {fmt(row[key], key)}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </>
+                    )}
                   </tbody>
                 </table>
               </div>
-
-              {/* <div style={{ marginTop: 16 }}>
-                <div style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: ".06em", opacity: .4, marginBottom: 8, fontWeight: 500 }}>Beyond the Portal Metrics (BtPM)</div>
-                <div style={{ overflowX: "auto" }}>
-                  <table style={{ borderCollapse: "collapse", fontSize: 12, whiteSpace: "nowrap" }}>
-                    <thead>
-                      <tr>
-                        {ADV_ROWS.map(({ key, label }) => (
-                          <th key={key} style={{ padding: "4px 10px", opacity: .5, fontWeight: 600, textAlign: "center", borderBottom: "1px solid rgba(255,255,255,.1)" }}>
-                            {label}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        {ADV_ROWS.map(({ key }) => (
-                          <td key={key} style={{ padding: "6px 10px", textAlign: "center", fontVariantNumeric: "tabular-nums", fontWeight: 600 }}>
-                            {fmt(stats[key], key)}
-                          </td>
-                        ))}
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div> */}
-              </>
             )}
           </div>
 

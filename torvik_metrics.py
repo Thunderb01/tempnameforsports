@@ -35,6 +35,16 @@ Prerequisites — run once in Supabase SQL Editor:
     ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS torvik_adjoe float;
     ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS torvik_min_pct float;
     ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS torvik_gp int;
+    ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS torvik_blk_pct float;
+    ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS torvik_stl_pct float;
+    ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS torvik_ftr float;
+    ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS torvik_pfr float;
+    ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS torvik_adrtg float;
+    ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS torvik_dporpag float;
+    ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS torvik_ogbpm float;
+    ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS torvik_dgbpm float;
+    ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS torvik_gbpm float;
+    ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS torvik_rec_rank float;
     ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS cdi float;
     ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS dds float;
     ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS sei float;
@@ -1068,26 +1078,36 @@ def main():
         _ft_pct  = round((safe(row.get("FT_per")) or 0) * 100, 1) if safe(row.get("FT_per")) is not None else None
 
         torvik = {
-            "torvik_ortg":   safe(row.get("ORtg")),
-            "torvik_usg":    safe(row.get("usg")),
-            "torvik_efg":    safe(row.get("eFG")),
-            "torvik_ts":     safe(row.get("TS_per")),
-            "torvik_obpm":   safe(row.get("obpm")),
-            "torvik_dbpm":   safe(row.get("dbpm")),
-            "torvik_bpm":    safe(row.get("bpm")),
-            "torvik_drtg":   safe(row.get("drtg")),
-            "torvik_stops":  safe(row.get("stops")),
-            "torvik_ast_pct":safe(row.get("AST_per")),
-            "torvik_to_pct": safe(row.get("TO_per")),
-            "torvik_orb_pct":safe(row.get("ORB_per")),
-            "torvik_drb_pct":safe(row.get("DRB_per")),
-            "torvik_rim_pct":safe(row.get("rimmade/(rimmade+rimmiss)")),
-            "torvik_mid_pct":safe(row.get("midmade/(midmade+midmiss)")),
-            "torvik_3p_pct": safe(row.get("TP_per")),
-            "torvik_porpag": safe(row.get("porpag")),
-            "torvik_adjoe":  safe(row.get("adjoe")),
-            "torvik_min_pct":safe(row.get("Min_per")),
-            "torvik_gp":     _gp,
+            "torvik_ortg":    safe(row.get("ORtg")),
+            "torvik_usg":     safe(row.get("usg")),
+            "torvik_efg":     safe(row.get("eFG")),
+            "torvik_ts":      safe(row.get("TS_per")),
+            "torvik_obpm":    safe(row.get("obpm")),
+            "torvik_dbpm":    safe(row.get("dbpm")),
+            "torvik_bpm":     safe(row.get("bpm")),
+            "torvik_drtg":    safe(row.get("drtg")),
+            "torvik_stops":   safe(row.get("stops")),
+            "torvik_ast_pct": safe(row.get("AST_per")),
+            "torvik_to_pct":  safe(row.get("TO_per")),
+            "torvik_orb_pct": safe(row.get("ORB_per")),
+            "torvik_drb_pct": safe(row.get("DRB_per")),
+            "torvik_rim_pct": safe(row.get("rimmade/(rimmade+rimmiss)")),
+            "torvik_mid_pct": safe(row.get("midmade/(midmade+midmiss)")),
+            "torvik_3p_pct":  safe(row.get("TP_per")),
+            "torvik_porpag":  safe(row.get("porpag")),
+            "torvik_adjoe":   safe(row.get("adjoe")),
+            "torvik_min_pct": safe(row.get("Min_per")),
+            "torvik_gp":      _gp,
+            "torvik_blk_pct": safe(row.get("blk_per")),
+            "torvik_stl_pct": safe(row.get("stl_per")),
+            "torvik_ftr":     safe(row.get("ftr")),
+            "torvik_pfr":     safe(row.get("pfr")),
+            "torvik_adrtg":   safe(row.get("adrtg")),
+            "torvik_dporpag": safe(row.get("dporpag")),
+            "torvik_ogbpm":   safe(row.get("ogbpm")),
+            "torvik_dgbpm":   safe(row.get("dgbpm")),
+            "torvik_gbpm":    safe(row.get("gbpm")),
+            "torvik_rec_rank":safe(row.get("Rec_Rank")),
             # ── Per-game stats (already per-game in Torvik CSV) ───────────────
             "ppg":    round(safe(row.get("pts")),  1) if safe(row.get("pts"))  is not None else None,
             "rpg":    round(safe(row.get("treb")), 1) if safe(row.get("treb")) is not None else None,
@@ -1253,26 +1273,36 @@ def main():
             _fga   = (_twoPA or 0) + (_tpa or 0)
 
             stats_patch = {
-                "torvik_ortg":   safe(row.get("ORtg")),
-                "torvik_usg":    safe(row.get("usg")),
-                "torvik_efg":    safe(row.get("eFG")),
-                "torvik_ts":     safe(row.get("TS_per")),
-                "torvik_obpm":   safe(row.get("obpm")),
-                "torvik_dbpm":   safe(row.get("dbpm")),
-                "torvik_bpm":    safe(row.get("bpm")),
-                "torvik_drtg":   safe(row.get("drtg")),
-                "torvik_stops":  safe(row.get("stops")),
-                "torvik_ast_pct":safe(row.get("AST_per")),
-                "torvik_to_pct": safe(row.get("TO_per")),
-                "torvik_orb_pct":safe(row.get("ORB_per")),
-                "torvik_drb_pct":safe(row.get("DRB_per")),
-                "torvik_rim_pct":safe(row.get("rimmade/(rimmade+rimmiss)")),
-                "torvik_mid_pct":safe(row.get("midmade/(midmade+midmiss)")),
-                "torvik_3p_pct": safe(row.get("TP_per")),
-                "torvik_porpag": safe(row.get("porpag")),
-                "torvik_adjoe":  safe(row.get("adjoe")),
-                "torvik_min_pct":safe(row.get("Min_per")),
-                "torvik_gp":     _gp,
+                "torvik_ortg":    safe(row.get("ORtg")),
+                "torvik_usg":     safe(row.get("usg")),
+                "torvik_efg":     safe(row.get("eFG")),
+                "torvik_ts":      safe(row.get("TS_per")),
+                "torvik_obpm":    safe(row.get("obpm")),
+                "torvik_dbpm":    safe(row.get("dbpm")),
+                "torvik_bpm":     safe(row.get("bpm")),
+                "torvik_drtg":    safe(row.get("drtg")),
+                "torvik_stops":   safe(row.get("stops")),
+                "torvik_ast_pct": safe(row.get("AST_per")),
+                "torvik_to_pct":  safe(row.get("TO_per")),
+                "torvik_orb_pct": safe(row.get("ORB_per")),
+                "torvik_drb_pct": safe(row.get("DRB_per")),
+                "torvik_rim_pct": safe(row.get("rimmade/(rimmade+rimmiss)")),
+                "torvik_mid_pct": safe(row.get("midmade/(midmade+midmiss)")),
+                "torvik_3p_pct":  safe(row.get("TP_per")),
+                "torvik_porpag":  safe(row.get("porpag")),
+                "torvik_adjoe":   safe(row.get("adjoe")),
+                "torvik_min_pct": safe(row.get("Min_per")),
+                "torvik_gp":      _gp,
+                "torvik_blk_pct": safe(row.get("blk_per")),
+                "torvik_stl_pct": safe(row.get("stl_per")),
+                "torvik_ftr":     safe(row.get("ftr")),
+                "torvik_pfr":     safe(row.get("pfr")),
+                "torvik_adrtg":   safe(row.get("adrtg")),
+                "torvik_dporpag": safe(row.get("dporpag")),
+                "torvik_ogbpm":   safe(row.get("ogbpm")),
+                "torvik_dgbpm":   safe(row.get("dgbpm")),
+                "torvik_gbpm":    safe(row.get("gbpm")),
+                "torvik_rec_rank":safe(row.get("Rec_Rank")),
                 "ppg":    round(safe(row.get("pts")),  1) if safe(row.get("pts"))  is not None else None,
                 "rpg":    round(safe(row.get("treb")), 1) if safe(row.get("treb")) is not None else None,
                 "apg":    round(safe(row.get("ast")),  1) if safe(row.get("ast"))  is not None else None,
