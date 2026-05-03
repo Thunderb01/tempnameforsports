@@ -37,13 +37,31 @@ function playerScore(p) {
   return p.open_market_high || 0;
 }
 
-// Team score = average NIL valuation across all portal commits
-function scoreTeam(players) {
-  if (!players.length) return 0;
-  return players.reduce((sum, p) => sum + (p.open_market_high || 0), 0) / players.length;
+// Depth coefficient: C_n = 1 + (n-1) * 0.05, where n is 1-indexed rank within position group.
+// Rewards roster depth — each successive player at a position is worth slightly more.
+function depthCoeff(zeroIdx) {
+  return 1 + zeroIdx * 0.05;
 }
 
-// Grade cutoffs mirror projected NIL tiers (HM All-American = A+, HM All-Conference = A, etc.)
+// Team score = sum of (MPV * C_i) per position group, players sorted by MPV desc within group.
+function scoreTeam(players) {
+  if (!players.length) return 0;
+  const byPos = {};
+  players.forEach(p => {
+    const pos = p.primary_position || "Wing";
+    if (!byPos[pos]) byPos[pos] = [];
+    byPos[pos].push(p);
+  });
+  let total = 0;
+  Object.values(byPos).forEach(group => {
+    group
+      .sort((a, b) => (b.open_market_high || 0) - (a.open_market_high || 0))
+      .forEach((p, i) => { total += (p.open_market_high || 0) * depthCoeff(i); });
+  });
+  return total / players.length;
+}
+
+// Individual player grade — calibrated to single-player NIL market value
 function grade(nilValue) {
   const v = Number(nilValue) || 0;
   if (v >= 2_000_000) return { label: "A+", color: "#4ade80" };  // HM All-American / Pre-Draft
@@ -57,6 +75,26 @@ function grade(nilValue) {
   if (v >=   150_000) return { label: "C-", color: "#fbbf24" };  // HM Rotation (low)
   if (v >=   100_000) return { label: "D",  color: "#fb923c" };  // MM Starter / LM All-Conference
   return { label: "F", color: "#f87171" };                        // LM Rotation
+}
+
+// Team class grade — calibrated to the depth-weighted sum produced by scoreTeam().
+// Reference anchors:
+//   5 commits @ $400k avg  ≈  $2.1M  →  B   (solid mid-major class)
+//   6 commits @ $700k avg  ≈  $4.3M  →  A-  (typical power-conf class)
+//   8 commits @ $1M avg    ≈  $8.4M  →  A+  (elite class)
+function teamGrade(score) {
+  const v = Number(score) || 0;
+  if (v >= 9_000_000) return { label: "A+", color: "#4ade80" };
+  if (v >= 6_500_000) return { label: "A",  color: "#4ade80" };
+  if (v >= 4_500_000) return { label: "A-", color: "#86efac" };
+  if (v >= 3_000_000) return { label: "B+", color: "#a3e635" };
+  if (v >= 2_000_000) return { label: "B",  color: "#bef264" };
+  if (v >= 1_400_000) return { label: "B-", color: "#d9f99d" };
+  if (v >=   950_000) return { label: "C+", color: "#fde68a" };
+  if (v >=   650_000) return { label: "C",  color: "#fcd34d" };
+  if (v >=   450_000) return { label: "C-", color: "#fbbf24" };
+  if (v >=   250_000) return { label: "D",  color: "#fb923c" };
+  return { label: "F", color: "#f87171" };
 }
 
 function displayName(name) {
@@ -279,14 +317,14 @@ export function PortalRankingsPage() {
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                 <thead>
                   <tr>
-                    {["", "Rank", "Team", "Grade", "Avg Value / Player", "Commits", "Guard", "Wing", "Big", "Proj. Transfer Value", "Top Commit"].map(h => (
+                    {["", "Rank", "Team", "Grade", "Class Score", "Commits", "Guard", "Wing", "Big", "Proj. Transfer Value", "Top Commit"].map(h => (
                       <th key={h} style={thStyle}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {filtered.map(r => {
-                    const g = grade(r.raw);
+                    const g = teamGrade(r.raw);
                     const isOpen = expanded === r.team;
                     const posScore = pos => {
                       const players = (r.byPos[pos] || []).sort((a, b) => playerScore(b) - playerScore(a));

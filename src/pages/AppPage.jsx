@@ -12,6 +12,7 @@ import { supabase }         from "@/lib/supabase";
 import { exportRosterPDF }  from "@/lib/exportRoster";
 import { track }            from "@/lib/track";
 import { money }            from "@/lib/display";
+import teamConferences      from "@/data/teamConferences.json";
 
 // Absolute thresholds calibrated against portal rankings score distribution
 function rosterGrade(score) {
@@ -222,59 +223,185 @@ function btpPlayerScoreDisplay(p) {
   return sei * 0.50 + market * 0.15 + ath * 0.13 + ris * 0.08 + dds * 0.08 + cdi * 0.06;
 }
 
-function RosterStrengthPanel({ calc, onOpenModal }) {
-  const { rosterScore, scoringPool = [] } = calc;
-  const g = rosterGrade(rosterScore);
+function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], userTeam = "", customOrder, setCustomOrder, starterCounts, setStarterCounts }) {
+  const { scoringPool = [] } = calc;
+  const [cmpScope, setCmpScope] = useState("conference");
+
+  // Compute a BTP pool score for every team from the full player board
+  const teamScores = useMemo(() => {
+    if (!allPlayers.length) return [];
+    const byTeam = {};
+    allPlayers.forEach(p => {
+      if (!p.team) return;
+      if (!byTeam[p.team]) byTeam[p.team] = [];
+      byTeam[p.team].push(p);
+    });
+    return Object.entries(byTeam).map(([team, players]) => {
+      // teamConferences.json is authoritative — prevents stale conf tags on
+      // transferred players from polluting the wrong conference bucket.
+      const conf = teamConferences[team] ?? players[0]?.conf ?? null;
+      const byPos = {};
+      players.forEach(p => {
+        const pos = p.pos || "Wing";
+        if (!byPos[pos]) byPos[pos] = [];
+        byPos[pos].push(p);
+      });
+      let score = 0;
+      Object.values(byPos).forEach(group => {
+        group.sort((a, b) => btpPlayerScoreDisplay(b) - btpPlayerScoreDisplay(a))
+             .forEach((p, i) => { score += btpPlayerScoreDisplay(p) * (SLOT_WEIGHTS_DISPLAY[i] ?? 0.05); });
+      });
+      return { team, score, conf, playerCount: players.length };
+    }).sort((a, b) => b.score - a.score).map((t, i) => ({ ...t, rank: i + 1 }));
+  }, [allPlayers]);
+
+  // Derive user's conference from the JSON map so it matches the same abbreviation
+  // used for all other teams in teamScores.
+  const userConf = useMemo(() => teamConferences[userTeam] ?? teamScores.find(t => t.team === userTeam)?.conf ?? null, [teamScores, userTeam]);
+
+  // Conference-adjusted team scores: metrics (SEI/ATH/RIS/DDS/CDI) are min-max
+  // normalised within the conference pool so scores reflect intra-conference
+  // competition rather than national standings.
+  const confTeamScores = useMemo(() => {
+    if (!allPlayers.length || !userConf) return [];
+    const confPool = allPlayers.filter(p => (teamConferences[p.team] ?? p.conf) === userConf);
+    if (confPool.length < 2) return [];
+
+    const METRIC_KEYS = ["sei", "ath", "ris", "dds", "cdi"];
+    const ranges = {};
+    METRIC_KEYS.forEach(k => {
+      const vals = confPool.map(p => p.stats?.[k]).filter(v => v != null && !isNaN(parseFloat(v))).map(Number);
+      ranges[k] = { min: Math.min(...vals, 0), max: Math.max(...vals, 1) };
+    });
+
+    function confNorm(val, key) {
+      const { min, max } = ranges[key];
+      if (max === min) return 50;
+      return Math.max(0, Math.min(100, ((val - min) / (max - min)) * 100));
+    }
+    function confPlayerScore(p) {
+      const s = p.stats || {};
+      const sei    = confNorm(s.sei  || 0, "sei") * 15000;
+      const ath    = confNorm(s.ath  || 0, "ath") *  5000;
+      const ris    = confNorm(s.ris  || 0, "ris") *  4000;
+      const dds    = confNorm(s.dds  || 0, "dds") *  4000;
+      const cdi    = confNorm(s.cdi  || 0, "cdi") *  4000;
+      const market = (p.marketHigh || 0) * (isPriorYearEval(p) ? 0.8 : 1.0);
+      return sei * 0.50 + market * 0.15 + ath * 0.13 + ris * 0.08 + dds * 0.08 + cdi * 0.06;
+    }
+
+    const byTeam = {};
+    confPool.forEach(p => {
+      if (!p.team) return;
+      if (!byTeam[p.team]) byTeam[p.team] = [];
+      byTeam[p.team].push(p);
+    });
+    return Object.entries(byTeam).map(([team, players]) => {
+      const conf = teamConferences[team] ?? players[0]?.conf ?? null;
+      const byPos = {};
+      players.forEach(p => {
+        const pos = p.pos || "Wing";
+        if (!byPos[pos]) byPos[pos] = [];
+        byPos[pos].push(p);
+      });
+      let score = 0;
+      Object.values(byPos).forEach(group => {
+        group.sort((a, b) => confPlayerScore(b) - confPlayerScore(a))
+             .forEach((p, i) => { score += confPlayerScore(p) * (SLOT_WEIGHTS_DISPLAY[i] ?? 0.05); });
+      });
+      return { team, score, conf, playerCount: players.length };
+    }).sort((a, b) => b.score - a.score).map((t, i) => ({ ...t, rank: i + 1 }));
+  }, [allPlayers, userConf]);
+
+  const POS_ORDER = ["Guard", "Wing", "Big"];
+  // Depth chart state — owned by AppPage, passed in as props so it survives view switches
+
+  // Plain variables (no memoization) — scoringPool is ≤20 players, compute is trivial,
+  // and avoiding useMemo ensures these always reflect the latest scoringPool on every render.
+  const defaultChart = (() => {
+    const groups = { Guard: [], Wing: [], Big: [] };
+    scoringPool.forEach(p => {
+      const pos = POS_ORDER.includes(p.pos) ? p.pos : "Wing";
+      groups[pos].push(p);
+    });
+    POS_ORDER.forEach(pos => groups[pos].sort((a, b) => btpPlayerScoreDisplay(b) - btpPlayerScoreDisplay(a)));
+    return groups;
+  })();
+
+  const chart = (() => {
+    if (!customOrder) return defaultChart;
+    const result = {};
+    POS_ORDER.forEach(pos => {
+      const poolMap = Object.fromEntries(defaultChart[pos].map(p => [p.id, p]));
+      const ordered = (customOrder[pos] || []).map(id => poolMap[id]).filter(Boolean);
+      const remaining = defaultChart[pos].filter(p => !(customOrder[pos] || []).includes(p.id));
+      result[pos] = [...ordered, ...remaining];
+    });
+    return result;
+  })();
+
+  let chartScore = 0;
+  POS_ORDER.forEach(pos => {
+    (chart[pos] || []).forEach((p, i) => { chartScore += btpPlayerScoreDisplay(p) * (SLOT_WEIGHTS_DISPLAY[i] ?? 0.05); });
+  });
 
   if (!scoringPool.length) {
     return <div className="empty" style={{ marginTop: 24 }}>Add players to your roster to see the strength breakdown.</div>;
   }
 
-  const POS_ORDER = ["Guard", "Wing", "Big"];
+  function slotBadge(pos, i) {
+    const sc = starterCounts[pos] ?? 0;
+    if (i < sc) return { label: "S", bg: "rgba(251,191,36,.2)", border: "rgba(251,191,36,.45)", color: "#fbbf24" };
+    return { label: String(i - sc + 1), bg: "rgba(255,255,255,.05)", border: "rgba(255,255,255,.08)", color: "rgba(255,255,255,.35)" };
+  }
 
-  // Build per-position groups sorted by score desc
-  const byPos = {};
-  scoringPool.forEach(p => {
-    const pos = p.pos || "Wing";
-    if (!byPos[pos]) byPos[pos] = [];
-    byPos[pos].push(p);
-  });
-  POS_ORDER.forEach(pos => {
-    if (byPos[pos]) byPos[pos].sort((a, b) => btpPlayerScoreDisplay(b) - btpPlayerScoreDisplay(a));
-  });
+  function slotLabel(pos, i) {
+    const sc = starterCounts[pos] ?? 0;
+    if (i < sc) return "Starter";
+    const bench = i - sc;
+    return bench === 0 ? "1st off bench" : bench === 1 ? "2nd off bench" : `#${bench + 1}`;
+  }
 
-  // Per-position weighted score
-  const posScores = {};
-  Object.entries(byPos).forEach(([pos, players]) => {
+  function movePlayer(pos, fromIdx, dir) {
+    const toIdx = fromIdx + dir;
+    if (toIdx < 0 || toIdx >= chart[pos].length) return;
+    setCustomOrder(prev => {
+      const base = prev ?? Object.fromEntries(POS_ORDER.map(p => [p, chart[p].map(pl => pl.id)]));
+      const ids = [...(base[pos] || chart[pos].map(pl => pl.id))];
+      [ids[fromIdx], ids[toIdx]] = [ids[toIdx], ids[fromIdx]];
+      return { ...base, [pos]: ids };
+    });
+  }
+
+  const chartGrade = rosterGrade(chartScore);
+  const chartPosScores = Object.fromEntries(POS_ORDER.map(pos => {
     let s = 0;
-    players.forEach((p, i) => { s += btpPlayerScoreDisplay(p) * (SLOT_WEIGHTS_DISPLAY[i] ?? 0.05); });
-    posScores[pos] = s;
-  });
-
-  const maxPosScore = Math.max(...Object.values(posScores), 1);
+    (chart[pos] || []).forEach((p, i) => { s += btpPlayerScoreDisplay(p) * (SLOT_WEIGHTS_DISPLAY[i] ?? 0.05); });
+    return [pos, s];
+  }));
+  const maxPosScore    = Math.max(...Object.values(chartPosScores), 1);
   const maxPlayerScore = Math.max(...scoringPool.map(btpPlayerScoreDisplay), 1);
+  const posCount       = POS_ORDER.filter(pos => (chart[pos] || []).length > 0).length;
 
   return (
-    <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 20 }}>
+    <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 16 }}>
 
       {/* Overall header */}
       <div style={{ background: "rgba(255,255,255,.04)", border: "1px solid var(--border)", borderRadius: 10, padding: "16px 20px", display: "flex", alignItems: "center", gap: 20, flexWrap: "wrap" }}>
         <div>
           <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".06em", opacity: .4, marginBottom: 6 }}>Overall Roster Strength</div>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <span style={{ background: g.color, color: "#0e1521", fontWeight: 800, fontSize: 28, padding: "4px 18px", borderRadius: 12 }}>{g.label}</span>
+            <span style={{ background: chartGrade.color, color: "#0e1521", fontWeight: 800, fontSize: 28, padding: "4px 18px", borderRadius: 12 }}>{chartGrade.label}</span>
             <div>
-              <div style={{ fontSize: 20, fontWeight: 700 }}>{(rosterScore / 1000000).toFixed(2)}M <span style={{ fontSize: 12, opacity: .45, fontWeight: 400 }}>BTP Score</span></div>
-              <div style={{ fontSize: 12, opacity: .4 }}>{scoringPool.length} players · {Object.keys(byPos).length} position groups</div>
+              <div style={{ fontSize: 20, fontWeight: 700 }}>{(chartScore / 1000000).toFixed(2)}M <span style={{ fontSize: 12, opacity: .45, fontWeight: 400 }}>BTP Score</span></div>
+              <div style={{ fontSize: 12, opacity: .4 }}>{scoringPool.length} players · {posCount} position groups</div>
             </div>
           </div>
         </div>
-
-        {/* Pos score bars */}
         <div style={{ flex: 1, minWidth: 240, display: "flex", gap: 16, flexWrap: "wrap" }}>
-          {POS_ORDER.filter(pos => byPos[pos]).map(pos => {
-            const pct = (posScores[pos] / maxPosScore) * 100;
-            const pg = rosterGrade(posScores[pos]);
+          {POS_ORDER.filter(pos => (chart[pos] || []).length > 0).map(pos => {
+            const pct = (chartPosScores[pos] / maxPosScore) * 100;
+            const pg  = rosterGrade(chartPosScores[pos]);
             return (
               <div key={pos} style={{ flex: "1 1 100px" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
@@ -284,86 +411,225 @@ function RosterStrengthPanel({ calc, onOpenModal }) {
                 <div style={{ height: 6, background: "rgba(255,255,255,.08)", borderRadius: 3 }}>
                   <div style={{ width: `${pct}%`, height: "100%", background: pg.color, borderRadius: 3, opacity: .8 }} />
                 </div>
-                <div style={{ fontSize: 11, opacity: .35, marginTop: 3 }}>{(posScores[pos] / 1000000).toFixed(2)}M · {byPos[pos].length} players</div>
+                <div style={{ fontSize: 11, opacity: .35, marginTop: 3 }}>{(chartPosScores[pos] / 1000000).toFixed(2)}M · {(chart[pos] || []).length} players</div>
               </div>
             );
           })}
         </div>
+        {customOrder && (
+          <button onClick={() => setCustomOrder(null)} style={{ fontSize: 11, opacity: .5, background: "none", border: "1px solid rgba(255,255,255,.12)", borderRadius: 8, padding: "4px 10px", cursor: "pointer", color: "inherit", whiteSpace: "nowrap" }}>
+            Reset to auto
+          </button>
+        )}
       </div>
 
-      {/* Per-position player breakdowns */}
-      {POS_ORDER.filter(pos => byPos[pos]).map(pos => (
-        <div key={pos} style={{ background: "rgba(255,255,255,.03)", border: "1px solid var(--border)", borderRadius: 10, overflow: "hidden" }}>
-          <div style={{ padding: "10px 16px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={{ fontWeight: 700, fontSize: 14 }}>{pos}s</span>
-            <span style={{ fontSize: 12, opacity: .4 }}>{byPos[pos].length} players</span>
-            <span style={{ marginLeft: "auto", fontSize: 12, opacity: .5 }}>{(posScores[pos] / 1000000).toFixed(2)}M weighted</span>
-          </div>
-          <div style={{ padding: "12px 16px", display: "flex", flexDirection: "column", gap: 12 }}>
-            {byPos[pos].map((p, i) => {
-              const score = btpPlayerScoreDisplay(p);
-              const weight = SLOT_WEIGHTS_DISPLAY[i] ?? 0.05;
-              const contribution = score * weight;
-              const barPct = (score / maxPlayerScore) * 100;
-              const s = p.stats || {};
-              return (
-                <div key={p.id} onClick={() => onOpenModal && onOpenModal(p)}
-                  style={{ display: "flex", gap: 12, alignItems: "flex-start", paddingBottom: 12, borderBottom: i < byPos[pos].length - 1 ? "1px solid rgba(255,255,255,.05)" : "none", cursor: "pointer", borderRadius: 6, padding: "8px 4px" }}
-                  onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,.03)"}
-                  onMouseLeave={e => e.currentTarget.style.background = ""}>
-                  {/* Slot indicator */}
-                  <div style={{ width: 28, height: 28, borderRadius: "50%", background: i === 0 ? "rgba(91,156,246,.2)" : "rgba(255,255,255,.05)", border: `1px solid ${i === 0 ? "rgba(91,156,246,.4)" : "rgba(255,255,255,.1)"}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, flexShrink: 0, color: i === 0 ? "#5b9cf6" : "rgba(255,255,255,.4)" }}>
-                    {i + 1}
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                        <span style={{ fontWeight: 600, fontSize: 14 }}>{p.name}</span>
-                        <span style={{ fontSize: 11, opacity: .4 }}>{p.year} · {p.team}</span>
-                        {p._priorYearEval && (
-                          <span title="Stats from prior season — NIL valued at 80% of prior year market" style={{ fontSize: 10, fontWeight: 700, color: "#f5a623", background: "rgba(245,166,35,.12)", border: "1px solid rgba(245,166,35,.35)", borderRadius: 6, padding: "1px 6px", letterSpacing: ".03em" }}>
-                            PY 80%
-                          </span>
-                        )}
-                      </div>
-                      <div style={{ textAlign: "right", flexShrink: 0 }}>
-                        <span style={{ fontSize: 12, fontWeight: 600, opacity: .7 }}>{(contribution / 1000).toFixed(0)}k</span>
-                        <span style={{ fontSize: 10, opacity: .3, marginLeft: 4 }}>×{weight.toFixed(2)} slot</span>
-                      </div>
-                    </div>
+      {/* 3-column depth chart + settings sidebar */}
+      <div style={{ display: "flex", gap: 12, alignItems: "start" }}>
 
-                    {/* BTP metric bars */}
-                    <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 6 }}>
-                      {BTP_METRICS.map(({ key, label }) => {
-                        const val = s[key];
-                        const pct = val != null ? Math.min(val / 100, 1) * 100 : 0;
-                        const color = val == null ? "rgba(255,255,255,.1)" : val >= 70 ? "#4ade80" : val >= 50 ? "#fcd34d" : "#f87171";
-                        return (
-                          <div key={key} style={{ flex: "1 1 60px", minWidth: 60 }}>
-                            <div style={{ fontSize: 10, opacity: .45, marginBottom: 3 }}>{label}</div>
-                            <div style={{ height: 4, background: "rgba(255,255,255,.08)", borderRadius: 2 }}>
-                              <div style={{ width: `${pct}%`, height: "100%", background: color, borderRadius: 2 }} />
-                            </div>
-                            <div style={{ fontSize: 10, opacity: .5, marginTop: 2 }}>{val != null ? Math.round(val) : "—"}</div>
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    {/* Overall score bar */}
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <div style={{ flex: 1, height: 5, background: "rgba(255,255,255,.07)", borderRadius: 3 }}>
-                        <div style={{ width: `${barPct}%`, height: "100%", background: "#5b9cf6", borderRadius: 3, opacity: .7 }} />
-                      </div>
-                      <span style={{ fontSize: 11, opacity: .35, whiteSpace: "nowrap" }}>Raw {(score / 1000).toFixed(0)}k</span>
-                    </div>
-                  </div>
+        {/* Depth chart columns */}
+        <div style={{ flex: 1, display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, alignItems: "start" }}>
+          {POS_ORDER.map(pos => {
+            const players = chart[pos] || [];
+            const pg = rosterGrade(chartPosScores[pos] || 0);
+            return (
+              <div key={pos} style={{ background: "rgba(255,255,255,.03)", border: "1px solid var(--border)", borderRadius: 10, overflow: "hidden" }}>
+                {/* Column header */}
+                <div style={{ padding: "10px 14px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontWeight: 700, fontSize: 14 }}>{pos}s</span>
+                  <span style={{ fontSize: 11, opacity: .35 }}>{players.length}</span>
+                  <span style={{ marginLeft: "auto", background: pg.color, color: "#0e1521", fontWeight: 700, fontSize: 10, padding: "1px 7px", borderRadius: 8 }}>{pg.label}</span>
+                  <span style={{ fontSize: 12, opacity: .45 }}>{(chartPosScores[pos] / 1000000).toFixed(2)}M</span>
                 </div>
+
+                {players.length === 0 ? (
+                  <div style={{ padding: "20px 14px", fontSize: 12, opacity: .3, textAlign: "center" }}>No players</div>
+                ) : players.map((p, i) => {
+                  const score        = btpPlayerScoreDisplay(p);
+                  const weight       = SLOT_WEIGHTS_DISPLAY[i] ?? 0.05;
+                  const contribution = score * weight;
+                  const barPct       = (score / maxPlayerScore) * 100;
+                  const s            = p.stats || {};
+                  const isStarter    = i < (starterCounts[pos] ?? 0);
+                  const badge        = slotBadge(pos, i);
+
+                  return (
+                    <div key={p.id} style={{
+                      display: "flex", alignItems: "center", gap: 7,
+                      padding: "8px 10px",
+                      borderBottom: i < players.length - 1 ? "1px solid rgba(255,255,255,.04)" : "none",
+                      background: isStarter ? "rgba(251,191,36,.03)" : "transparent",
+                    }}>
+                      {/* Up / down arrows */}
+                      <div style={{ display: "flex", flexDirection: "column", gap: 1, flexShrink: 0 }}>
+                        <button onClick={() => movePlayer(pos, i, -1)} disabled={i === 0}
+                          style={{ background: "none", border: "none", cursor: i === 0 ? "default" : "pointer", padding: "1px 4px", lineHeight: 1, fontSize: 9, color: i === 0 ? "rgba(255,255,255,.1)" : "rgba(255,255,255,.45)" }}>▲</button>
+                        <button onClick={() => movePlayer(pos, i, 1)} disabled={i === players.length - 1}
+                          style={{ background: "none", border: "none", cursor: i === players.length - 1 ? "default" : "pointer", padding: "1px 4px", lineHeight: 1, fontSize: 9, color: i === players.length - 1 ? "rgba(255,255,255,.1)" : "rgba(255,255,255,.45)" }}>▼</button>
+                      </div>
+
+                      {/* Slot badge */}
+                      <div style={{ width: 20, height: 20, borderRadius: "50%", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, background: badge.bg, border: `1px solid ${badge.border}`, color: badge.color }}>
+                        {badge.label}
+                      </div>
+
+                      {/* Player info */}
+                      <div style={{ flex: 1, minWidth: 0, cursor: "pointer" }} onClick={() => onOpenModal && onOpenModal(p)}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                          <span style={{ fontSize: 12, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</span>
+                          {p._priorYearEval && <span title="Prior year stats" style={{ fontSize: 9, fontWeight: 700, color: "#f5a623", background: "rgba(245,166,35,.12)", border: "1px solid rgba(245,166,35,.35)", borderRadius: 4, padding: "0 3px", flexShrink: 0 }}>PY</span>}
+                        </div>
+                        <div style={{ fontSize: 10, opacity: .38, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                          {p.year} · {slotLabel(pos, i)}
+                        </div>
+                        {/* Metric colour dots */}
+                        <div style={{ display: "flex", gap: 3, marginTop: 3 }}>
+                          {BTP_METRICS.map(({ key, label }) => {
+                            const val = s[key];
+                            const color = val == null ? "rgba(255,255,255,.12)" : val >= 70 ? "#4ade80" : val >= 50 ? "#fcd34d" : "#f87171";
+                            return <div key={key} title={`${label}: ${val != null ? Math.round(val) : "—"}`} style={{ width: 6, height: 6, borderRadius: "50%", background: color, flexShrink: 0 }} />;
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Contribution + score bar */}
+                      <div style={{ flexShrink: 0, textAlign: "right", minWidth: 36 }}>
+                        <div style={{ fontSize: 11, fontWeight: 600, opacity: .7 }}>{(contribution / 1000).toFixed(0)}k</div>
+                        <div style={{ fontSize: 9, opacity: .28 }}>×{weight.toFixed(2)}</div>
+                        <div style={{ width: 36, height: 3, background: "rgba(255,255,255,.07)", borderRadius: 2, marginTop: 3 }}>
+                          <div style={{ width: `${barPct}%`, height: "100%", background: isStarter ? "#fbbf24" : "#6b7280", borderRadius: 2 }} />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Settings sidebar */}
+        <div style={{ width: 156, flexShrink: 0, background: "rgba(255,255,255,.03)", border: "1px solid var(--border)", borderRadius: 10, padding: "14px 16px" }}>
+          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".07em", textTransform: "uppercase", opacity: .4, marginBottom: 14 }}>Starter Slots</div>
+          {POS_ORDER.map(pos => {
+            const count   = starterCounts[pos] ?? 0;
+            const maxSlot = (chart[pos] || []).length;
+            return (
+              <div key={pos} style={{ marginBottom: 14 }}>
+                <div style={{ fontSize: 12, opacity: .55, marginBottom: 6 }}>{pos}s</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <button
+                    onClick={() => setStarterCounts(prev => ({ ...prev, [pos]: Math.max(0, count - 1) }))}
+                    disabled={count === 0}
+                    style={{ width: 26, height: 26, borderRadius: 6, border: "1px solid rgba(255,255,255,.12)", background: "none", cursor: count === 0 ? "default" : "pointer", color: count === 0 ? "rgba(255,255,255,.2)" : "inherit", fontSize: 16, lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>−</button>
+                  <span style={{ fontSize: 18, fontWeight: 700, minWidth: 22, textAlign: "center", color: count > 0 ? "#fbbf24" : "rgba(255,255,255,.25)" }}>{count}</span>
+                  <button
+                    onClick={() => setStarterCounts(prev => ({ ...prev, [pos]: Math.min(maxSlot, count + 1) }))}
+                    disabled={count >= maxSlot}
+                    style={{ width: 26, height: 26, borderRadius: 6, border: "1px solid rgba(255,255,255,.12)", background: "none", cursor: count >= maxSlot ? "default" : "pointer", color: count >= maxSlot ? "rgba(255,255,255,.2)" : "inherit", fontSize: 16, lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>+</button>
+                </div>
+              </div>
+            );
+          })}
+          <div style={{ borderTop: "1px solid rgba(255,255,255,.06)", paddingTop: 10 }}>
+            {(() => {
+              const total = POS_ORDER.reduce((s, pos) => s + (starterCounts[pos] ?? 0), 0);
+              return (
+                <>
+                  <div style={{ fontSize: 12, opacity: .4 }}>{total} starter{total !== 1 ? "s" : ""}</div>
+                  {total !== 5 && (
+                    <div style={{ fontSize: 10, color: "#fbbf24", marginTop: 4, opacity: .8 }}>standard is 5</div>
+                  )}
+                  {total !== 5 && (
+                    <button onClick={() => setStarterCounts({ Guard: 2, Wing: 2, Big: 1 })}
+                      style={{ marginTop: 8, fontSize: 10, opacity: .45, background: "none", border: "1px solid rgba(255,255,255,.1)", borderRadius: 6, padding: "3px 8px", cursor: "pointer", color: "inherit" }}>Reset</button>
+                  )}
+                </>
               );
-            })}
+            })()}
           </div>
         </div>
-      ))}
+      </div>
+
+      {/* ── Conference / League comparison ─────────────────────────────────── */}
+      {teamScores.length > 0 && (() => {
+        const displayList = cmpScope === "conference" ? confTeamScores : (() => {
+          const userRank = teamScores.findIndex(t => t.team === userTeam);
+          if (userRank <= 24) return teamScores.slice(0, Math.max(25, userRank + 1));
+          return [...teamScores.slice(0, 5), null, ...teamScores.slice(userRank - 2, userRank + 3)];
+        })();
+        const maxScore = Math.max(...displayList.filter(Boolean).map(t => t.score), 1);
+        const userRankAll  = teamScores.findIndex(t => t.team === userTeam) + 1;
+        const userRankConf = confTeamScores.findIndex(t => t.team === userTeam) + 1;
+
+        return (
+          <div style={{ background: "rgba(255,255,255,.03)", border: "1px solid var(--border)", borderRadius: 10, overflow: "hidden" }}>
+            {/* Header */}
+            <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <span style={{ fontWeight: 700, fontSize: 14 }}>Team Comparison</span>
+              {userConf && (
+                <span style={{ fontSize: 12, opacity: .4 }}>{userConf}</span>
+              )}
+              <div style={{ marginLeft: "auto", display: "flex", gap: 4 }}>
+                {[["conference", "Conference"], ["all", "All Teams"]].map(([val, lbl]) => (
+                  <button key={val} onClick={() => setCmpScope(val)} style={{
+                    fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 14, cursor: "pointer",
+                    border: "1px solid",
+                    background:   cmpScope === val ? "rgba(91,156,246,.18)" : "transparent",
+                    color:        cmpScope === val ? "#5b9cf6" : "rgba(255,255,255,.4)",
+                    borderColor:  cmpScope === val ? "rgba(91,156,246,.5)"  : "rgba(255,255,255,.12)",
+                  }}>{lbl}</button>
+                ))}
+              </div>
+              <div style={{ width: "100%", fontSize: 11, opacity: .35 }}>
+                {cmpScope === "conference"
+                  ? `${confTeamScores.length} teams · metrics scaled within ${userConf ?? "conference"}`
+                  : `Rank ${userRankAll} of ${teamScores.length} teams nationally · national metrics`}
+              </div>
+            </div>
+
+            {/* Ranked list */}
+            <div style={{ padding: "10px 16px", display: "flex", flexDirection: "column", gap: 6 }}>
+              {cmpScope === "conference" && userRankConf > 0 && (
+                <div style={{ fontSize: 11, opacity: .4, marginBottom: 4 }}>
+                  #{userRankConf} in {userConf} · #{userRankAll} nationally
+                </div>
+              )}
+              {displayList.map((t, idx) => {
+                if (!t) return (
+                  <div key={`sep-${idx}`} style={{ textAlign: "center", fontSize: 11, opacity: .25, padding: "2px 0" }}>· · ·</div>
+                );
+                const isUser = t.team === userTeam;
+                const barPct = (t.score / maxScore) * 100;
+                const tg = rosterGrade(t.score);
+                return (
+                  <div key={t.team} style={{
+                    display: "flex", alignItems: "center", gap: 10,
+                    padding: "6px 8px", borderRadius: 6,
+                    background: isUser ? "rgba(91,156,246,.08)" : "transparent",
+                    border: isUser ? "1px solid rgba(91,156,246,.2)" : "1px solid transparent",
+                  }}>
+                    <span style={{ width: 22, fontSize: 11, opacity: .4, textAlign: "right", flexShrink: 0 }}>
+                      {t.rank}
+                    </span>
+                    <span style={{ minWidth: 0, flex: "0 0 auto", maxWidth: 180, fontSize: 13, fontWeight: isUser ? 700 : 400, color: isUser ? "#5b9cf6" : "inherit", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {isUser ? `▶ ${t.team}` : t.team}
+                    </span>
+                    <div style={{ flex: 1, height: 5, background: "rgba(255,255,255,.07)", borderRadius: 3, minWidth: 40 }}>
+                      <div style={{ width: `${barPct}%`, height: "100%", background: isUser ? "#5b9cf6" : tg.color, borderRadius: 3, opacity: isUser ? 1 : .65 }} />
+                    </div>
+                    <span style={{ fontSize: 11, opacity: .55, flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>
+                      {(t.score / 1000000).toFixed(2)}M
+                    </span>
+                    <span style={{ background: tg.color, color: "#0e1521", fontWeight: 700, fontSize: 10, padding: "1px 6px", borderRadius: 6, flexShrink: 0 }}>
+                      {tg.label}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
@@ -394,6 +660,10 @@ export function AppPage() {
   const [saving,        setSaving]        = useState(false);
   const [sortKey,       setSortKey]       = useState(null);
   const [sortDir,       setSortDir]       = useState("asc");
+
+  // Depth chart state — lifted here so it survives view switches
+  const [depthChartOrder,  setDepthChartOrder]  = useState(null);
+  const [depthStarterCounts, setDepthStarterCounts] = useState({ Guard: 2, Wing: 2, Big: 1 });
 
   const handleCustomNilChange = useCallback((id, val) => board.updateCustomPlayerNil(id, val), [board.updateCustomPlayerNil]);
   const handleCustomNilBlur   = useCallback((id, val) => board.persistCustomPlayerNil(id, val), [board.persistCustomPlayerNil]);
@@ -978,7 +1248,7 @@ export function AppPage() {
         )}
 
         {/* ── Roster Strength breakdown ───────────────────────────────────── */}
-        {viewMode === "strength" && <RosterStrengthPanel calc={calc} onOpenModal={handleOpenModal} />}
+        {viewMode === "strength" && <RosterStrengthPanel calc={calc} onOpenModal={handleOpenModal} allPlayers={board.state.board} userTeam={activeTeam} customOrder={depthChartOrder} setCustomOrder={setDepthChartOrder} starterCounts={depthStarterCounts} setStarterCounts={setDepthStarterCounts} />}
 
       </div>
 

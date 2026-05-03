@@ -492,7 +492,7 @@ export function useRosterBoard(team, userId) {
     const maxPerPlayer       = settings.nilTotal * settings.maxPct;
 
     // All returners not definitively leaving — includes undecided/portal/returning
-    const LEAVING_STATUSES = new Set(["graduating", "transferred", "transferring", "entering_portal"]);
+    const LEAVING_STATUSES = new Set(["graduating", "transferred", "transferring", "entering_portal", "entering_draft"]);
     const activeRosterReturners = returningPlayers.filter(p => !LEAVING_STATUSES.has(retentionById[p.id] || "returning"));
 
     const rosterPlayers      = [
