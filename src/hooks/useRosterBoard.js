@@ -244,7 +244,7 @@ export function useRosterBoard(team, userId) {
     const returningIds   = returning.map(p => p.id);
     const returningIdSet = new Set(returningIds);
 
-    const [{ data: portalData }, { data: incomingPortalData }] = await Promise.all([
+    const [{ data: portalData }, { data: incomingPortalData }, { data: playerStatusData }] = await Promise.all([
       supabase
         .from("portal_transfers")
         .select("player_id, status")
@@ -258,6 +258,11 @@ export function useRosterBoard(team, userId) {
         .eq("status", "committed")
         .ilike("to_team", teamName)
         .not("player_id", "is", null),
+      supabase
+        .from("players")
+        .select("id, player_status")
+        .in("id", returningIds)
+        .not("player_status", "is", null),
     ]);
 
     // Fetch full player data for incoming transfers not already on this roster
@@ -304,6 +309,19 @@ export function useRosterBoard(team, userId) {
       portalRetentionMap[r.player_id] = r.status === "committed" ? "transferred" : "entering_portal";
     });
 
+    // Admin-set player_status → retention value mapping
+    const PLAYER_STATUS_TO_RETENTION = {
+      returning:   "returning",
+      graduating:  "graduating",
+      transferring: "entering_portal",
+      declared:    "entering_draft",
+    };
+    const adminStatusMap = {};
+    (playerStatusData || []).forEach(r => {
+      const mapped = PLAYER_STATUS_TO_RETENTION[r.player_status];
+      if (mapped) adminStatusMap[r.id] = mapped;
+    });
+
     const GRADUATING_YEARS = ["Senior", "Graduate", "SR", "GR"];
     setState(s => {
       const portalRetention  = {};  // always overrides saved state
@@ -313,7 +331,9 @@ export function useRosterBoard(team, userId) {
         if (portalRetentionMap[p.id]) {
           portalRetention[p.id] = portalRetentionMap[p.id]; // always wins
         } else if (!s.retentionById[p.id]) {
-          defaultRetention[p.id] = GRADUATING_YEARS.includes(p.year) ? "graduating" : "returning";
+          // admin player_status > year-based fallback
+          defaultRetention[p.id] = adminStatusMap[p.id]
+            ?? (GRADUATING_YEARS.includes(p.year) ? "graduating" : "returning");
         }
         if (!s.nilById[p.id] && p.nilValuation > 0) {
           autoNil[p.id] = Math.round(p.nilValuation);

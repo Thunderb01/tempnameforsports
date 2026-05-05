@@ -627,13 +627,25 @@ function PlayersTab() {
     if (q.trim().length < 2) { setResults([]); return; }
     setLoading(true);
     timeoutRef.current = setTimeout(async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("vw_players")
-        .select("id, name, primary_position, year, current_team, open_market_high, open_market_low, nil_valuation, player_status")
+        .select("id, name, primary_position, year, current_team, open_market_high, open_market_low, nil_valuation")
         .ilike("name", `%${q.trim()}%`)
         .order("name")
         .limit(30);
-      setResults(data || []);
+      if (error) { console.error("Player search error:", error); setLoading(false); return; }
+      const players = data || [];
+      if (players.length) {
+        const ids = players.map(p => p.id);
+        const { data: statusRows } = await supabase
+          .from("players")
+          .select("id, player_status")
+          .in("id", ids);
+        const statusById = Object.fromEntries((statusRows || []).map(r => [r.id, r.player_status]));
+        setResults(players.map(p => ({ ...p, player_status: statusById[p.id] ?? null })));
+      } else {
+        setResults([]);
+      }
       setLoading(false);
     }, 250);
   }, []);
