@@ -648,9 +648,10 @@ export function AppPage() {
   const [posFilter,     setPosFilter]     = useState("all");
   const [portalOnly,    setPortalOnly]    = useState(true);
   const [availableIds,  setAvailableIds]  = useState(new Set());
-  const [modal,         setModal]         = useState(null);
-  const [settings,      setSettings]      = useState(null);
-  const [finderOpen,    setFinderOpen]    = useState(false);
+  const [modal,           setModal]           = useState(null);
+  const [settings,        setSettings]        = useState(null);
+  const [finderOpen,      setFinderOpen]      = useState(false);
+  const [replacingPlayer, setReplacingPlayer] = useState(null);
   const [drawerOpen,    setDrawerOpen]    = useState(false);
   const [myRosters,     setMyRosters]     = useState([]);
   const [teamRosters,   setTeamRosters]   = useState([]);
@@ -1055,7 +1056,7 @@ export function AppPage() {
                     const leaving = LEAVING.has(status);
                     return (
                       <div key={p.id} className="row row-click" style={{ opacity: dimmed ? .45 : .9 }}
-                        onClick={e => { if (!e.target.closest("button,input")) handleOpenModal(p); }}>
+                        onClick={e => { if (!e.target.closest("button,input")) handleOpenModal({ ...p, _typeKey: status }); }}>
                         <div className="row-main">
                           <div className="row-title" style={{ fontSize: 13 }}>{p.name}</div>
                           <div className="row-sub" style={{ fontSize: 11 }}>{p.primary_position || p.pos} · {p.year}</div>
@@ -1104,7 +1105,7 @@ export function AppPage() {
                             if (!p) return null;
                             return (
                               <div key={entry.id} className="row row-click"
-                                onClick={e => { if (!e.target.closest("button,input")) handleOpenModal(p); }}>
+                                onClick={e => { if (!e.target.closest("button,input")) handleOpenModal({ ...p, _typeKey: "transfer", nilOffer: entry.nilOffer }); }}>
                                 <div className="row-main">
                                   <div className="row-title">{p.name}</div>
                                   <div className="row-sub">{p.team} · {p.pos} · {p.year}</div>
@@ -1347,11 +1348,38 @@ export function AppPage() {
         </>
       )}
 
-      {modal && <PlayerModal player={modal} onClose={() => setModal(null)} />}
+      {modal && (
+        <PlayerModal
+          player={modal}
+          onClose={() => setModal(null)}
+          onReplace={["returning", "undecided", "transfer"].includes(modal._typeKey)
+            ? () => {
+                setReplacingPlayer(modal);
+                setModal(null);
+                setFinderOpen(true);
+              }
+            : undefined}
+        />
+      )}
 
       {finderOpen && (
-        <PlayerFinder board={board} returningPlayers={board.returningPlayers}
-          retentionById={board.state.retentionById} onClose={() => setFinderOpen(false)} />
+        <PlayerFinder
+          board={board}
+          returningPlayers={board.returningPlayers}
+          retentionById={board.state.retentionById}
+          onClose={() => { setFinderOpen(false); setReplacingPlayer(null); }}
+          initialMode={replacingPlayer ? "replace" : "need"}
+          initialReplaceId={replacingPlayer?.id ?? ""}
+          onRosterAdd={replacingPlayer ? () => {
+            if (replacingPlayer._typeKey === "transfer") {
+              board.removeFromRoster(replacingPlayer.id);
+            } else {
+              board.setRetention(replacingPlayer.id, "entering_portal");
+            }
+            setReplacingPlayer(null);
+            setFinderOpen(false);
+          } : undefined}
+        />
       )}
     </>
   );

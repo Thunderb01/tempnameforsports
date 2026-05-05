@@ -4,7 +4,7 @@ import { PlayerModal } from "@/components/PlayerModal";
 import { useAuth }     from "@/hooks/useAuth";
 import { getBoardCache } from "@/hooks/useRosterBoard";
 import { supabase }    from "@/lib/supabase";
-import { money, projectedTier, tierColor } from "@/lib/display";
+import { money, nilRange, projectedTier, tierColor } from "@/lib/display";
 
 const STATUS_CONFIG = {
   uncommitted: { label: "Available", color: "#4ade80", bg: "rgba(74,222,128,.12)"  },
@@ -308,7 +308,7 @@ export function PortalPage() {
                       <td style={{ padding: "9px 10px", whiteSpace: "nowrap" }}>
                         {p ? (
                           <span style={{ color: tierColor(tier), fontSize: 12 }}>
-                            {money(p.marketLow)} – {money(p.marketHigh)}
+                            {nilRange(p.marketLow, p.marketHigh)}
                           </span>
                         ) : "—"}
                       </td>

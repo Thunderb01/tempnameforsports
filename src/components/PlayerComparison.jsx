@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from "react";
-import { money, letterGrade, tierColor, projectedTier } from "@/lib/display";
+import { money, nilRange, letterGrade, tierColor, projectedTier } from "@/lib/display";
 
 // One color per slot — consistent across the whole comparison
 const SLOT_COLORS = ["#5b9cf6", "#f97316", "#4ade80", "#a78bfa"];
@@ -427,7 +427,7 @@ export function PlayerComparison({ initialIds = [], allPlayers = [] }) {
                   <td style={labelStyle}>NIL Range</td>
                   {players.map((p, i) => (
                     <td key={i} style={tdStyle(i, NIL_GET)}>
-                      {p ? `${money(p.marketLow)} – ${money(p.marketHigh)}` : <span style={{ opacity: .2 }}>—</span>}
+                      {p ? nilRange(p.marketLow, p.marketHigh) : <span style={{ opacity: .2 }}>—</span>}
                     </td>
                   ))}
                 </tr>

@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { PlayerModal } from "@/components/PlayerModal";
 import { track } from "@/lib/track";
-import { money, gradeColorFromVal as gradeColor } from "@/lib/display";
+import { money, nilRange, gradeColorFromVal as gradeColor } from "@/lib/display";
 
 // BtP skill metrics shown in the finder
 const METRICS = [
@@ -21,28 +21,52 @@ const PRIORITY_OPTIONS = [
 
 const POSITIONS = ["All", "Guard", "Wing", "Big"];
 
-function cosineSimilarity(a, b) {
-  const dot  = a.reduce((s, v, i) => s + v * b[i], 0);
-  const magA = Math.sqrt(a.reduce((s, v) => s + v * v, 0));
-  const magB = Math.sqrt(b.reduce((s, v) => s + v * v, 0));
-  return magA && magB ? dot / (magA * magB) : 0;
+const MAX_METRIC_DIST = Math.sqrt(5) * 100; // ~223.6, theoretical max across 5 metrics each 0–100
+
+function euclideanDistance(a, b) {
+  return Math.sqrt(a.reduce((s, v, i) => s + (v - b[i]) ** 2, 0));
+}
+
+function classifyArchetype(pos, stats) {
+  if (!stats) return null;
+  const { sei = 0, dds = 0, cdi = 0, ath = 0, ris = 0 } = stats;
+
+  // Cross-position: high SEI, almost no rim presence, low creation = pure shooter
+  if (sei >= 65 && ris <= 35 && cdi <= 45) return "Three-Point Specialist";
+
+  if (pos === "Guard") {
+    if (cdi >= 60 && cdi > sei) return "Playmaking Guard";
+    if (dds >= 62 && ath >= 58) return "Two-Way Guard";
+    return "Scoring Guard";
+  }
+  if (pos === "Wing") {
+    if (dds >= 62 && sei >= 50) return "3-and-D Wing";
+    if (sei >= 60 && ath >= 58) return "Scoring Wing";
+    return "Versatile Wing";
+  }
+  if (pos === "Big") {
+    if (ris >= 65 && dds >= 58) return "Two-Way Big";
+    if (ris >= 60) return "Rim Protector";
+    return "Stretch Big";
+  }
+  return null;
 }
 
 function metricVec(stats) {
   return METRICS.map(m => stats?.[m.key] ?? 0);
 }
 
-export function PlayerFinder({ board, returningPlayers, retentionById, onClose }) {
+export function PlayerFinder({ board, returningPlayers, retentionById, onClose, initialMode = "need", initialReplaceId = "", onRosterAdd }) {
   useEffect(() => {
     document.body.style.overflow = "hidden";
     return () => { document.body.style.overflow = ""; };
   }, []);
 
-  const [mode, setMode]           = useState("need"); // "need" | "replace"
+  const [mode, setMode]           = useState(initialMode); // "need" | "replace"
   const [posFilter, setPosFilter] = useState("All");
   const [maxNil, setMaxNil]       = useState(board.state.settings.nilTotal ?? 3000000);
   const [priorities, setPriorities] = useState({ sei: 2, dds: 1, cdi: 1, ath: 1, ris: 1 });
-  const [replaceId, setReplaceId] = useState("");
+  const [replaceId, setReplaceId] = useState(initialReplaceId);
   const [results, setResults]     = useState(null);
   const [modal, setModal]         = useState(null);
 
@@ -82,13 +106,24 @@ export function PlayerFinder({ board, returningPlayers, retentionById, onClose }
         return { ...p, _score: score, _pct: null };
       });
     } else {
-      // Replace player — cosine similarity to leaving player's metric vector
+      pool = pool.filter(p => p.id !== replaceId);
       const leaving = [...returningPlayers, ...board.state.board].find(p => p.id === replaceId);
       if (!leaving) return;
+      const targetArchetype = classifyArchetype(leaving.pos, leaving.stats);
       const refVec = metricVec(leaving.stats);
-      scored = pool.map(p => {
-        const sim = cosineSimilarity(refVec, metricVec(p.stats));
-        return { ...p, _score: sim, _pct: Math.round(sim * 100) };
+
+      // Primary pool: same archetype. Fallback: same position if archetype pool is thin.
+      const archetypePool = targetArchetype
+        ? pool.filter(p => classifyArchetype(p.pos, p.stats) === targetArchetype)
+        : [];
+      const fallbackPool = archetypePool.length < 5
+        ? pool.filter(p => p.pos === leaving.pos && !archetypePool.find(ap => ap.id === p.id))
+        : [];
+
+      scored = [...archetypePool, ...fallbackPool].map(p => {
+        const dist = euclideanDistance(refVec, metricVec(p.stats));
+        const matchPct = Math.round((1 - dist / MAX_METRIC_DIST) * 100);
+        return { ...p, _score: -dist, _pct: matchPct, _archetype: classifyArchetype(p.pos, p.stats) };
       });
     }
 
@@ -156,16 +191,29 @@ export function PlayerFinder({ board, returningPlayers, retentionById, onClose }
                   </optgroup>
                 </select>
                 {replacePlayer && (
-                  <div style={{ marginTop: 8, display: "flex", gap: 10, flexWrap: "wrap" }}>
-                    {METRICS.map(m => {
-                      const val = replacePlayer.stats?.[m.key];
-                      return (
-                        <div key={m.key} style={{ fontSize: 11 }}>
-                          <span style={{ opacity: .4 }}>{m.label}: </span>
-                          <span style={{ fontWeight: 700, color: gradeColor(val) }}>{val != null ? Math.round(val) : "—"}</span>
-                        </div>
-                      );
-                    })}
+                  <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 6 }}>
+                    {classifyArchetype(replacePlayer.pos, replacePlayer.stats) && (
+                      <div style={{ display: "inline-flex" }}>
+                        <span style={{
+                          fontSize: 11, fontWeight: 700, padding: "2px 10px", borderRadius: 20,
+                          background: "rgba(91,156,246,.15)", color: "#5b9cf6",
+                          border: "1px solid rgba(91,156,246,.3)",
+                        }}>
+                          {classifyArchetype(replacePlayer.pos, replacePlayer.stats)}
+                        </span>
+                      </div>
+                    )}
+                    <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                      {METRICS.map(m => {
+                        const val = replacePlayer.stats?.[m.key];
+                        return (
+                          <div key={m.key} style={{ fontSize: 11 }}>
+                            <span style={{ opacity: .4 }}>{m.label}: </span>
+                            <span style={{ fontWeight: 700, color: gradeColor(val) }}>{val != null ? Math.round(val) : "—"}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
               </div>
@@ -239,24 +287,60 @@ export function PlayerFinder({ board, returningPlayers, retentionById, onClose }
                     <div key={p.id} style={{
                       background: "rgba(255,255,255,.03)", border: "1px solid rgba(255,255,255,.07)",
                       borderRadius: 8, padding: "10px 14px",
-                      display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap",
                     }}>
-                      {/* Rank */}
-                      <div style={{ width: 22, fontSize: 11, opacity: .3, flexShrink: 0, textAlign: "right" }}>#{i + 1}</div>
+                      {/* Row 1: rank + identity + actions */}
+                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <div style={{ fontSize: 11, opacity: .3, width: 22, textAlign: "right", flexShrink: 0 }}>#{i + 1}</div>
 
-                      {/* Name + meta */}
-                      <div style={{ flex: 1, minWidth: 160 }}>
-                        <button onClick={() => setModal(p)} style={{
-                          background: "none", border: "none", color: "#fff", fontWeight: 600, fontSize: 13,
-                          padding: 0, cursor: "pointer", textAlign: "left",
-                        }}>{p.name}</button>
-                        <div style={{ fontSize: 11, opacity: .4, marginTop: 1 }}>
-                          {[p.team, p.pos, p.year].filter(Boolean).join(" · ")}
+                        {/* Name + meta + archetype */}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                            <button onClick={() => setModal(p)} style={{
+                              background: "none", border: "none", color: "#fff", fontWeight: 600, fontSize: 13,
+                              padding: 0, cursor: "pointer", textAlign: "left",
+                            }}>{p.name}</button>
+                            {p._archetype && (
+                              <span style={{
+                                fontSize: 10, fontWeight: 700, padding: "1px 8px", borderRadius: 20,
+                                background: "rgba(91,156,246,.1)", color: "rgba(91,156,246,.8)",
+                                border: "1px solid rgba(91,156,246,.2)", flexShrink: 0,
+                              }}>{p._archetype}</span>
+                            )}
+                          </div>
+                          <div style={{ fontSize: 11, opacity: .4, marginTop: 2 }}>
+                            {[p.team, p.pos, p.year].filter(Boolean).join(" · ")}
+                          </div>
+                        </div>
+
+                        {/* Match % */}
+                        {mode === "replace" && (
+                          <div style={{ fontSize: 11, fontWeight: 700, flexShrink: 0, width: 70, textAlign: "right",
+                            color: p._pct != null ? gradeColor(p._pct) : "transparent" }}>
+                            {p._pct != null ? `${p._pct}% match` : ""}
+                          </div>
+                        )}
+
+                        {/* Actions */}
+                        <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+                          {!board.inShort(p.id) && !board.inRoster(p.id) && (
+                            <button className="btn btn-ghost" style={{ fontSize: 11, padding: "3px 10px" }}
+                              onClick={() => board.addToShortlist(p.id)}>+ Shortlist</button>
+                          )}
+                          {board.inShort(p.id) && !board.inRoster(p.id) && (
+                            <span style={{ fontSize: 11, opacity: .4 }}>Shortlisted</span>
+                          )}
+                          {!board.inRoster(p.id) && (
+                            <button className="btn btn-primary" style={{ fontSize: 11, padding: "3px 10px" }}
+                              onClick={() => { board.addToRoster(p.id); onRosterAdd?.(); }}>+ Roster</button>
+                          )}
+                          {board.inRoster(p.id) && (
+                            <span style={{ fontSize: 11, opacity: .4 }}>On Roster</span>
+                          )}
                         </div>
                       </div>
 
-                      {/* Metrics */}
-                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      {/* Row 2: metrics + NIL */}
+                      <div style={{ display: "flex", alignItems: "center", gap: 16, marginTop: 8, paddingLeft: 32 }}>
                         {METRICS.map(m => {
                           const val = p.stats?.[m.key];
                           return (
@@ -266,40 +350,10 @@ export function PlayerFinder({ board, returningPlayers, retentionById, onClose }
                             </div>
                           );
                         })}
-                      </div>
-
-                      {/* NIL range */}
-                      <div style={{ fontSize: 11, opacity: .5, flexShrink: 0, textAlign: "right" }}>
-                        {money(p.marketLow)}–{money(p.marketHigh)}
-                      </div>
-
-                      {/* Match score (replace mode) */}
-                      {mode === "replace" && p._pct != null && (
-                        <div style={{ fontSize: 11, fontWeight: 700, color: gradeColor(p._pct), flexShrink: 0 }}>
-                          {p._pct}% match
+                        <div style={{ flex: 1 }} />
+                        <div style={{ fontSize: 11, opacity: .45, textAlign: "right" }}>
+                          {nilRange(p.marketLow, p.marketHigh)}
                         </div>
-                      )}
-
-                      {/* Actions */}
-                      <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
-                        {!board.inShort(p.id) && !board.inRoster(p.id) && (
-                          <button className="btn btn-ghost" style={{ fontSize: 11, padding: "3px 10px" }}
-                            onClick={() => board.addToShortlist(p.id)}>
-                            + Shortlist
-                          </button>
-                        )}
-                        {board.inShort(p.id) && !board.inRoster(p.id) && (
-                          <span style={{ fontSize: 11, opacity: .4, padding: "3px 0" }}>Shortlisted</span>
-                        )}
-                        {!board.inRoster(p.id) && (
-                          <button className="btn btn-primary" style={{ fontSize: 11, padding: "3px 10px" }}
-                            onClick={() => board.addToRoster(p.id)}>
-                            + Roster
-                          </button>
-                        )}
-                        {board.inRoster(p.id) && (
-                          <span style={{ fontSize: 11, opacity: .4, padding: "3px 0" }}>On Roster</span>
-                        )}
                       </div>
                     </div>
                   ))}

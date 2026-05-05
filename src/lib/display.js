@@ -9,6 +9,14 @@ export function money(n) {
   });
 }
 
+export function nilValue(v) {
+  return v > 0 ? money(v) : "N/A";
+}
+
+export function nilRange(low, high) {
+  return low > 0 || high > 0 ? `${money(low)} – ${money(high)}` : "N/A";
+}
+
 // ── Height ────────────────────────────────────────────────────────────────────
 export function heightToInches(h) {
   if (!h || h === "—") return -1;

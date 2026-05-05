@@ -1,5 +1,5 @@
 import { memo } from "react";
-import { money } from "@/lib/display";
+import { nilRange } from "@/lib/display";
 
 export const PlayerCard = memo(function PlayerCard({ player, inRoster, inShortlist, onRoster, onShortlist, onClick }) {
   const s = player.stats || {};
@@ -18,7 +18,7 @@ export const PlayerCard = memo(function PlayerCard({ player, inRoster, inShortli
       <div className="row-main">
         <div className="row-title">{player.name}</div>
         <div className="row-sub">{player.team} · {player.pos} · {player.year}</div>
-        <div className="row-sub">Market: {money(player.marketLow)} – {money(player.marketHigh)}</div>
+        <div className="row-sub">Market: {nilRange(player.marketLow, player.marketHigh)}</div>
         {statLine && <div className="row-sub" style={{ opacity: .75 }}>{statLine}</div>}
       </div>
 

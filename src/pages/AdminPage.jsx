@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { supabase }   from "@/lib/supabase";
-import { money, letterGrade, gradeColor } from "@/lib/display";
+import { money, nilRange, letterGrade, gradeColor } from "@/lib/display";
 
 // Self-contained team search — queries vw_players.current_team (avoids teams table RLS)
 function TeamSearch({ value, onChange, placeholder = "Search team…" }) {
@@ -73,6 +73,14 @@ function TeamSearch({ value, onChange, placeholder = "Search team…" }) {
 
 const STATUS_OPTIONS = ["uncommitted", "committed", "enrolled", "withdrawn"];
 const CURRENT_SEASON = 2027;
+
+const PLAYER_STATUS_OPTIONS = ["returning", "graduating", "transferring", "declared"];
+const PLAYER_STATUS_COLOR   = {
+  returning:   "#4ade80",
+  graduating:  "#5b9cf6",
+  transferring: "#f5a623",
+  declared:    "#c084fc",
+};
 
 const YEAR_OPTIONS     = ["Fr", "RS Fr", "So", "RS So", "Jr", "RS Jr", "Sr", "RS Sr", "Grad"];
 const POSITION_OPTIONS = ["Guard", "Wing", "Big"];
@@ -252,7 +260,7 @@ function PlayerPreviewPanel({ player }) {
             {[player.primary_position, player.year, player.current_team].filter(Boolean).join(" · ")}
           </div>
           <div style={{ fontSize: 11, marginTop: 4, opacity: .7 }}>
-            {money(player.open_market_low)} – {money(player.open_market_high)}
+            {nilRange(player.open_market_low, player.open_market_high)}
           </div>
         </div>
       </div>
@@ -621,7 +629,7 @@ function PlayersTab() {
     timeoutRef.current = setTimeout(async () => {
       const { data } = await supabase
         .from("vw_players")
-        .select("id, name, primary_position, year, current_team, open_market_high, open_market_low, nil_valuation")
+        .select("id, name, primary_position, year, current_team, open_market_high, open_market_low, nil_valuation, player_status")
         .ilike("name", `%${q.trim()}%`)
         .order("name")
         .limit(30);
@@ -639,6 +647,12 @@ function PlayersTab() {
     setResults(prev => prev.map(p => p.id === id ? { ...p, ...patch } : p));
     setEditId(null);
     setSaving(false);
+  }
+
+  async function handlePlayerStatusChange(id, player_status) {
+    const { error } = await supabase.from("players").update({ player_status }).eq("id", id);
+    if (error) { alert("Error: " + error.message); return; }
+    setResults(prev => prev.map(p => p.id === id ? { ...p, player_status } : p));
   }
 
   return (
@@ -668,6 +682,20 @@ function PlayersTab() {
                       {p.primary_position} · {p.year} · {p.current_team}
                     </div>
                   </div>
+                  <select
+                    className="input"
+                    value={p.player_status || ""}
+                    style={{
+                      fontSize: 11, padding: "2px 6px", width: "auto",
+                      color: PLAYER_STATUS_COLOR[p.player_status] || "rgba(255,255,255,.4)",
+                    }}
+                    onChange={e => handlePlayerStatusChange(p.id, e.target.value || null)}
+                  >
+                    <option value="">— status —</option>
+                    {PLAYER_STATUS_OPTIONS.map(s => (
+                      <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
+                    ))}
+                  </select>
                   <button className="btn btn-ghost" style={{ fontSize: 11, padding: "2px 8px" }}
                     onClick={() => setEditId(p.id)}>Edit</button>
                 </div>
@@ -681,21 +709,23 @@ function PlayersTab() {
 }
 
 function PlayerEditForm({ player, onSave, onCancel, saving }) {
-  const [year,    setYear]    = useState(player.year             || "");
-  const [pos,     setPos]     = useState(player.primary_position || "");
-  const [team,    setTeam]    = useState(player.current_team     || "");
-  const [mktLow,  setMktLow]  = useState(player.open_market_low  ?? "");
-  const [mktHigh, setMktHigh] = useState(player.open_market_high ?? "");
-  const [nilVal,  setNilVal]  = useState(player.nil_valuation    ?? "");
+  const [year,          setYear]          = useState(player.year             || "");
+  const [pos,           setPos]           = useState(player.primary_position || "");
+  const [team,          setTeam]          = useState(player.current_team     || "");
+  const [mktLow,        setMktLow]        = useState(player.open_market_low  ?? "");
+  const [mktHigh,       setMktHigh]       = useState(player.open_market_high ?? "");
+  const [nilVal,        setNilVal]        = useState(player.nil_valuation    ?? "");
+  const [playerStatus,  setPlayerStatus]  = useState(player.player_status    || "");
 
   function submit() {
     onSave({
-      year:             year    || null,
-      primary_position: pos     || null,
-      current_team:     team    || null,
+      year:             year         || null,
+      primary_position: pos          || null,
+      current_team:     team         || null,
       open_market_low:  mktLow  !== "" ? Number(mktLow)  : null,
       open_market_high: mktHigh !== "" ? Number(mktHigh) : null,
       nil_valuation:    nilVal  !== "" ? Number(nilVal)  : null,
+      player_status:    playerStatus || null,
     });
   }
 
@@ -736,6 +766,16 @@ function PlayerEditForm({ player, onSave, onCancel, saving }) {
           <label style={labelStyle}>NIL Valuation ($)</label>
           <input className="input" style={{ width: "100%" }} type="number" value={nilVal}
             onChange={e => setNilVal(e.target.value)} placeholder="0" />
+        </div>
+        <div>
+          <label style={labelStyle}>Player Status</label>
+          <select className="input" style={{ width: "100%", color: PLAYER_STATUS_COLOR[playerStatus] || "inherit" }}
+            value={playerStatus} onChange={e => setPlayerStatus(e.target.value)}>
+            <option value="">— unset —</option>
+            {PLAYER_STATUS_OPTIONS.map(s => (
+              <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
+            ))}
+          </select>
         </div>
       </div>
       <div style={{ display: "flex", gap: 8, marginTop: 12 }}>

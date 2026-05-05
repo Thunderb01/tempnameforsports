@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
-import { money, letterGrade, gradeColor, tierColor, projectedTier } from "@/lib/display";
+import { money, nilRange, letterGrade, gradeColor, tierColor, projectedTier } from "@/lib/display";
 
 function fmt(val, key) {
   if (val === null || val === undefined || val === "" || (typeof val === "number" && isNaN(val)) || val === "NaN") return "—";
@@ -145,7 +145,7 @@ function SkillProfile({ stats }) {
   );
 }
 
-export function PlayerModal({ player, onClose }) {
+export function PlayerModal({ player, onClose, onReplace }) {
   const navigate = useNavigate();
   const [stats, setStats] = useState(null);
   const [loadingStats, setLoadingStats] = useState(true);
@@ -200,6 +200,11 @@ export function PlayerModal({ player, onClose }) {
               </div>
             </div>
             <div style={{ display: "flex", gap: 8 }}>
+              {onReplace && (
+                <button className="btn btn-primary" style={{ fontSize: 12 }} onClick={onReplace}>
+                  Replace This Player
+                </button>
+              )}
               <button className="btn btn-ghost" style={{ fontSize: 12 }}
                 onClick={() => { onClose(); navigate(`/compare?p0=${player.id}`); }}>
                 Compare
@@ -212,7 +217,7 @@ export function PlayerModal({ player, onClose }) {
 
           <div className="modal-section">
             <h4>Market Production Value Range</h4>
-            <div className="modal-sub">{money(player.marketLow)} – {money(player.marketHigh)}</div>
+            <div className="modal-sub">{nilRange(player.marketLow, player.marketHigh)}</div>
             {player.nilValuation > 0 && (() => {
               const label = projectedTier(player.nilValuation);
               const color = tierColor(label);

@@ -3,7 +3,7 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { PlayerModal } from "@/components/PlayerModal";
 import { supabase }   from "@/lib/supabase";
 import { useTeamLogos } from "@/hooks/useTeamLogos";
-import { money }      from "@/lib/display";
+import { money, nilValue } from "@/lib/display";
 
 // ── Previous BTP scoring formula (kept for reference) ─────────────────────
 // const SLOT_WEIGHTS = [1.0, 0.55, 0.30, 0.15, 0.08];
@@ -94,7 +94,7 @@ function teamGrade(score) {
   if (v >= 800_000) return { label: "B+", color: "#a3e635" };
   if (v >= 600_000) return { label: "B",  color: "#bef264" };
   if (v >= 400_000) return { label: "B-", color: "#d9f99d" };
-  if (v >=   200_000) return { label: "C", color: "#fde68a" };
+  if (v >= 200_000) return { label: "C", color: "#fde68a" };
 
   return { label: "F", color: "#f87171" };
 }
@@ -162,7 +162,7 @@ function TeamExpandRow({ r, colCount, onOpenModal }) {
                             <div style={{ height: "100%", width: `${pct}%`, background: g.color, borderRadius: 2, opacity: .7 }} />
                           </div>
                         </div>
-                        <span style={{ fontSize: 11, opacity: .4, whiteSpace: "nowrap" }}>{money(p.open_market_high)}</span>
+                        <span style={{ fontSize: 11, opacity: .4, whiteSpace: "nowrap" }}>{nilValue(p.open_market_high)}</span>
                       </div>
                     );
                   })}
@@ -191,7 +191,7 @@ function TeamExpandRow({ r, colCount, onOpenModal }) {
                   <td style={{ padding: "6px 10px", fontWeight: 500 }}>{displayName(p.name)}</td>
                   <td style={{ padding: "6px 10px", opacity: .6 }}>{p.primary_position || "—"}</td>
                   <td style={{ padding: "6px 10px", opacity: .6 }}>{p.year || "—"}</td>
-                  <td style={{ padding: "6px 10px" }}>{money(p.open_market_high)}</td>
+                  <td style={{ padding: "6px 10px" }}>{nilValue(p.open_market_high)}</td>
                   <td style={{ padding: "6px 10px", opacity: .7 }}>{p.ppg != null ? Number(p.ppg).toFixed(1) : "—"}</td>
                   <td style={{ padding: "6px 10px", opacity: .7 }}>{p.rpg != null ? Number(p.rpg).toFixed(1) : "—"}</td>
                   <td style={{ padding: "6px 10px", opacity: .7 }}>{p.apg != null ? Number(p.apg).toFixed(1) : "—"}</td>
@@ -209,9 +209,10 @@ export function PortalRankingsPage() {
   const teamLogos = useTeamLogos();
   const [rows,      setRows]      = useState([]);
   const [loading,   setLoading]   = useState(true);
-  const [search,    setSearch]    = useState("");
-  const [posFilter, setPosFilter] = useState("all");
-  const [expanded,  setExpanded]  = useState(null);
+  const [search,     setSearch]     = useState("");
+  const [posFilter,  setPosFilter]  = useState("all");
+  const [confFilter, setConfFilter] = useState("all");
+  const [expanded,   setExpanded]   = useState(null);
   const [modal,     setModal]     = useState(null);
 
   useEffect(() => {
@@ -248,6 +249,7 @@ export function PortalRankingsPage() {
       const scored = Object.entries(teamMap).filter(([, players]) => players.length >= 3).map(([team, players]) => ({
         team,
         players,
+        conference: players.find(p => p.conference)?.conference ?? null,
         raw: scoreTeam(players),
         commits: players.length,
         byPos: players.reduce((acc, p) => {
@@ -274,14 +276,19 @@ export function PortalRankingsPage() {
     load();
   }, []);
 
+  const conferences = useMemo(() =>
+    [...new Set(rows.map(r => r.conference).filter(Boolean))].sort(),
+  [rows]);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return rows.filter(r => {
       if (q && !r.team.toLowerCase().includes(q)) return false;
       if (posFilter !== "all" && !r.byPos[posFilter]?.length) return false;
+      if (confFilter !== "all" && r.conference !== confFilter) return false;
       return true;
     });
-  }, [rows, search, posFilter]);
+  }, [rows, search, posFilter, confFilter]);
 
   const COL_COUNT = 10;
 
@@ -300,6 +307,10 @@ export function PortalRankingsPage() {
             </div>
             <div style={{ display: "flex", gap: 8 }}>
               <input className="input" placeholder="Search team…" value={search} onChange={e => setSearch(e.target.value)} style={{ width: 180 }} />
+              <select className="input" value={confFilter} onChange={e => setConfFilter(e.target.value)}>
+                <option value="all">All conferences</option>
+                {conferences.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
               <select className="input" value={posFilter} onChange={e => setPosFilter(e.target.value)}>
                 <option value="all">All positions</option>
                 <option value="Guard">Guards</option>
@@ -377,7 +388,7 @@ export function PortalRankingsPage() {
                             {r.topCommit
                               ? <div>
                                   <div style={{ fontWeight: 500 }}>{displayName(r.topCommit.name)}</div>
-                                  <div style={{ fontSize: 11, opacity: .45 }}>{r.topCommit.primary_position} · {money(r.topCommit.open_market_high)}</div>
+                                  <div style={{ fontSize: 11, opacity: .45 }}>{r.topCommit.primary_position} · {nilValue(r.topCommit.open_market_high)}</div>
                                 </div>
                               : "—"
                             }

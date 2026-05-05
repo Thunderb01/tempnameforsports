@@ -8,7 +8,7 @@ import { useRosterBoard }  from "@/hooks/useRosterBoard";
 import { supabase }        from "@/lib/supabase";
 import teamConferences from "@/data/teamConferences.json";
 import { useTeamLogos } from "@/hooks/useTeamLogos";
-import { money, heightToInches, tierColor, projectedTier } from "@/lib/display";
+import { money, nilValue, nilRange, heightToInches, tierColor, projectedTier } from "@/lib/display";
 
 // label → getter(player)
 const COLS = [
@@ -21,8 +21,8 @@ const COLS = [
   { label: "PPG",       get: p => p.stats?.ppg    ?? "—" },
   { label: "RPG",       get: p => p.stats?.rpg    ?? "—" },
   { label: "APG",       get: p => p.stats?.apg    ?? "—" },
-  { label: "Mkt Low",   get: p => money(p.marketLow) },
-  { label: "Mkt High",  get: p => money(p.marketHigh) },
+  { label: "Mkt Low",   get: p => nilValue(p.marketLow) },
+  { label: "Mkt High",  get: p => nilValue(p.marketHigh) },
   { label: "To Team",   get: p => p._toTeam || "—" },
 ];
 
@@ -435,7 +435,7 @@ export function BoardPage() {
                             </div>
                           );
                         })()}
-                        <div className="row-sub">Market: {money(p.marketLow)} – {money(p.marketHigh)}</div>
+                        <div className="row-sub">Market: {nilRange(p.marketLow, p.marketHigh)}</div>
                         {(() => {
                           const s = p.stats || {};
                           const st = v => v != null && String(v) !== "NaN" ? Number(v).toFixed(1) : null;
