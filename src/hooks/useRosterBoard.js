@@ -141,19 +141,14 @@ export function useRosterBoard(team, userId) {
       conf:           row.conference ?? null,
       pos:            row.primary_position,
       year:           row.year,
-      height:         row.height   ?? null,
-      hometown:       row.hometown ?? null,
-      espn_id:        row.espn_id  ?? null,
-      marketLow:      row.open_market_low  ?? 0,
-      marketHigh:     row.open_market_high ?? 0,
-      nilValuation:   row.nil_valuation    ?? 0,
-      playmakerTags:  row.playmaker_tags  ? row.playmaker_tags.split(",").map(t => t.trim()).filter(Boolean)  : [],
-      specialistTags: row.specialist_tags ? row.specialist_tags.split(",").map(t => t.trim()).filter(Boolean) : [],
-      shootingTags:   row.shooting_tags   ? row.shooting_tags.split(",").map(t => t.trim()).filter(Boolean)   : [],
-      shotmakingTags: row.shotmaking_tags ? row.shotmaking_tags.split(",").map(t => t.trim()).filter(Boolean) : [],
-      interiorTags:   row.interior_tags   ? row.interior_tags.split(",").map(t => t.trim()).filter(Boolean)   : [],
-      defensiveTags:  row.defensive_tags  ? row.defensive_tags.split(",").map(t => t.trim()).filter(Boolean)  : [],
-      tags:           [],
+      height:            row.height            ?? null,
+      hometown:          row.hometown          ?? null,
+      espn_id:           row.espn_id           ?? null,
+      eligibility_years: row.eligibility_years ?? null,
+      marketLow:         row.open_market_low   ?? 0,
+      marketHigh:        row.open_market_high  ?? 0,
+      nilValuation:      row.nil_valuation     ?? 0,
+      archetype: row.archetype ?? null,
       stats: {
         ppg:         row.ppg,
         rpg:         row.rpg,
@@ -214,18 +209,14 @@ export function useRosterBoard(team, userId) {
       returning = (data || [])
         .map(row => ({
           ...row,
-          team:           row.current_team,
-          pos:            row.primary_position,
-          espn_id:        row.espn_id  ?? null,
-          marketLow:      row.open_market_low  ?? 0,
-          marketHigh:     row.open_market_high ?? 0,
-          nilValuation:   row.nil_valuation    ?? 0,
-          playmakerTags:  row.playmaker_tags  ? row.playmaker_tags.split(",").map(t => t.trim()).filter(Boolean)  : [],
-          specialistTags: row.specialist_tags ? row.specialist_tags.split(",").map(t => t.trim()).filter(Boolean) : [],
-          shootingTags:   row.shooting_tags   ? row.shooting_tags.split(",").map(t => t.trim()).filter(Boolean)   : [],
-          shotmakingTags: row.shotmaking_tags ? row.shotmaking_tags.split(",").map(t => t.trim()).filter(Boolean) : [],
-          interiorTags:   row.interior_tags   ? row.interior_tags.split(",").map(t => t.trim()).filter(Boolean)   : [],
-          defensiveTags:  row.defensive_tags  ? row.defensive_tags.split(",").map(t => t.trim()).filter(Boolean)  : [],
+          team:              row.current_team,
+          pos:               row.primary_position,
+          espn_id:           row.espn_id           ?? null,
+          eligibility_years: row.eligibility_years ?? null,
+          marketLow:         row.open_market_low   ?? 0,
+          marketHigh:        row.open_market_high  ?? 0,
+          nilValuation:      row.nil_valuation     ?? 0,
+          archetype: row.archetype ?? null,
           stats: {
             ppg: row.ppg, rpg: row.rpg, apg: row.apg, usg: row.usg,
             ast_tov: row.ast_tov, fg_pct: row.fg_pct, "3p_pct": row["3p_pct"],
@@ -248,13 +239,13 @@ export function useRosterBoard(team, userId) {
       supabase
         .from("portal_transfers")
         .select("player_id, status")
-        .eq("season_year", 2026)
+        .gte("season_year", 2026)
         .neq("status", "withdrawn")
         .in("player_id", returningIds),
       supabase
         .from("portal_transfers")
         .select("player_id")
-        .eq("season_year", 2026)
+        .gte("season_year", 2026)
         .eq("status", "committed")
         .ilike("to_team", teamName)
         .not("player_id", "is", null),
@@ -322,7 +313,8 @@ export function useRosterBoard(team, userId) {
       if (mapped) adminStatusMap[r.id] = mapped;
     });
 
-    const GRADUATING_YEARS = ["Senior", "Graduate", "SR", "GR"];
+    // Fallback label list for players whose eligibility_years isn't set yet
+    const GRADUATING_LABELS = ["Sr", "RS Sr", "Grad", "5th Year", "Senior", "RS Senior", "Graduate", "SR", "GR"];
     setState(s => {
       const portalRetention  = {};  // always overrides saved state
       const defaultRetention = {};  // only fills missing entries
@@ -331,9 +323,10 @@ export function useRosterBoard(team, userId) {
         if (portalRetentionMap[p.id]) {
           portalRetention[p.id] = portalRetentionMap[p.id]; // always wins
         } else if (!s.retentionById[p.id]) {
-          // admin player_status > year-based fallback
-          defaultRetention[p.id] = adminStatusMap[p.id]
-            ?? (GRADUATING_YEARS.includes(p.year) ? "graduating" : "returning");
+          // eligibility_years === 1 is authoritative; fall back to label matching
+          const isGraduating = p.eligibility_years === 1
+            || (!p.eligibility_years && GRADUATING_LABELS.includes(p.year));
+          defaultRetention[p.id] = adminStatusMap[p.id] ?? (isGraduating ? "graduating" : "returning");
         }
         if (!s.nilById[p.id] && p.nilValuation > 0) {
           autoNil[p.id] = Math.round(p.nilValuation);

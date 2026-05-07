@@ -227,13 +227,11 @@ export function PlayerModal({ player, onClose, onReplace }) {
                 </div>
               );
             })()}
-            {/* 3PT Specialist badge — hidden until ready to surface
-            {player.specialistTags?.includes("3pt_specialist") && (
+            {player.archetype && (
               <div style={{ marginTop: 6, marginLeft: 6, display: "inline-block", padding: "3px 10px", borderRadius: 20, fontSize: 12, fontWeight: 600, background: "#38bdf822", color: "#38bdf8", border: "1px solid #38bdf855" }}>
-                3PT Specialist
+                {player.archetype}
               </div>
             )}
-            */}
           </div>
 
           <div className="modal-section">

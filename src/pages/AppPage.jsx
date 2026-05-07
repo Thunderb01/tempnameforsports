@@ -262,10 +262,10 @@ function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], userTeam = ""
   // Conference-adjusted team scores: metrics (SEI/ATH/RIS/DDS/CDI) are min-max
   // normalised within the conference pool so scores reflect intra-conference
   // competition rather than national standings.
-  const confTeamScores = useMemo(() => {
-    if (!allPlayers.length || !userConf) return [];
+  const { scores: confTeamScores, ranges: confRanges } = useMemo(() => {
+    if (!allPlayers.length || !userConf) return { scores: [], ranges: null };
     const confPool = allPlayers.filter(p => (teamConferences[p.team] ?? p.conf) === userConf);
-    if (confPool.length < 2) return [];
+    if (confPool.length < 2) return { scores: [], ranges: null };
 
     const METRIC_KEYS = ["sei", "ath", "ris", "dds", "cdi"];
     const ranges = {};
@@ -296,7 +296,7 @@ function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], userTeam = ""
       if (!byTeam[p.team]) byTeam[p.team] = [];
       byTeam[p.team].push(p);
     });
-    return Object.entries(byTeam).map(([team, players]) => {
+    const scores = Object.entries(byTeam).map(([team, players]) => {
       const conf = teamConferences[team] ?? players[0]?.conf ?? null;
       const byPos = {};
       players.forEach(p => {
@@ -311,6 +311,7 @@ function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], userTeam = ""
       });
       return { team, score, conf, playerCount: players.length };
     }).sort((a, b) => b.score - a.score).map((t, i) => ({ ...t, rank: i + 1 }));
+    return { scores, ranges };
   }, [allPlayers, userConf]);
 
   const POS_ORDER = ["Guard", "Wing", "Big"];
@@ -344,6 +345,45 @@ function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], userTeam = ""
   POS_ORDER.forEach(pos => {
     (chart[pos] || []).forEach((p, i) => { chartScore += btpPlayerScoreDisplay(p) * (SLOT_WEIGHTS_DISPLAY[i] ?? 0.05); });
   });
+
+  // Conf-normalized score for the live chart using the same ranges as confTeamScores
+  const liveConfScore = (() => {
+    if (!confRanges) return chartScore;
+    function confNormLive(val, key) {
+      const { min, max } = confRanges[key];
+      if (max === min) return 50;
+      return Math.max(0, Math.min(100, ((val - min) / (max - min)) * 100));
+    }
+    function confPsLive(p) {
+      const s = p.stats || {};
+      const sei    = confNormLive(s.sei  || 0, "sei") * 15000;
+      const ath    = confNormLive(s.ath  || 0, "ath") *  5000;
+      const ris    = confNormLive(s.ris  || 0, "ris") *  4000;
+      const dds    = confNormLive(s.dds  || 0, "dds") *  4000;
+      const cdi    = confNormLive(s.cdi  || 0, "cdi") *  4000;
+      const market = (p.marketHigh || 0) * (isPriorYearEval(p) ? 0.8 : 1.0);
+      return sei * 0.50 + market * 0.15 + ath * 0.13 + ris * 0.08 + dds * 0.08 + cdi * 0.06;
+    }
+    let s = 0;
+    POS_ORDER.forEach(pos => {
+      (chart[pos] || []).forEach((p, i) => { s += confPsLive(p) * (SLOT_WEIGHTS_DISPLAY[i] ?? 0.05); });
+    });
+    return s;
+  })();
+
+  function injectUserScore(list, liveScore, team, conf, count) {
+    if (!list.length || !team) return list;
+    const existing = list.find(t => t.team === team);
+    const entry = { ...(existing ?? { team, conf, playerCount: count }), score: liveScore };
+    return list
+      .filter(t => t.team !== team)
+      .concat([entry])
+      .sort((a, b) => b.score - a.score)
+      .map((t, i) => ({ ...t, rank: i + 1 }));
+  }
+
+  const liveTeamScores = injectUserScore(teamScores, chartScore, userTeam, userConf, scoringPool.length);
+  const liveConfTeamScores = injectUserScore(confTeamScores, liveConfScore, userTeam, userConf, scoringPool.length);
 
   if (!scoringPool.length) {
     return <div className="empty" style={{ marginTop: 24 }}>Add players to your roster to see the strength breakdown.</div>;
@@ -551,15 +591,15 @@ function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], userTeam = ""
       </div>
 
       {/* ── Conference / League comparison ─────────────────────────────────── */}
-      {teamScores.length > 0 && (() => {
-        const displayList = cmpScope === "conference" ? confTeamScores : (() => {
-          const userRank = teamScores.findIndex(t => t.team === userTeam);
-          if (userRank <= 24) return teamScores.slice(0, Math.max(25, userRank + 1));
-          return [...teamScores.slice(0, 5), null, ...teamScores.slice(userRank - 2, userRank + 3)];
+      {liveTeamScores.length > 0 && (() => {
+        const displayList = cmpScope === "conference" ? liveConfTeamScores : (() => {
+          const userRank = liveTeamScores.findIndex(t => t.team === userTeam);
+          if (userRank <= 24) return liveTeamScores.slice(0, Math.max(25, userRank + 1));
+          return [...liveTeamScores.slice(0, 5), null, ...liveTeamScores.slice(userRank - 2, userRank + 3)];
         })();
         const maxScore = Math.max(...displayList.filter(Boolean).map(t => t.score), 1);
-        const userRankAll  = teamScores.findIndex(t => t.team === userTeam) + 1;
-        const userRankConf = confTeamScores.findIndex(t => t.team === userTeam) + 1;
+        const userRankAll  = liveTeamScores.findIndex(t => t.team === userTeam) + 1;
+        const userRankConf = liveConfTeamScores.findIndex(t => t.team === userTeam) + 1;
 
         return (
           <div style={{ background: "rgba(255,255,255,.03)", border: "1px solid var(--border)", borderRadius: 10, overflow: "hidden" }}>
@@ -582,8 +622,8 @@ function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], userTeam = ""
               </div>
               <div style={{ width: "100%", fontSize: 11, opacity: .35 }}>
                 {cmpScope === "conference"
-                  ? `${confTeamScores.length} teams · metrics scaled within ${userConf ?? "conference"}`
-                  : `Rank ${userRankAll} of ${teamScores.length} teams nationally · national metrics`}
+                  ? `${liveConfTeamScores.length} teams · metrics scaled within ${userConf ?? "conference"}`
+                  : `Rank ${userRankAll} of ${liveTeamScores.length} teams nationally · national metrics`}
               </div>
             </div>
 

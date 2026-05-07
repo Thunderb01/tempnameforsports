@@ -24,6 +24,7 @@ Dependencies:
 import argparse
 import csv
 import os
+import re
 import time
 import logging
 from typing import Iterator
@@ -143,14 +144,95 @@ def parse_rows(
             "stats":       stat_cols,
         }
 
-        # Grab profile URL for potential follow-up
-        name_td = tr.find("td", {"data-title": lambda t: t and "player" in t.lower()})
+        # Grab profile URL — try data-th, data-title, then first td with a link
+        name_td = (
+            tr.find("td", {"data-th":    lambda t: t and "player" in t.lower()})
+            or tr.find("td", {"data-title": lambda t: t and "player" in t.lower()})
+            or next((td for td in tr.find_all("td") if td.find("a", href=lambda h: h and "/player/" in h)), None)
+        )
         if name_td and name_td.find("a"):
             row["profile_url"] = BASE_URL + name_td.find("a")["href"]
 
         rows.append(row)
 
     return rows
+
+
+def splits_url(profile_url: str, season: int) -> str | None:
+    """Derive a player's international splits URL from their RealGM profile URL."""
+    m = re.search(r"/player/([^/]+)/[^/]+/(\d+)", profile_url)
+    if not m:
+        return None
+    name_slug, player_id = m.group(1), m.group(2)
+    return (
+        f"{BASE_URL}/player/{name_slug}/International/{player_id}"
+        f"/{season}/By_Season/Per_Game/{LEAGUE_ID}/{LEAGUE_SLUG}"
+    )
+
+
+def parse_splits(soup: BeautifulSoup) -> list[dict]:
+    """Parse the splits/season-breakdown table from a player's international page."""
+    table = (
+        soup.find("table", class_=lambda c: c and "tablesaw" in c)
+        or next((t for t in soup.find_all("table") if t.find("thead")), None)
+    )
+    if not table:
+        return []
+
+    headers = [th.get_text(strip=True).lower() for th in table.select("thead th")]
+    rows = []
+    for tr in table.select("tbody tr"):
+        cells = [td.get_text(strip=True) for td in tr.find_all("td")]
+        if not cells or len(cells) < 3:
+            continue
+        rows.append(dict(zip(headers, cells)))
+    return rows
+
+
+def scrape_splits(rows: list[dict], season: int) -> list[dict]:
+    """
+    Visit each unique player's splits page and return split records.
+    Deduplicates by profile_url so multi-stat-type runs don't double-fetch.
+    """
+    seen: dict[str, str] = {}
+    for r in rows:
+        url = r.get("profile_url")
+        if url and url not in seen:
+            seen[url] = r["player_name"]
+
+    missing = [r["player_name"] for r in rows if not r.get("profile_url")]
+    if missing:
+        log.warning(f"{len(missing)} player(s) had no profile_url: {missing[:5]}{'...' if len(missing) > 5 else ''}")
+    log.info(f"Scraping splits for {len(seen)} unique player(s).")
+
+    if not seen:
+        log.error("No profile URLs found — splits cannot be fetched. Check parse_rows is capturing links.")
+        return []
+
+    split_records = []
+    total = len(seen)
+    for i, (profile_url, player_name) in enumerate(seen.items(), 1):
+        url = splits_url(profile_url, season)
+        if not url:
+            log.warning(f"Could not derive splits URL for {player_name}")
+            continue
+        log.info(f"[{i}/{total}] Splits: {player_name}")
+        soup = fetch(url)
+        if not soup:
+            log.warning(f"  Failed to fetch splits for {player_name}")
+            continue
+        splits = parse_splits(soup)
+        log.info(f"  {len(splits)} split row(s)")
+        for s in splits:
+            split_records.append({
+                "player_name": player_name,
+                "profile_url": profile_url,
+                "league":      LEAGUE_NAME,
+                "season":      season,
+                "split_stats": s,
+            })
+
+    return split_records
 
 
 def has_next_page(soup: BeautifulSoup, current_page: int) -> bool:
@@ -239,6 +321,35 @@ def write_csv(rows: list[dict], path: str) -> None:
     log.info(f"Wrote {len(flat)} rows to {path}")
 
 
+# ── Output: CSV (splits) ─────────────────────────────────────────────────────
+
+def write_splits_csv(split_records: list[dict], path: str) -> None:
+    if not split_records:
+        log.warning("No splits data to write.")
+        return
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+
+    all_stat_keys: list[str] = []
+    for r in split_records:
+        for k in r.get("split_stats", {}):
+            if k not in all_stat_keys:
+                all_stat_keys.append(k)
+
+    flat = []
+    for r in split_records:
+        row = {k: v for k, v in r.items() if k not in ("split_stats", "profile_url")}
+        for k in all_stat_keys:
+            row[k] = r.get("split_stats", {}).get(k, "")
+        flat.append(row)
+
+    keys = list(flat[0].keys())
+    with open(path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=keys, extrasaction="ignore")
+        writer.writeheader()
+        writer.writerows(flat)
+    log.info(f"Wrote {len(flat)} split rows to {path}")
+
+
 # ── Output: Supabase ──────────────────────────────────────────────────────────
 
 def write_supabase(rows: list[dict], url: str, key: str) -> None:
@@ -305,6 +416,59 @@ def write_supabase(rows: list[dict], url: str, key: str) -> None:
     log.info("Supabase write complete.")
 
 
+def write_supabase_splits(split_records: list[dict], url: str, key: str) -> None:
+    """
+    Upsert split records into international_players_splits.
+    'split' is extracted as a top-level column; remaining stats go into a JSONB blob.
+    Unique key: (player_name, league, season, split).
+    """
+    from supabase import create_client
+
+    if not split_records:
+        log.warning("No splits data to write.")
+        return
+
+    sb = create_client(url, key)
+
+    # Fetch player UUIDs for all names in this batch
+    names = list({r["player_name"] for r in split_records})
+    result = sb.table("international_players").select("id,name").in_("name", names).execute()
+    id_map = {p["name"]: p["id"] for p in (result.data or [])}
+
+    records = []
+    for r in split_records:
+        stats = dict(r.get("split_stats", {}))
+        # Pull 'split' out as a top-level column so it can be used in the unique key
+        split_label = stats.pop("split", None)
+        records.append({
+            "player_id":   id_map.get(r["player_name"]),
+            "player_name": r["player_name"],
+            "league":      r["league"],
+            "season":      r["season"],
+            "split":       split_label,
+            "team":        stats.pop("team", None),
+            "stats":       stats,  # remaining per-game numbers as JSONB
+        })
+
+    log.info(f"Upserting {len(records)} split rows into international_players_splits...")
+    chunk_size = 500
+    for i in range(0, len(records), chunk_size):
+        chunk = records[i : i + chunk_size]
+        try:
+            resp = sb.table("international_players_splits").upsert(
+                chunk,
+                on_conflict="player_name,league,season,split",
+            ).execute()
+            if hasattr(resp, "error") and resp.error:
+                log.error(f"  Supabase error on chunk {i//chunk_size + 1}: {resp.error}")
+            else:
+                log.info(f"  Upserted rows {i+1}–{min(i+chunk_size, len(records))}")
+        except Exception as e:
+            log.error(f"  Exception on chunk {i//chunk_size + 1}: {e}")
+
+    log.info("Splits Supabase write complete.")
+
+
 # ── CLI ───────────────────────────────────────────────────────────────────────
 
 def main():
@@ -320,7 +484,11 @@ def main():
     parser.add_argument("--season-type", default="Regular_Season", choices=SEASON_TYPES,
                         help="Regular_Season or Playoffs (default: Regular_Season)")
     parser.add_argument("--out",         default=None,
-                        help="Output CSV path (omit to skip CSV)")
+                        help="Output CSV path for main stats (omit to skip CSV)")
+    parser.add_argument("--splits",      action="store_true",
+                        help="Also scrape each player's individual splits page")
+    parser.add_argument("--splits-out",  default=None, metavar="FILE",
+                        help="Output CSV path for splits data")
     parser.add_argument("--save-html",   default=None, metavar="FILE",
                         help="Save raw HTML of first page to FILE for debugging")
     parser.add_argument("--supabase",    action="store_true",
@@ -331,8 +499,8 @@ def main():
                         help="Supabase service role key (or set SUPABASE_SERVICE_KEY env var)")
     args = parser.parse_args()
 
-    if not args.out and not args.supabase:
-        parser.error("Specify at least --out <file.csv> or --supabase (or both).")
+    if not args.out and not args.supabase and not args.splits_out:
+        parser.error("Specify at least --out <file.csv>, --splits-out <file.csv>, or --supabase (or a combination).")
 
     seasons = args.seasons if args.seasons else [args.season]
     rows    = scrape(seasons, args.stat_type, args.qualifier, args.season_type, args.save_html)
@@ -344,6 +512,19 @@ def main():
         if not args.supabase_url or not args.supabase_key:
             parser.error("--supabase requires SUPABASE_URL and SUPABASE_SERVICE_KEY env vars (or --supabase-url / --supabase-key flags).")
         write_supabase(rows, args.supabase_url, args.supabase_key)
+
+    if args.splits or args.splits_out:
+        # Splits are per-season — use the first season if multiple were given
+        split_season = seasons[0]
+        if len(seasons) > 1:
+            log.warning(f"Splits only supports one season at a time; using {split_season}.")
+        split_records = scrape_splits(rows, split_season)
+
+        if args.splits_out:
+            write_splits_csv(split_records, args.splits_out)
+
+        if args.supabase:
+            write_supabase_splits(split_records, args.supabase_url, args.supabase_key)
 
 
 if __name__ == "__main__":

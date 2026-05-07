@@ -82,7 +82,14 @@ const PLAYER_STATUS_COLOR   = {
   declared:    "#c084fc",
 };
 
-const YEAR_OPTIONS     = ["Fr", "RS Fr", "So", "RS So", "Jr", "RS Jr", "Sr", "RS Sr", "Grad"];
+const YEAR_OPTIONS = ["Fr", "RS Fr", "So", "RS So", "Jr", "RS Jr", "Sr", "RS Sr", "Grad", "5th Year", "JuCo", "G League"];
+
+const ARCHETYPE_OPTIONS = [
+  "Three-Point Specialist",
+  "Playmaking Guard", "Two-Way Guard", "Scoring Guard",
+  "3-and-D Wing", "Scoring Wing", "Versatile Wing",
+  "Two-Way Big", "Rim Protector", "Stretch Big",
+];
 const POSITION_OPTIONS = ["Guard", "Wing", "Big"];
 
 const PENTAGON_METRICS = [
@@ -433,9 +440,10 @@ export function AdminPage() {
 
           <div style={{ display: "flex", gap: 6, marginTop: 20 }}>
             {[
-              { key: "transfers", label: "Portal Transfers" },
-              { key: "players",   label: "Players" },
-              { key: "coaches",   label: "Coaches" },
+              { key: "transfers",     label: "Portal Transfers" },
+              { key: "players",       label: "Players" },
+              { key: "international", label: "International" },
+              { key: "coaches",       label: "Coaches" },
             ].map(t => (
               <button key={t.key} onClick={() => setActiveTab(t.key)} style={{
                 fontSize: 12, fontWeight: 600, padding: "5px 16px", borderRadius: 20, cursor: "pointer", border: "1px solid",
@@ -448,9 +456,10 @@ export function AdminPage() {
         </div>
 
         <div style={{ marginTop: 24 }}>
-          {activeTab === "transfers" && <TransfersTab />}
-          {activeTab === "players"   && <PlayersTab />}
-          {activeTab === "coaches"   && <CoachesTab />}
+          {activeTab === "transfers"     && <TransfersTab />}
+          {activeTab === "players"       && <PlayersTab />}
+          {activeTab === "international" && <InternationalPlayersTab />}
+          {activeTab === "coaches"       && <CoachesTab />}
         </div>
       </div>
     </>
@@ -493,13 +502,18 @@ function TransfersTab() {
 
     let error;
     if (form.existing_transfer_id) {
-      // Update the existing row
       ({ error } = await supabase.from("portal_transfers").update(payload).eq("id", form.existing_transfer_id));
     } else {
       ({ error } = await supabase.from("portal_transfers").insert(payload));
     }
     if (error) { alert("Error: " + error.message); }
-    else { await fetchTransfers(); }
+    else {
+      // Auto-mark the linked player as transferring
+      if (form.player_id) {
+        await supabase.from("players").update({ player_status: "transferring" }).eq("id", form.player_id);
+      }
+      await fetchTransfers();
+    }
     setSaving(false);
   }
 
@@ -515,7 +529,13 @@ function TransfersTab() {
       status:      form.status,
     }).eq("id", id);
     if (error) { alert("Error: " + error.message); }
-    else { setEditId(null); await fetchTransfers(); }
+    else {
+      if (form.player_id) {
+        await supabase.from("players").update({ player_status: "transferring" }).eq("id", form.player_id);
+      }
+      setEditId(null);
+      await fetchTransfers();
+    }
     setSaving(false);
   }
 
@@ -615,11 +635,13 @@ function TransfersTab() {
 
 // ── Players tab ────────────────────────────────────────────────────────────
 function PlayersTab() {
-  const [query,   setQuery]   = useState("");
-  const [results, setResults] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [editId,  setEditId]  = useState(null);
-  const [saving,  setSaving]  = useState(false);
+  const [query,      setQuery]      = useState("");
+  const [results,    setResults]    = useState([]);
+  const [loading,    setLoading]    = useState(false);
+  const [editId,     setEditId]     = useState(null);
+  const [editPlayer, setEditPlayer] = useState(null);
+  const [addMode,    setAddMode]    = useState(false);
+  const [saving,     setSaving]     = useState(false);
   const timeoutRef = useRef(null);
 
   const search = useCallback((q) => {
@@ -629,7 +651,7 @@ function PlayersTab() {
     timeoutRef.current = setTimeout(async () => {
       const { data, error } = await supabase
         .from("vw_players")
-        .select("id, name, primary_position, year, current_team, open_market_high, open_market_low, nil_valuation")
+        .select("*")
         .ilike("name", `%${q.trim()}%`)
         .order("name")
         .limit(30);
@@ -652,12 +674,28 @@ function PlayersTab() {
 
   useEffect(() => { search(query); }, [query]);
 
+  function handleEdit(p) {
+    setEditPlayer(p);
+    setEditId(p.id);
+    setAddMode(false);
+  }
+
   async function handleSave(id, patch) {
     setSaving(true);
     const { error } = await supabase.from("players").update(patch).eq("id", id);
     if (error) { alert("Error: " + error.message); setSaving(false); return; }
     setResults(prev => prev.map(p => p.id === id ? { ...p, ...patch } : p));
     setEditId(null);
+    setEditPlayer(null);
+    setSaving(false);
+  }
+
+  async function handleAdd(patch) {
+    setSaving(true);
+    const { error } = await supabase.from("players").insert(patch);
+    if (error) { alert("Error: " + error.message); setSaving(false); return; }
+    setAddMode(false);
+    if (query.trim().length >= 2) search(query);
     setSaving(false);
   }
 
@@ -669,11 +707,28 @@ function PlayersTab() {
 
   return (
     <div>
-      <div style={{ marginBottom: 20 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
         <input className="input" placeholder="Search player by name…" value={query}
-          onChange={e => setQuery(e.target.value)} style={{ width: 300 }} />
-        {loading && <span style={{ marginLeft: 10, fontSize: 12, opacity: .4 }}>Searching…</span>}
+          onChange={e => { setQuery(e.target.value); setEditId(null); setEditPlayer(null); setAddMode(false); }}
+          style={{ width: 300 }} />
+        {loading && <span style={{ fontSize: 12, opacity: .4 }}>Searching…</span>}
+        <button className="btn btn-primary" style={{ fontSize: 12, marginLeft: "auto" }}
+          onClick={() => { setAddMode(true); setEditId(null); setEditPlayer(null); }}>
+          + Add Player
+        </button>
       </div>
+
+      {addMode && (
+        <div style={{ marginBottom: 20 }}>
+          <PlayerEditForm
+            player={{}}
+            mode="add"
+            saving={saving}
+            onSave={patch => handleAdd(patch)}
+            onCancel={() => setAddMode(false)}
+          />
+        </div>
+      )}
 
       {results.length === 0 && query.trim().length >= 2 && !loading && (
         <div style={{ opacity: .35, fontSize: 13 }}>No players found.</div>
@@ -683,7 +738,13 @@ function PlayersTab() {
         {results.map(p => (
           <div key={p.id}>
             {editId === p.id
-              ? <PlayerEditForm player={p} saving={saving} onSave={patch => handleSave(p.id, patch)} onCancel={() => setEditId(null)} />
+              ? <PlayerEditForm
+                  player={editPlayer || p}
+                  mode="edit"
+                  saving={saving}
+                  onSave={patch => handleSave(p.id, patch)}
+                  onCancel={() => { setEditId(null); setEditPlayer(null); }}
+                />
               : (
                 <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap",
                   background: "rgba(255,255,255,.03)", border: "1px solid var(--border)",
@@ -691,16 +752,14 @@ function PlayersTab() {
                   <div style={{ flex: 1, minWidth: 180 }}>
                     <div style={{ fontWeight: 600, fontSize: 13 }}>{p.name}</div>
                     <div style={{ fontSize: 11, opacity: .4, marginTop: 2 }}>
-                      {p.primary_position} · {p.year} · {p.current_team}
+                      {[p.primary_position, p.year, p.current_team].filter(Boolean).join(" · ")}
                     </div>
                   </div>
                   <select
                     className="input"
                     value={p.player_status || ""}
-                    style={{
-                      fontSize: 11, padding: "2px 6px", width: "auto",
-                      color: PLAYER_STATUS_COLOR[p.player_status] || "rgba(255,255,255,.4)",
-                    }}
+                    style={{ fontSize: 11, padding: "2px 6px", width: "auto",
+                      color: PLAYER_STATUS_COLOR[p.player_status] || "rgba(255,255,255,.4)" }}
                     onChange={e => handlePlayerStatusChange(p.id, e.target.value || null)}
                   >
                     <option value="">— status —</option>
@@ -709,7 +768,7 @@ function PlayersTab() {
                     ))}
                   </select>
                   <button className="btn btn-ghost" style={{ fontSize: 11, padding: "2px 8px" }}
-                    onClick={() => setEditId(p.id)}>Edit</button>
+                    onClick={() => handleEdit(p)}>Edit</button>
                 </div>
               )
             }
@@ -720,79 +779,353 @@ function PlayersTab() {
   );
 }
 
-function PlayerEditForm({ player, onSave, onCancel, saving }) {
-  const [year,          setYear]          = useState(player.year             || "");
-  const [pos,           setPos]           = useState(player.primary_position || "");
-  const [team,          setTeam]          = useState(player.current_team     || "");
-  const [mktLow,        setMktLow]        = useState(player.open_market_low  ?? "");
-  const [mktHigh,       setMktHigh]       = useState(player.open_market_high ?? "");
-  const [nilVal,        setNilVal]        = useState(player.nil_valuation    ?? "");
-  const [playerStatus,  setPlayerStatus]  = useState(player.player_status    || "");
+function PlayerEditForm({ player, mode = "edit", onSave, onCancel, saving }) {
+  const isAdd = mode === "add";
+  const [form, setForm] = useState({
+    name:              player.name              || "",
+    espn_id:           player.espn_id           || "",
+    height:            player.height            || "",
+    hometown:          player.hometown          || "",
+    year:              player.year              || "",
+    eligibility_years: player.eligibility_years ?? "",
+    primary_position:  player.primary_position  || "",
+    current_team:      player.current_team      || "",
+    conference:        player.conference        || "",
+    player_status:     player.player_status     || "",
+    open_market_low:   player.open_market_low   ?? "",
+    open_market_high:  player.open_market_high  ?? "",
+    nil_valuation:     player.nil_valuation     ?? "",
+    sei:               player.sei               ?? "",
+    ath:               player.ath               ?? "",
+    ris:               player.ris               ?? "",
+    dds:               player.dds               ?? "",
+    cdi:               player.cdi               ?? "",
+    archetype:         player.archetype         || "",
+  });
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
   function submit() {
+    const num = (v) => v !== "" ? Number(v) : null;
     onSave({
-      year:             year         || null,
-      primary_position: pos          || null,
-      current_team:     team         || null,
-      open_market_low:  mktLow  !== "" ? Number(mktLow)  : null,
-      open_market_high: mktHigh !== "" ? Number(mktHigh) : null,
-      nil_valuation:    nilVal  !== "" ? Number(nilVal)  : null,
-      player_status:    playerStatus || null,
+      name:              form.name.trim()          || null,
+      espn_id:           form.espn_id.trim()       || null,
+      height:            form.height.trim()        || null,
+      hometown:          form.hometown.trim()      || null,
+      year:              form.year                 || null,
+      eligibility_years: num(form.eligibility_years),
+      primary_position:  form.primary_position     || null,
+      current_team:      form.current_team.trim()  || null,
+      conference:        form.conference.trim()    || null,
+      player_status:     form.player_status        || null,
+      open_market_low:   num(form.open_market_low),
+      open_market_high:  num(form.open_market_high),
+      nil_valuation:     num(form.nil_valuation),
+      sei:               num(form.sei),
+      ath:               num(form.ath),
+      ris:               num(form.ris),
+      dds:               num(form.dds),
+      cdi:               num(form.cdi),
+      archetype:         form.archetype || null,
     });
   }
 
+  const sectionHead = (title) => (
+    <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".06em", opacity: .35,
+      fontWeight: 600, marginBottom: 10, marginTop: 4 }}>{title}</div>
+  );
+
   return (
-    <div style={{ background: "rgba(255,255,255,.03)", border: "1px solid var(--border)", borderRadius: 10, padding: 16, maxWidth: 640 }}>
-      <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 12 }}>{player.name}</div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+    <div style={{ background: "rgba(255,255,255,.03)", border: "1px solid var(--border)", borderRadius: 10, padding: 20 }}>
+      <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 18 }}>
+        {isAdd ? "Add New Player" : (player.name || "Edit Player")}
+      </div>
+
+      {/* Identity */}
+      {sectionHead("Identity")}
+      <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr", gap: 10, marginBottom: 16 }}>
         <div>
-          <label style={labelStyle}>Year / Eligibility</label>
-          <select className="input" style={{ width: "100%" }} value={year} onChange={e => setYear(e.target.value)}>
+          <label style={labelStyle}>Name</label>
+          <input className="input" style={{ width: "100%" }} value={form.name}
+            onChange={e => set("name", e.target.value)} placeholder="Full name" />
+        </div>
+        <div>
+          <label style={labelStyle}>ESPN ID</label>
+          <input className="input" style={{ width: "100%" }} value={form.espn_id}
+            onChange={e => set("espn_id", e.target.value)} placeholder="optional" />
+        </div>
+        <div>
+          <label style={labelStyle}>Height</label>
+          <input className="input" style={{ width: "100%" }} value={form.height}
+            onChange={e => set("height", e.target.value)} placeholder='6&apos;4"' />
+        </div>
+        <div>
+          <label style={labelStyle}>Hometown</label>
+          <input className="input" style={{ width: "100%" }} value={form.hometown}
+            onChange={e => set("hometown", e.target.value)} placeholder="City, ST" />
+        </div>
+      </div>
+
+      {/* Classification */}
+      {sectionHead("Classification")}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 2fr 2fr 1fr", gap: 10, marginBottom: 16 }}>
+        <div>
+          <label style={labelStyle}>Class / Year</label>
+          <select className="input" style={{ width: "100%" }} value={form.year} onChange={e => set("year", e.target.value)}>
             <option value="">— unset —</option>
             {YEAR_OPTIONS.map(y => <option key={y} value={y}>{y}</option>)}
           </select>
         </div>
         <div>
+          <label style={labelStyle}>Elig. Years Left</label>
+          <input className="input" style={{ width: "100%" }} type="number" min={1} max={5}
+            value={form.eligibility_years} onChange={e => set("eligibility_years", e.target.value)}
+            placeholder="1–5" />
+        </div>
+        <div>
           <label style={labelStyle}>Position</label>
-          <select className="input" style={{ width: "100%" }} value={pos} onChange={e => setPos(e.target.value)}>
+          <select className="input" style={{ width: "100%" }} value={form.primary_position} onChange={e => set("primary_position", e.target.value)}>
             <option value="">— unset —</option>
             {POSITION_OPTIONS.map(p => <option key={p} value={p}>{p}</option>)}
           </select>
         </div>
         <div>
           <label style={labelStyle}>Current Team</label>
-          <input className="input" style={{ width: "100%" }} value={team}
-            onChange={e => setTeam(e.target.value)} placeholder="Team name" />
+          <input className="input" style={{ width: "100%" }} value={form.current_team}
+            onChange={e => set("current_team", e.target.value)} placeholder="Team name" />
         </div>
         <div>
-          <label style={labelStyle}>Market Low ($)</label>
-          <input className="input" style={{ width: "100%" }} type="number" value={mktLow}
-            onChange={e => setMktLow(e.target.value)} placeholder="0" />
-        </div>
-        <div>
-          <label style={labelStyle}>Market High ($)</label>
-          <input className="input" style={{ width: "100%" }} type="number" value={mktHigh}
-            onChange={e => setMktHigh(e.target.value)} placeholder="0" />
-        </div>
-        <div>
-          <label style={labelStyle}>NIL Valuation ($)</label>
-          <input className="input" style={{ width: "100%" }} type="number" value={nilVal}
-            onChange={e => setNilVal(e.target.value)} placeholder="0" />
+          <label style={labelStyle}>Conference</label>
+          <input className="input" style={{ width: "100%" }} value={form.conference}
+            onChange={e => set("conference", e.target.value)} placeholder="e.g. ACC" />
         </div>
         <div>
           <label style={labelStyle}>Player Status</label>
-          <select className="input" style={{ width: "100%", color: PLAYER_STATUS_COLOR[playerStatus] || "inherit" }}
-            value={playerStatus} onChange={e => setPlayerStatus(e.target.value)}>
+          <select className="input" style={{ width: "100%", color: PLAYER_STATUS_COLOR[form.player_status] || "inherit" }}
+            value={form.player_status} onChange={e => set("player_status", e.target.value)}>
             <option value="">— unset —</option>
-            {PLAYER_STATUS_OPTIONS.map(s => (
-              <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
-            ))}
+            {PLAYER_STATUS_OPTIONS.map(s => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
           </select>
         </div>
       </div>
-      <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+
+      {/* NIL */}
+      {sectionHead("NIL & Market")}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 16 }}>
+        <div>
+          <label style={labelStyle}>Market Low ($)</label>
+          <input className="input" style={{ width: "100%" }} type="number" value={form.open_market_low}
+            onChange={e => set("open_market_low", e.target.value)} placeholder="0" />
+        </div>
+        <div>
+          <label style={labelStyle}>Market High ($)</label>
+          <input className="input" style={{ width: "100%" }} type="number" value={form.open_market_high}
+            onChange={e => set("open_market_high", e.target.value)} placeholder="0" />
+        </div>
+        <div>
+          <label style={labelStyle}>NIL Valuation ($)</label>
+          <input className="input" style={{ width: "100%" }} type="number" value={form.nil_valuation}
+            onChange={e => set("nil_valuation", e.target.value)} placeholder="0" />
+        </div>
+      </div>
+
+      {/* BTP Metrics */}
+      {sectionHead("BTP Metrics (0–100)")}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 10, marginBottom: 16 }}>
+        {PENTAGON_METRICS.map(({ key, label }) => (
+          <div key={key}>
+            <label style={labelStyle}>{label}</label>
+            <input className="input" style={{ width: "100%" }} type="number" min={0} max={100} step={0.1}
+              value={form[key]} onChange={e => set(key, e.target.value)} placeholder="—" />
+          </div>
+        ))}
+      </div>
+
+      {/* Archetype */}
+      {sectionHead("Archetype")}
+      <div style={{ fontSize: 11, opacity: .3, marginBottom: 8, marginTop: -6 }}>Leave blank to auto-compute from BTP metrics.</div>
+      <div style={{ marginBottom: 16, maxWidth: 280 }}>
+        <label style={labelStyle}>Archetype</label>
+        <select className="input" style={{ width: "100%" }} value={form.archetype} onChange={e => set("archetype", e.target.value)}>
+          <option value="">— auto (from metrics) —</option>
+          {ARCHETYPE_OPTIONS.map(a => <option key={a} value={a}>{a}</option>)}
+        </select>
+      </div>
+
+      <div style={{ display: "flex", gap: 8 }}>
         <button className="btn btn-primary" style={{ fontSize: 12 }} disabled={saving} onClick={submit}>
-          {saving ? "Saving…" : "Save Changes"}
+          {saving ? "Saving…" : isAdd ? "Add Player" : "Save Changes"}
+        </button>
+        <button className="btn btn-ghost" style={{ fontSize: 12 }} onClick={onCancel}>Cancel</button>
+      </div>
+    </div>
+  );
+}
+
+// ── International Players tab ──────────────────────────────────────────────
+function InternationalPlayersTab() {
+  const [query,   setQuery]   = useState("");
+  const [results, setResults] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [editId,  setEditId]  = useState(null);
+  const [addMode, setAddMode] = useState(false);
+  const [saving,  setSaving]  = useState(false);
+  const timeoutRef = useRef(null);
+
+  const search = useCallback((q) => {
+    clearTimeout(timeoutRef.current);
+    if (q.trim().length < 2) { setResults([]); return; }
+    setLoading(true);
+    timeoutRef.current = setTimeout(async () => {
+      const { data, error } = await supabase
+        .from("international_players")
+        .select("id, name, league, profile_url, created_at")
+        .ilike("name", `%${q.trim()}%`)
+        .order("name")
+        .limit(30);
+      if (error) { console.error("Intl player search error:", error); }
+      setResults(data || []);
+      setLoading(false);
+    }, 250);
+  }, []);
+
+  useEffect(() => { search(query); }, [query]);
+
+  async function handleSave(id, patch) {
+    setSaving(true);
+    const { error } = await supabase.from("international_players").update(patch).eq("id", id);
+    if (error) { alert("Error: " + error.message); setSaving(false); return; }
+    setResults(prev => prev.map(p => p.id === id ? { ...p, ...patch } : p));
+    setEditId(null);
+    setSaving(false);
+  }
+
+  async function handleAdd(patch) {
+    setSaving(true);
+    const { error } = await supabase.from("international_players").insert(patch);
+    if (error) { alert("Error: " + error.message); setSaving(false); return; }
+    setAddMode(false);
+    if (query.trim().length >= 2) search(query);
+    setSaving(false);
+  }
+
+  async function handleDelete(id) {
+    if (!confirm("Delete this player? This will also remove their stats records.")) return;
+    const { error } = await supabase.from("international_players").delete().eq("id", id);
+    if (error) { alert("Error: " + error.message); return; }
+    setResults(prev => prev.filter(p => p.id !== id));
+  }
+
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
+        <input className="input" placeholder="Search international player by name…" value={query}
+          onChange={e => { setQuery(e.target.value); setEditId(null); setAddMode(false); }}
+          style={{ width: 340 }} />
+        {loading && <span style={{ fontSize: 12, opacity: .4 }}>Searching…</span>}
+        <button className="btn btn-primary" style={{ fontSize: 12, marginLeft: "auto" }}
+          onClick={() => { setAddMode(true); setEditId(null); }}>
+          + Add International Player
+        </button>
+      </div>
+
+      {addMode && (
+        <div style={{ marginBottom: 20 }}>
+          <IntlPlayerEditForm
+            player={{}}
+            mode="add"
+            saving={saving}
+            onSave={patch => handleAdd(patch)}
+            onCancel={() => setAddMode(false)}
+          />
+        </div>
+      )}
+
+      {results.length === 0 && query.trim().length >= 2 && !loading && (
+        <div style={{ opacity: .35, fontSize: 13 }}>No international players found.</div>
+      )}
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        {results.map(p => (
+          <div key={p.id}>
+            {editId === p.id
+              ? <IntlPlayerEditForm
+                  player={p}
+                  mode="edit"
+                  saving={saving}
+                  onSave={patch => handleSave(p.id, patch)}
+                  onCancel={() => setEditId(null)}
+                />
+              : (
+                <div style={{ display: "flex", alignItems: "center", gap: 12,
+                  background: "rgba(255,255,255,.03)", border: "1px solid var(--border)",
+                  borderRadius: 8, padding: "10px 14px" }}>
+                  <div style={{ flex: 1, minWidth: 180 }}>
+                    <div style={{ fontWeight: 600, fontSize: 13 }}>{p.name}</div>
+                    <div style={{ fontSize: 11, opacity: .4, marginTop: 2 }}>{p.league}</div>
+                    {p.profile_url && (
+                      <div style={{ fontSize: 10, opacity: .3, marginTop: 2, fontFamily: "monospace",
+                        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 400 }}>
+                        {p.profile_url}
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <button className="btn btn-ghost" style={{ fontSize: 11, padding: "2px 8px" }}
+                      onClick={() => setEditId(p.id)}>Edit</button>
+                    <button className="btn btn-ghost" style={{ fontSize: 11, padding: "2px 8px", color: "#f77", borderColor: "rgba(220,70,70,.3)" }}
+                      onClick={() => handleDelete(p.id)}>Delete</button>
+                  </div>
+                </div>
+              )
+            }
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function IntlPlayerEditForm({ player, mode = "edit", onSave, onCancel, saving }) {
+  const isAdd = mode === "add";
+  const [name,       setName]       = useState(player.name        || "");
+  const [league,     setLeague]     = useState(player.league      || "");
+  const [profileUrl, setProfileUrl] = useState(player.profile_url || "");
+
+  function submit() {
+    if (!name.trim())   { alert("Name is required.");   return; }
+    if (!league.trim()) { alert("League is required."); return; }
+    onSave({
+      name:        name.trim(),
+      league:      league.trim(),
+      profile_url: profileUrl.trim() || null,
+    });
+  }
+
+  return (
+    <div style={{ background: "rgba(255,255,255,.03)", border: "1px solid var(--border)", borderRadius: 10, padding: 16, maxWidth: 640 }}>
+      <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 12 }}>
+        {isAdd ? "Add International Player" : (player.name || "Edit Player")}
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 10, marginBottom: 10 }}>
+        <div>
+          <label style={labelStyle}>Name</label>
+          <input className="input" style={{ width: "100%" }} value={name}
+            onChange={e => setName(e.target.value)} placeholder="Full name" />
+        </div>
+        <div>
+          <label style={labelStyle}>League</label>
+          <input className="input" style={{ width: "100%" }} value={league}
+            onChange={e => setLeague(e.target.value)} placeholder="e.g. Liga ACB" />
+        </div>
+      </div>
+      <div style={{ marginBottom: 12 }}>
+        <label style={labelStyle}>Profile URL (RealGM)</label>
+        <input className="input" style={{ width: "100%" }} value={profileUrl}
+          onChange={e => setProfileUrl(e.target.value)} placeholder="https://basketball.realgm.com/player/…" />
+      </div>
+      <div style={{ display: "flex", gap: 8 }}>
+        <button className="btn btn-primary" style={{ fontSize: 12 }} disabled={saving} onClick={submit}>
+          {saving ? "Saving…" : isAdd ? "Add Player" : "Save Changes"}
         </button>
         <button className="btn btn-ghost" style={{ fontSize: 12 }} onClick={onCancel}>Cancel</button>
       </div>

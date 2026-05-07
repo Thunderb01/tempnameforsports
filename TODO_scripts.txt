@@ -1,0 +1,59 @@
+================================================================================
+PENDING SCRIPTS — run these when ready
+================================================================================
+
+────────────────────────────────────────────────────────────────────────────────
+1. ELIGIBILITY YEARS BACKFILL
+   Script: backfill_eligibility.py
+────────────────────────────────────────────────────────────────────────────────
+
+Step 1 — Supabase SQL Editor:
+  ALTER TABLE public.players ADD COLUMN IF NOT EXISTS eligibility_years integer;
+
+Step 2 — Run script:
+  python backfill_eligibility.py --dry-run    (preview only)
+  python backfill_eligibility.py              (write to DB)
+
+What it does:
+  Reads every player's current `year` value, maps it to a normalized label
+  ("Junior" → "Jr") and an eligibility_years int ("Jr" → 2), then writes
+  both back. Flags anything it can't recognize so you can fix manually
+  in Admin → Players.
+
+────────────────────────────────────────────────────────────────────────────────
+2. ARCHETYPES BACKFILL
+   Script: backfill_archetypes.py
+────────────────────────────────────────────────────────────────────────────────
+
+Step 1 — Supabase SQL Editor:
+  ALTER TABLE public.players ADD COLUMN IF NOT EXISTS archetype text;
+
+Step 2 — Run script:
+  python backfill_archetypes.py --dry-run     (preview distribution)
+  python backfill_archetypes.py               (write to DB)
+  python backfill_archetypes.py --overwrite   (re-compute already-set archetypes)
+
+Step 3 — After confirming archetypes look right, drop old tag columns:
+  ALTER TABLE public.players
+    DROP COLUMN IF EXISTS playmaker_tags,
+    DROP COLUMN IF EXISTS specialist_tags,
+    DROP COLUMN IF EXISTS shooting_tags,
+    DROP COLUMN IF EXISTS shotmaking_tags,
+    DROP COLUMN IF EXISTS interior_tags,
+    DROP COLUMN IF EXISTS defensive_tags;
+
+What it does:
+  Computes archetype from BTP metrics (SEI, ATH, RIS, DDS, CDI) for every
+  player using the same logic as PlayerFinder. Writes result to players.archetype.
+  Skips unevaluated players (no metrics) and players with no position set.
+
+────────────────────────────────────────────────────────────────────────────────
+ENV VARS (needed for both scripts)
+────────────────────────────────────────────────────────────────────────────────
+
+  $env:SUPABASE_URL         = "https://xxxx.supabase.co"
+  $env:SUPABASE_SERVICE_KEY = "your-service-role-key"
+
+  Find these in: Supabase Dashboard → Settings → API
+
+================================================================================

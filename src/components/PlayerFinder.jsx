@@ -109,12 +109,13 @@ export function PlayerFinder({ board, returningPlayers, retentionById, onClose, 
       pool = pool.filter(p => p.id !== replaceId);
       const leaving = [...returningPlayers, ...board.state.board].find(p => p.id === replaceId);
       if (!leaving) return;
-      const targetArchetype = classifyArchetype(leaving.pos, leaving.stats);
+      const getArchetype = (p) => p.archetype || classifyArchetype(p.pos, p.stats);
+      const targetArchetype = getArchetype(leaving);
       const refVec = metricVec(leaving.stats);
 
       // Primary pool: same archetype. Fallback: same position if archetype pool is thin.
       const archetypePool = targetArchetype
-        ? pool.filter(p => classifyArchetype(p.pos, p.stats) === targetArchetype)
+        ? pool.filter(p => getArchetype(p) === targetArchetype)
         : [];
       const fallbackPool = archetypePool.length < 5
         ? pool.filter(p => p.pos === leaving.pos && !archetypePool.find(ap => ap.id === p.id))
