@@ -143,11 +143,18 @@ create policy "Anyone can submit an access request"
 -- ── International players ──────────────────────────────────────────────────────
 -- One row per player per league. Profile URL links back to RealGM.
 create table if not exists public.international_players (
-  id          uuid primary key default gen_random_uuid(),
-  name        text not null,
-  league      text not null,
-  profile_url text,
-  created_at  timestamp with time zone default now(),
+  id                uuid primary key default gen_random_uuid(),
+  name              text not null,
+  league            text not null,
+  profile_url       text,
+  height            text,
+  primary_position  text,
+  agent_name        text,
+  agent_contact     text,
+  film_url          text,
+  competition_tier  integer default 2 check (competition_tier between 1 and 4),
+  metrics           jsonb default '{}',
+  created_at        timestamp with time zone default now(),
   unique (name, league)
 );
 
