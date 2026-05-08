@@ -72,6 +72,7 @@ function TeamSearch({ value, onChange, placeholder = "Search team…" }) {
 }
 
 const STATUS_OPTIONS = ["uncommitted", "committed", "enrolled", "withdrawn"];
+
 const CURRENT_SEASON = 2027;
 
 const PLAYER_STATUS_OPTIONS = ["returning", "graduating", "transferring", "declared"];
@@ -682,8 +683,19 @@ function PlayersTab() {
 
   async function handleSave(id, patch) {
     setSaving(true);
-    const { error } = await supabase.from("players").update(patch).eq("id", id);
-    if (error) { alert("Error: " + error.message); setSaving(false); return; }
+    const { data, error } = await supabase.from("players").update(patch).eq("id", id).select();
+    if (error) {
+      console.error("handleSave error:", error);
+      alert("Error: " + error.message);
+      setSaving(false);
+      return;
+    }
+    if (!data || data.length === 0) {
+      console.warn("handleSave: update returned no rows — likely RLS blocking write on players table");
+      alert("Save failed: no rows updated. Check RLS policy on players table.");
+      setSaving(false);
+      return;
+    }
     setResults(prev => prev.map(p => p.id === id ? { ...p, ...patch } : p));
     setEditId(null);
     setEditPlayer(null);
@@ -692,8 +704,13 @@ function PlayersTab() {
 
   async function handleAdd(patch) {
     setSaving(true);
-    const { error } = await supabase.from("players").insert(patch);
-    if (error) { alert("Error: " + error.message); setSaving(false); return; }
+    const { data, error } = await supabase.from("players").insert(patch).select();
+    if (error) {
+      console.error("handleAdd error:", error);
+      alert("Error: " + error.message);
+      setSaving(false);
+      return;
+    }
     setAddMode(false);
     if (query.trim().length >= 2) search(query);
     setSaving(false);
@@ -790,16 +807,7 @@ function PlayerEditForm({ player, mode = "edit", onSave, onCancel, saving }) {
     eligibility_years: player.eligibility_years ?? "",
     primary_position:  player.primary_position  || "",
     current_team:      player.current_team      || "",
-    conference:        player.conference        || "",
     player_status:     player.player_status     || "",
-    open_market_low:   player.open_market_low   ?? "",
-    open_market_high:  player.open_market_high  ?? "",
-    nil_valuation:     player.nil_valuation     ?? "",
-    sei:               player.sei               ?? "",
-    ath:               player.ath               ?? "",
-    ris:               player.ris               ?? "",
-    dds:               player.dds               ?? "",
-    cdi:               player.cdi               ?? "",
     archetype:         player.archetype         || "",
   });
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
@@ -815,16 +823,7 @@ function PlayerEditForm({ player, mode = "edit", onSave, onCancel, saving }) {
       eligibility_years: num(form.eligibility_years),
       primary_position:  form.primary_position     || null,
       current_team:      form.current_team.trim()  || null,
-      conference:        form.conference.trim()    || null,
       player_status:     form.player_status        || null,
-      open_market_low:   num(form.open_market_low),
-      open_market_high:  num(form.open_market_high),
-      nil_valuation:     num(form.nil_valuation),
-      sei:               num(form.sei),
-      ath:               num(form.ath),
-      ris:               num(form.ris),
-      dds:               num(form.dds),
-      cdi:               num(form.cdi),
       archetype:         form.archetype || null,
     });
   }
@@ -894,11 +893,6 @@ function PlayerEditForm({ player, mode = "edit", onSave, onCancel, saving }) {
             onChange={e => set("current_team", e.target.value)} placeholder="Team name" />
         </div>
         <div>
-          <label style={labelStyle}>Conference</label>
-          <input className="input" style={{ width: "100%" }} value={form.conference}
-            onChange={e => set("conference", e.target.value)} placeholder="e.g. ACC" />
-        </div>
-        <div>
           <label style={labelStyle}>Player Status</label>
           <select className="input" style={{ width: "100%", color: PLAYER_STATUS_COLOR[form.player_status] || "inherit" }}
             value={form.player_status} onChange={e => set("player_status", e.target.value)}>
@@ -908,37 +902,6 @@ function PlayerEditForm({ player, mode = "edit", onSave, onCancel, saving }) {
         </div>
       </div>
 
-      {/* NIL */}
-      {sectionHead("NIL & Market")}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 16 }}>
-        <div>
-          <label style={labelStyle}>Market Low ($)</label>
-          <input className="input" style={{ width: "100%" }} type="number" value={form.open_market_low}
-            onChange={e => set("open_market_low", e.target.value)} placeholder="0" />
-        </div>
-        <div>
-          <label style={labelStyle}>Market High ($)</label>
-          <input className="input" style={{ width: "100%" }} type="number" value={form.open_market_high}
-            onChange={e => set("open_market_high", e.target.value)} placeholder="0" />
-        </div>
-        <div>
-          <label style={labelStyle}>NIL Valuation ($)</label>
-          <input className="input" style={{ width: "100%" }} type="number" value={form.nil_valuation}
-            onChange={e => set("nil_valuation", e.target.value)} placeholder="0" />
-        </div>
-      </div>
-
-      {/* BTP Metrics */}
-      {sectionHead("BTP Metrics (0–100)")}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 10, marginBottom: 16 }}>
-        {PENTAGON_METRICS.map(({ key, label }) => (
-          <div key={key}>
-            <label style={labelStyle}>{label}</label>
-            <input className="input" style={{ width: "100%" }} type="number" min={0} max={100} step={0.1}
-              value={form[key]} onChange={e => set(key, e.target.value)} placeholder="—" />
-          </div>
-        ))}
-      </div>
 
       {/* Archetype */}
       {sectionHead("Archetype")}

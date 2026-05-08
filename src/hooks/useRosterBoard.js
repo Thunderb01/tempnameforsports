@@ -6,7 +6,7 @@ import { money } from "@/lib/display";
 // Module-level caches so data survives page navigation without re-fetching.
 const SESSION_BOARD_KEY = "bp_board_cache";
 const SESSION_BOARD_TTL  = 4 * 60 * 60 * 1000; // 4 hours
-const SESSION_BOARD_VER  = 4; // bump to invalidate all cached sessions
+const SESSION_BOARD_VER  = 5; // bump to invalidate all cached sessions
 
 function loadSessionCache() {
   try {
@@ -148,7 +148,8 @@ export function useRosterBoard(team, userId) {
       marketLow:         row.open_market_low   ?? 0,
       marketHigh:        row.open_market_high  ?? 0,
       nilValuation:      row.nil_valuation     ?? 0,
-      archetype: row.archetype ?? null,
+      archetype:         row.archetype         ?? null,
+      player_status:     null,  // merged below from players table
       stats: {
         ppg:         row.ppg,
         rpg:         row.rpg,
@@ -166,6 +167,23 @@ export function useRosterBoard(team, userId) {
         calendar_year: row.calendar_year,
       },
     }));
+
+    // Fetch player_status for all players so team comparison can exclude leavers
+    try {
+      const statusMap = {};
+      let sPage = 0;
+      while (true) {
+        const { data: sData } = await supabase
+          .from("players")
+          .select("id, player_status")
+          .not("player_status", "is", null)
+          .range(sPage * 1000, (sPage + 1) * 1000 - 1);
+        (sData || []).forEach(r => { statusMap[r.id] = r.player_status; });
+        if ((sData || []).length < 1000) break;
+        sPage++;
+      }
+      players.forEach(p => { if (statusMap[p.id]) p.player_status = statusMap[p.id]; });
+    } catch (_) { /* RLS or column missing — comparison includes all players */ }
 
     _boardCache = players;
     saveSessionCache(players);

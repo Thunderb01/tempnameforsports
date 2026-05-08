@@ -194,7 +194,8 @@ const TYPE_COLOR = {
 };
 
 // ── Roster Strength breakdown panel ──────────────────────────────────────────
-const SLOT_WEIGHTS_DISPLAY = [1.0, 0.55, 0.30, 0.15, 0.08];
+const SLOT_WEIGHTS_DISPLAY  = [1.0, 0.55, 0.30, 0.15, 0.08];
+const CMP_LEAVING_STATUSES  = new Set(["declared", "transferring", "graduating"]);
 const BTP_METRICS = [
   { key: "sei", label: "SEI", desc: "Scoring Efficiency" },
   { key: "ath", label: "ATH", desc: "Athleticism" },
@@ -233,6 +234,7 @@ function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], userTeam = ""
     const byTeam = {};
     allPlayers.forEach(p => {
       if (!p.team) return;
+      if (CMP_LEAVING_STATUSES.has(p.player_status)) return;
       if (!byTeam[p.team]) byTeam[p.team] = [];
       byTeam[p.team].push(p);
     });
@@ -264,7 +266,7 @@ function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], userTeam = ""
   // competition rather than national standings.
   const { scores: confTeamScores, ranges: confRanges } = useMemo(() => {
     if (!allPlayers.length || !userConf) return { scores: [], ranges: null };
-    const confPool = allPlayers.filter(p => (teamConferences[p.team] ?? p.conf) === userConf);
+    const confPool = allPlayers.filter(p => (teamConferences[p.team] ?? p.conf) === userConf && !CMP_LEAVING_STATUSES.has(p.player_status));
     if (confPool.length < 2) return { scores: [], ranges: null };
 
     const METRIC_KEYS = ["sei", "ath", "ris", "dds", "cdi"];

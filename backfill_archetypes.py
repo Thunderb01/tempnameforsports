@@ -81,14 +81,105 @@ def parse_args():
     p = argparse.ArgumentParser()
     p.add_argument("--dry-run",   action="store_true", help="Print without writing")
     p.add_argument("--overwrite", action="store_true", help="Re-compute even if archetype already set")
+    p.add_argument("--analyze",   action="store_true", help="Show archetype distribution + metric ranges, no writes")
     return p.parse_args()
 
 
-def fetch_all_players(sb):
+# ── Analysis mode ──────────────────────────────────────────────────────────────
+def run_analyze(players):
+    from collections import defaultdict
+    import statistics
+
+    METRICS = ["sei", "ath", "ris", "dds", "cdi"]
+    POSITIONS = ["Guard", "Wing", "Big"]
+
+    # Classify every player that has metrics and a position
+    classified = []
+    skipped_no_pos, skipped_no_metrics = 0, 0
+    for p in players:
+        pos = p.get("primary_position")
+        if not pos:
+            skipped_no_pos += 1
+            continue
+        vals = [p.get(k) for k in METRICS]
+        if all(v is None for v in vals):
+            skipped_no_metrics += 1
+            continue
+        arch = classify_archetype(pos, **{k: p.get(k) for k in METRICS})
+        classified.append({ "name": p.get("name", ""), "pos": pos, "arch": arch,
+                             **{k: p.get(k) or 0 for k in METRICS} })
+
+    total = len(classified)
+    print(f"\n{'='*66}")
+    print(f"  ARCHETYPE ANALYSIS  —  {total} evaluated players")
+    print(f"  (skipped: {skipped_no_pos} no-position, {skipped_no_metrics} no-metrics)")
+    print(f"{'='*66}\n")
+
+    # ── Per-position breakdown ──────────────────────────────────────────────
+    for pos in POSITIONS:
+        group = [r for r in classified if r["pos"] == pos]
+        if not group:
+            continue
+        by_arch = defaultdict(list)
+        for r in group:
+            by_arch[r["arch"] or "(none)"].append(r)
+
+        print(f"  ── {pos}s  ({len(group)} players) {'─'*(44 - len(pos))}")
+        print(f"  {'Archetype':<26}  {'Count':>5}  {'%':>5}  {'SEI':>4}  {'ATH':>4}  {'RIS':>4}  {'DDS':>4}  {'CDI':>4}")
+        print(f"  {'-'*64}")
+        for arch, rows in sorted(by_arch.items(), key=lambda x: -len(x[1])):
+            pct  = len(rows) / len(group) * 100
+            avgs = { k: statistics.mean(r[k] for r in rows) for k in METRICS }
+            print(f"  {arch:<26}  {len(rows):>5}  {pct:>4.0f}%"
+                  f"  {avgs['sei']:>4.0f}  {avgs['ath']:>4.0f}  {avgs['ris']:>4.0f}"
+                  f"  {avgs['dds']:>4.0f}  {avgs['cdi']:>4.0f}")
+        print()
+
+    # ── Borderline players (within 5pts of a threshold) ────────────────────
+    borderline = []
+    for r in classified:
+        reasons = []
+        sei, ath, ris, dds, cdi, pos = r["sei"], r["ath"], r["ris"], r["dds"], r["cdi"], r["pos"]
+        # Three-Point Specialist threshold
+        if 60 <= sei <= 70 or 30 <= ris <= 40 or 40 <= cdi <= 50:
+            reasons.append("near 3PT-Spec threshold")
+        if pos == "Guard":
+            if 55 <= cdi <= 65: reasons.append("CDI near PG/SG split")
+            if 57 <= dds <= 67 or 53 <= ath <= 63: reasons.append("near Two-Way Guard")
+        if pos == "Wing":
+            if 57 <= dds <= 67 or 45 <= sei <= 55: reasons.append("near 3-and-D split")
+            if 55 <= sei <= 65 or 53 <= ath <= 63: reasons.append("near Scoring Wing")
+        if pos == "Big":
+            if 60 <= ris <= 70 or 53 <= dds <= 63: reasons.append("near rim/stretch split")
+        if reasons:
+            borderline.append((r["name"], r["pos"], r["arch"], reasons))
+
+    if borderline:
+        print(f"  ── Borderline players ({len(borderline)}) {'─'*38}")
+        print(f"  {'Player':<28}  {'Pos':<6}  {'Current Arch':<22}  Reason")
+        print(f"  {'-'*80}")
+        for name, pos, arch, reasons in borderline[:30]:
+            print(f"  {name:<28}  {pos:<6}  {arch or '(none)':<22}  {'; '.join(reasons)}")
+        if len(borderline) > 30:
+            print(f"  … and {len(borderline) - 30} more")
+        print()
+
+    # ── Overall distribution ────────────────────────────────────────────────
+    from collections import Counter
+    all_arches = Counter(r["arch"] or "(none)" for r in classified)
+    print(f"  ── National distribution {'─'*40}")
+    for arch, cnt in all_arches.most_common():
+        bar = "█" * int(cnt / max(all_arches.values()) * 30)
+        print(f"  {arch:<26}  {cnt:>4}  {bar}")
+    print()
+
+
+def fetch_all_players(sb, with_archetype=False):
+    # Metrics live on vw_players; archetype (if the column exists) lives on players.
     rows, page_size, offset = [], 1000, 0
     while True:
-        res = sb.table("players") \
-                .select("id, name, primary_position, sei, ath, ris, dds, cdi, archetype") \
+        res = sb.table("vw_players") \
+                .select("id, name, primary_position, sei, ath, ris, dds, cdi") \
                 .range(offset, offset + page_size - 1) \
                 .execute()
         batch = res.data or []
@@ -96,6 +187,25 @@ def fetch_all_players(sb):
         if len(batch) < page_size:
             break
         offset += page_size
+
+    if with_archetype:
+        try:
+            arch_rows, offset = [], 0
+            while True:
+                res = sb.table("players").select("id, archetype").range(offset, offset + page_size - 1).execute()
+                batch = res.data or []
+                arch_rows.extend(batch)
+                if len(batch) < page_size:
+                    break
+                offset += page_size
+            arch_map = {r["id"]: r.get("archetype") for r in arch_rows}
+            for r in rows:
+                r["archetype"] = arch_map.get(r["id"])
+        except Exception:
+            # archetype column not yet added — treat all as unset
+            for r in rows:
+                r["archetype"] = None
+
     return rows
 
 
@@ -107,6 +217,16 @@ def main():
         sys.exit("Set SUPABASE_URL and SUPABASE_SERVICE_KEY, or pass --dry-run.")
 
     sb = None if args.dry_run else create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+
+    if args.analyze:
+        if not SUPABASE_URL or not SUPABASE_SERVICE_KEY:
+            sys.exit("Set SUPABASE_URL and SUPABASE_SERVICE_KEY to run --analyze.")
+        sb = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+        print("Fetching players…")
+        players = fetch_all_players(sb)
+        print(f"  {len(players)} players loaded.")
+        run_analyze(players)
+        return
 
     if args.dry_run:
         print("[DRY-RUN] Showing archetype classification logic:\n")
@@ -131,7 +251,7 @@ def main():
         return
 
     print("Fetching players…")
-    players = fetch_all_players(sb)
+    players = fetch_all_players(sb, with_archetype=True)
     print(f"  {len(players)} players loaded.\n")
 
     updates    = []

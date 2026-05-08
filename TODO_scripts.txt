@@ -29,7 +29,8 @@ Step 1 — Supabase SQL Editor:
   ALTER TABLE public.players ADD COLUMN IF NOT EXISTS archetype text;
 
 Step 2 — Run script:
-  python backfill_archetypes.py --dry-run     (preview distribution)
+  python backfill_archetypes.py --analyze     (see distribution + borderline players)
+  python backfill_archetypes.py --dry-run     (preview changes without writing)
   python backfill_archetypes.py               (write to DB)
   python backfill_archetypes.py --overwrite   (re-compute already-set archetypes)
 
@@ -48,7 +49,25 @@ What it does:
   Skips unevaluated players (no metrics) and players with no position set.
 
 ────────────────────────────────────────────────────────────────────────────────
-ENV VARS (needed for both scripts)
+3. PLAYER STATUS BACKFILL
+   Script: backfill_player_status.py
+────────────────────────────────────────────────────────────────────────────────
+
+No SQL prerequisite — player_status column already exists.
+
+Run script:
+  python backfill_player_status.py --dry-run    (preview only)
+  python backfill_player_status.py              (write to DB)
+  python backfill_player_status.py --overwrite  (re-compute already-set statuses)
+
+Priority order:
+  1. In portal_transfers (season >= 2026)        → "transferring"
+  2. eligibility_years == 1 OR graduating label  → "graduating"
+  3. Has current_team                            → "returning"
+  No team → skipped (left null)
+
+────────────────────────────────────────────────────────────────────────────────
+ENV VARS (needed for all scripts)
 ────────────────────────────────────────────────────────────────────────────────
 
   $env:SUPABASE_URL         = "https://xxxx.supabase.co"
