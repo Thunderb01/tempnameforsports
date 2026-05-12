@@ -340,13 +340,34 @@ export function InternationalPage() {
     return [...ps].sort();
   }, [profiles]);
 
+  // ── Combine stat rows + profile-only orphans ──────────────────────────────
+  // Every profile gets at least one row on the board, even if it has no stats yet.
+  const combinedRows = useMemo(() => {
+    const hasStatsForType = new Set(
+      rows.filter(r => r.stat_type === statType).map(r => r.player_name)
+    );
+    const orphans = Object.values(profiles)
+      .filter(p => !hasStatsForType.has(p.name))
+      .map(p => ({
+        player_name: p.name,
+        league:      p.league,
+        team:        null,
+        season:      null,
+        season_type: null,
+        stat_type:   statType,
+        stats:       {},
+        _profileOnly: true,
+      }));
+    return [...rows, ...orphans];
+  }, [rows, profiles, statType]);
+
   // ── Filter ─────────────────────────────────────────────────────────────────
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return rows.filter(r => {
+    return combinedRows.filter(r => {
       if (r.stat_type !== statType) return false;
       if (leagueFilter !== "all" && r.league !== leagueFilter) return false;
-      if (seasonFilter !== "all" && String(r.season) !== String(seasonFilter)) return false;
+      if (seasonFilter !== "all" && !r._profileOnly && String(r.season) !== String(seasonFilter)) return false;
       if (teamFilter.trim() && !(r.team || "").toLowerCase().includes(teamFilter.trim().toLowerCase())) return false;
       if (q && !(r.player_name || "").toLowerCase().includes(q)) return false;
       if (tierFilter !== "all") {
@@ -359,7 +380,7 @@ export function InternationalPage() {
       }
       return true;
     });
-  }, [rows, profiles, search, leagueFilter, teamFilter, tierFilter, seasonFilter, posFilter, statType]);
+  }, [combinedRows, profiles, search, leagueFilter, teamFilter, tierFilter, seasonFilter, posFilter, statType]);
 
   // ── Sort ───────────────────────────────────────────────────────────────────
   const sorted = useMemo(() => {
@@ -523,7 +544,7 @@ export function InternationalPage() {
                         <div style={{ fontSize: 10, opacity: .4, fontWeight: 400 }}>{prof.primary_position}{prof.height ? ` · ${prof.height}` : ""}</div>
                       )}
                     </td>
-                    <td style={{ ...tdStyle("left"), opacity: .7 }}>{r.team}</td>
+                    <td style={{ ...tdStyle("left"), opacity: .7 }}>{r.team || "—"}</td>
                     <td style={{ ...tdStyle("left"), opacity: .55, fontSize: 12 }}>{r.league}</td>
                     <td style={{ ...tdStyle() }}>
                       {tier ? (
@@ -533,7 +554,7 @@ export function InternationalPage() {
                         }}>T{tier}</span>
                       ) : "—"}
                     </td>
-                    <td style={{ ...tdStyle(), opacity: .6 }}>{r.season}</td>
+                    <td style={{ ...tdStyle(), opacity: .6 }}>{r.season || "—"}</td>
                     {statCols.map(c => (
                       <td key={c.key} style={tdStyle()}>
                         {fmtStatByKey(r.stats?.[c.key], c.key)}

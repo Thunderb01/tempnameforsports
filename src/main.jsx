@@ -15,6 +15,7 @@ import { FAQPage }           from "@/pages/FAQPage";
 const AppPage          = lazy(() => import("@/pages/AppPage").then(m => ({ default: m.AppPage })));
 const BoardPage        = lazy(() => import("@/pages/BoardPage").then(m => ({ default: m.BoardPage })));
 const AdminPage        = lazy(() => import("@/pages/AdminPage").then(m => ({ default: m.AdminPage })));
+const InternationalAdminPage = lazy(() => import("@/pages/InternationalAdminPage").then(m => ({ default: m.InternationalAdminPage })));
 const ComparePage           = lazy(() => import("@/pages/ComparePage").then(m => ({ default: m.ComparePage })));
 const PortalRankingsPage    = lazy(() => import("@/pages/PortalRankingsPage").then(m => ({ default: m.PortalRankingsPage })));
 const PortalPage            = lazy(() => import("@/pages/PortalPage").then(m => ({ default: m.PortalPage })));
@@ -44,7 +45,8 @@ createRoot(document.getElementById("root")).render(
 
           {/* Superadmin only */}
           <Route element={<SuperAdminRoute />}>
-            <Route path="/admin" element={<AdminPage />} />
+            <Route path="/admin"               element={<AdminPage />} />
+            <Route path="/admin/international" element={<InternationalAdminPage />} />
           </Route>
 
           {/* Fallback */}

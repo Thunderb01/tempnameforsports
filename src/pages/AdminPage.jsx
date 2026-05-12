@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { supabase }   from "@/lib/supabase";
 import { money, nilRange, letterGrade, gradeColor } from "@/lib/display";
+import { InternationalAdminContent } from "@/pages/InternationalAdminPage";
 
 // Self-contained team search — queries vw_players.current_team (avoids teams table RLS)
 function TeamSearch({ value, onChange, placeholder = "Search team…" }) {
@@ -459,7 +460,7 @@ export function AdminPage() {
         <div style={{ marginTop: 24 }}>
           {activeTab === "transfers"     && <TransfersTab />}
           {activeTab === "players"       && <PlayersTab />}
-          {activeTab === "international" && <InternationalPlayersTab />}
+          {activeTab === "international" && <InternationalAdminContent />}
           {activeTab === "coaches"       && <CoachesTab />}
         </div>
       </div>
