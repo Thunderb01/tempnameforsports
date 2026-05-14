@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { supabase }   from "@/lib/supabase";
+import { MultiSelectFilter, RangeFilter, FilterChips, parseHeight, formatHeight, playerHeightInches } from "@/components/Filters";
 
 // ── Stat column definitions ───────────────────────────────────────────────────
 const AVERAGES_COLS = [
@@ -293,11 +294,16 @@ export function InternationalPage() {
   const [selected,     setSelected]     = useState(null);  // player_name
   const [searchInput,  setSearchInput]  = useState("");
   const [search,       setSearch]       = useState("");
-  const [leagueFilter, setLeagueFilter] = useState("all");
+  const [leagueFilter, setLeagueFilter] = useState([]);
   const [teamFilter,   setTeamFilter]   = useState("");
-  const [tierFilter,   setTierFilter]   = useState("all");
+  const [tierFilter,   setTierFilter]   = useState([]);
   const [seasonFilter, setSeasonFilter] = useState("all");
-  const [posFilter,    setPosFilter]    = useState("all");
+  const [posFilter,    setPosFilter]    = useState([]);
+  const [classFilter,  setClassFilter]  = useState([]);
+  const [heightMin,    setHeightMin]    = useState(null);
+  const [heightMax,    setHeightMax]    = useState(null);
+  const [ageMin,       setAgeMin]       = useState(null);
+  const [ageMax,       setAgeMax]       = useState(null);
   const [statType,     setStatType]     = useState("Averages");
   const [sortKey,      setSortKey]      = useState("pts");
   const [sortDir,      setSortDir]      = useState("desc");
@@ -309,7 +315,7 @@ export function InternationalPage() {
     return () => clearTimeout(t);
   }, [searchInput]);
 
-  useEffect(() => setPage(0), [search, leagueFilter, teamFilter, tierFilter, seasonFilter, posFilter, statType, sortKey, sortDir]);
+  useEffect(() => setPage(0), [search, leagueFilter, teamFilter, tierFilter, seasonFilter, posFilter, classFilter, heightMin, heightMax, ageMin, ageMax, statType, sortKey, sortDir]);
 
   // ── Fetch stats ────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -369,6 +375,11 @@ export function InternationalPage() {
     Object.values(profiles).forEach(p => { if (p.primary_position) ps.add(p.primary_position); });
     return [...ps].sort();
   }, [profiles]);
+  const classes = useMemo(() => {
+    const cs = new Set();
+    Object.values(profiles).forEach(p => { if (p.recruiting_class) cs.add(p.recruiting_class); });
+    return [...cs].sort();
+  }, [profiles]);
 
   // ── Combine stat rows + profile-only orphans ──────────────────────────────
   // Every profile gets at least one row on the board, even if it has no stats yet.
@@ -396,21 +407,29 @@ export function InternationalPage() {
     const q = search.trim().toLowerCase();
     return combinedRows.filter(r => {
       if (r.stat_type !== statType) return false;
-      if (leagueFilter !== "all" && r.league !== leagueFilter) return false;
+      if (leagueFilter.length && !leagueFilter.includes(r.league)) return false;
       if (seasonFilter !== "all" && !r._profileOnly && String(r.season) !== String(seasonFilter)) return false;
       if (teamFilter.trim() && !(r.team || "").toLowerCase().includes(teamFilter.trim().toLowerCase())) return false;
       if (q && !(r.player_name || "").toLowerCase().includes(q)) return false;
-      if (tierFilter !== "all") {
-        const tier = profiles[r.player_name]?.competition_tier;
-        if (String(tier) !== tierFilter) return false;
+      const prof = profiles[r.player_name];
+      if (tierFilter.length && !tierFilter.includes(String(prof?.competition_tier))) return false;
+      if (posFilter.length  && !posFilter.includes(prof?.primary_position))         return false;
+      if (classFilter.length && !classFilter.includes(prof?.recruiting_class))      return false;
+      if (heightMin != null || heightMax != null) {
+        const inches = playerHeightInches(prof?.height);
+        if (inches == null) return false;
+        if (heightMin != null && inches < heightMin) return false;
+        if (heightMax != null && inches > heightMax) return false;
       }
-      if (posFilter !== "all") {
-        const pos = profiles[r.player_name]?.primary_position;
-        if (pos !== posFilter) return false;
+      if (ageMin != null || ageMax != null) {
+        const a = prof?.age;
+        if (a == null) return false;
+        if (ageMin != null && a < ageMin) return false;
+        if (ageMax != null && a > ageMax) return false;
       }
       return true;
     });
-  }, [combinedRows, profiles, search, leagueFilter, teamFilter, tierFilter, seasonFilter, posFilter, statType]);
+  }, [combinedRows, profiles, search, leagueFilter, teamFilter, tierFilter, seasonFilter, posFilter, classFilter, heightMin, heightMax, ageMin, ageMax, statType]);
 
   // ── Sort ───────────────────────────────────────────────────────────────────
   const sorted = useMemo(() => {
@@ -496,7 +515,7 @@ export function InternationalPage() {
           </div>
 
           {/* Filters */}
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 10, alignItems: "center" }}>
             <input className="input" type="search" placeholder="Search players…"
               style={{ flex: 1, minWidth: 180 }}
               value={searchInput} onChange={e => setSearchInput(e.target.value)} />
@@ -505,28 +524,48 @@ export function InternationalPage() {
               style={{ width: 160 }}
               value={teamFilter} onChange={e => setTeamFilter(e.target.value)} />
 
-            <select className="input" style={{ width: 180 }} value={leagueFilter} onChange={e => setLeagueFilter(e.target.value)}>
-              <option value="all">All leagues</option>
-              {leagues.map(l => <option key={l} value={l}>{l}</option>)}
-            </select>
+            <MultiSelectFilter label="leagues"   options={leagues}   value={leagueFilter} onChange={setLeagueFilter} width={170} />
+            <MultiSelectFilter label="tiers"
+              options={[1,2,3,4].map(t => ({ value: String(t), label: `Tier ${t} · ${tierLabels[t] || TIER_LABELS_FALLBACK[t]}` }))}
+              value={tierFilter} onChange={setTierFilter} width={170} />
+            {positions.length > 0 && (
+              <MultiSelectFilter label="positions" options={positions} value={posFilter} onChange={setPosFilter} width={120} />
+            )}
+            {classes.length > 0 && (
+              <MultiSelectFilter label="classes" options={classes} value={classFilter} onChange={setClassFilter} width={120} />
+            )}
+            <RangeFilter label="Ht"  min={heightMin} max={heightMax}
+              onChange={(lo, hi) => { setHeightMin(lo); setHeightMax(hi); }}
+              parse={parseHeight} format={formatHeight} placeholder={["min","max"]} width={55} />
+            <RangeFilter label="Age" min={ageMin} max={ageMax}
+              onChange={(lo, hi) => { setAgeMin(lo); setAgeMax(hi); }}
+              placeholder={["min","max"]} width={45} />
 
             <select className="input" style={{ width: 120 }} value={seasonFilter} onChange={e => setSeasonFilter(e.target.value)}>
               <option value="all">All seasons</option>
               {seasons.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
-
-            <select className="input" style={{ width: 150 }} value={tierFilter} onChange={e => setTierFilter(e.target.value)}>
-              <option value="all">All tiers</option>
-              {[1,2,3,4].map(t => <option key={t} value={String(t)}>Tier {t} · {tierLabels[t] || TIER_LABELS_FALLBACK[t]}</option>)}
-            </select>
-
-            {positions.length > 0 && (
-              <select className="input" style={{ width: 120 }} value={posFilter} onChange={e => setPosFilter(e.target.value)}>
-                <option value="all">All positions</option>
-                {positions.map(p => <option key={p} value={p}>{p}</option>)}
-              </select>
-            )}
           </div>
+
+          <FilterChips
+            items={[
+              ...leagueFilter.map(v => ({ label: `League: ${v}`, onClear: () => setLeagueFilter(leagueFilter.filter(x => x !== v)) })),
+              ...tierFilter.map(v   => ({ label: `Tier ${v}`,    onClear: () => setTierFilter(tierFilter.filter(x => x !== v)) })),
+              ...posFilter.map(v    => ({ label: `Pos: ${v}`,    onClear: () => setPosFilter(posFilter.filter(x => x !== v)) })),
+              ...classFilter.map(v  => ({ label: `Class: ${v}`,  onClear: () => setClassFilter(classFilter.filter(x => x !== v)) })),
+              ...(heightMin != null ? [{ label: `Ht ≥ ${formatHeight(heightMin)}`, onClear: () => setHeightMin(null) }] : []),
+              ...(heightMax != null ? [{ label: `Ht ≤ ${formatHeight(heightMax)}`, onClear: () => setHeightMax(null) }] : []),
+              ...(ageMin != null    ? [{ label: `Age ≥ ${ageMin}`,                onClear: () => setAgeMin(null)    }] : []),
+              ...(ageMax != null    ? [{ label: `Age ≤ ${ageMax}`,                onClear: () => setAgeMax(null)    }] : []),
+              ...(teamFilter.trim() ? [{ label: `Team: ${teamFilter}`,           onClear: () => setTeamFilter("")   }] : []),
+              ...(seasonFilter !== "all" ? [{ label: `Season: ${seasonFilter}`,  onClear: () => setSeasonFilter("all") }] : []),
+            ]}
+            onClearAll={() => {
+              setLeagueFilter([]); setTierFilter([]); setPosFilter([]); setClassFilter([]);
+              setHeightMin(null); setHeightMax(null); setAgeMin(null); setAgeMax(null);
+              setTeamFilter(""); setSeasonFilter("all");
+            }}
+          />
 
           <div style={{ fontSize: 12, opacity: .4, marginBottom: 10 }}>
             {loading ? "Loading…" : `${sorted.length} player-seasons`}

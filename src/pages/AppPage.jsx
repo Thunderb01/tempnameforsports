@@ -12,6 +12,7 @@ import { supabase }         from "@/lib/supabase";
 import { exportRosterPDF }  from "@/lib/exportRoster";
 import { track }            from "@/lib/track";
 import { money, letterGrade, gradeColor } from "@/lib/display";
+import { MultiSelectFilter, RangeFilter, FilterChips, parseHeight, formatHeight, playerHeightInches } from "@/components/Filters";
 import teamConferences      from "@/data/teamConferences.json";
 
 // Absolute thresholds calibrated against portal rankings score distribution
@@ -757,7 +758,10 @@ export function AppPage() {
   const [settingsOpen,  setSettingsOpen]  = useState(false);
   const [shortlistOpen, setShortlistOpen] = useState(false);
   const [search,        setSearch]        = useState("");
-  const [posFilter,     setPosFilter]     = useState("all");
+  const [posFilter,     setPosFilter]     = useState([]);
+  const [yearFilter,    setYearFilter]    = useState([]);
+  const [heightMin,     setHeightMin]     = useState(null);
+  const [heightMax,     setHeightMax]     = useState(null);
   const [portalOnly,    setPortalOnly]    = useState(true);
   const [availableIds,  setAvailableIds]  = useState(new Set());
   const [modal,           setModal]           = useState(null);
@@ -820,11 +824,18 @@ export function AppPage() {
       .filter(p => {
         if (portalOnly && !availableIds.has(p.id)) return false;
         if (q && !p.name.toLowerCase().includes(q) && !(p.team || "").toLowerCase().includes(q)) return false;
-        if (posFilter !== "all" && p.pos !== posFilter) return false;
+        if (posFilter.length  && !posFilter.includes(p.pos))   return false;
+        if (yearFilter.length && !yearFilter.includes(p.year)) return false;
+        if (heightMin != null || heightMax != null) {
+          const inches = playerHeightInches(p.height);
+          if (inches == null) return false;
+          if (heightMin != null && inches < heightMin) return false;
+          if (heightMax != null && inches > heightMax) return false;
+        }
         return true;
       })
       .sort((a, b) => (b.marketHigh || 0) - (a.marketHigh || 0));
-  }, [board.state.board, search, posFilter, portalOnly, availableIds]);
+  }, [board.state.board, search, posFilter, yearFilter, heightMin, heightMax, portalOnly, availableIds]);
 
   // ── View mode: combined roster table ─────────────────────────────────────
   const rosterPlayers = useMemo(() => {
@@ -1127,19 +1138,32 @@ export function AppPage() {
                   </button>
                 </div>
                 <p className="muted">Portal targets. Status subject to change.</p>
-                <div className="panel-tools">
+                <div className="panel-tools" style={{ flexWrap: "wrap" }}>
                   <input className="input" type="search" placeholder="Search…" value={search} onChange={e => setSearch(e.target.value)} />
-                  <select className="input" value={posFilter} onChange={e => setPosFilter(e.target.value)}>
-                    <option value="all">All positions</option>
-                    <option value="Guard">Guard</option>
-                    <option value="Wing">Wing</option>
-                    <option value="Big">Big</option>
-                  </select>
+                  <MultiSelectFilter label="positions" options={["Guard", "Wing", "Big"]}
+                    value={posFilter} onChange={setPosFilter} width={130} />
+                  <MultiSelectFilter label="years"
+                    options={["Fr", "RS Fr", "So", "RS So", "Jr", "RS Jr", "Sr", "RS Sr", "Grad", "5th Year"]}
+                    value={yearFilter} onChange={setYearFilter} width={110} />
+                  <RangeFilter label="Ht"
+                    min={heightMin} max={heightMax}
+                    onChange={(lo, hi) => { setHeightMin(lo); setHeightMax(hi); }}
+                    parse={parseHeight} format={formatHeight}
+                    placeholder={["min", "max"]} width={55} />
                   <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, opacity: .7, cursor: "pointer", userSelect: "none", whiteSpace: "nowrap" }}>
                     <input type="checkbox" checked={portalOnly} onChange={e => setPortalOnly(e.target.checked)} />
                     Portal only
                   </label>
                 </div>
+                <FilterChips
+                  items={[
+                    ...posFilter.map(p => ({ label: `Pos: ${p}`, onClear: () => setPosFilter(posFilter.filter(x => x !== p)) })),
+                    ...yearFilter.map(y => ({ label: `Yr: ${y}`, onClear: () => setYearFilter(yearFilter.filter(x => x !== y)) })),
+                    ...(heightMin != null ? [{ label: `Ht ≥ ${formatHeight(heightMin)}`, onClear: () => setHeightMin(null) }] : []),
+                    ...(heightMax != null ? [{ label: `Ht ≤ ${formatHeight(heightMax)}`, onClear: () => setHeightMax(null) }] : []),
+                  ]}
+                  onClearAll={() => { setPosFilter([]); setYearFilter([]); setHeightMin(null); setHeightMax(null); }}
+                />
               </div>
               <div className="list">
                 {filtered.length === 0

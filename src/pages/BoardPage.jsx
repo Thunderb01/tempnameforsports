@@ -9,6 +9,7 @@ import { supabase }        from "@/lib/supabase";
 import teamConferences from "@/data/teamConferences.json";
 import { useTeamLogos } from "@/hooks/useTeamLogos";
 import { money, nilValue, nilRange, heightToInches, tierColor, projectedTier } from "@/lib/display";
+import { MultiSelectFilter, RangeFilter, FilterChips, parseHeight, formatHeight, playerHeightInches } from "@/components/Filters";
 
 // label → getter(player)
 const COLS = [
@@ -43,7 +44,10 @@ export function BoardPage() {
     const t = setTimeout(() => setSearch(searchInput), 200);
     return () => clearTimeout(t);
   }, [searchInput]);
-  const [posFilter,    setPosFilter]   = useState("all");
+  const [posFilter,    setPosFilter]   = useState([]);
+  const [yearFilter,   setYearFilter]  = useState([]);
+  const [heightMin,    setHeightMin]   = useState(null);
+  const [heightMax,    setHeightMax]   = useState(null);
   const [stateFilter,  setStateFilter] = useState("all");
   const [viewMode,     setViewMode]    = useState("cards"); // "cards" | "table"
   const [sortKey,   setSortKey]   = useState("Mkt High");
@@ -55,7 +59,8 @@ export function BoardPage() {
   const [includeUnevaluated, setIncludeUnevaluated] = useState(false);
   const [toTeamFilter,      setToTeamFilter]      = useState("");
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [confFilter,  setConfFilter]  = useState("all");
+  const [confFilter,  setConfFilter]  = useState([]);
+  const YEAR_OPTIONS = ["Fr", "RS Fr", "So", "RS So", "Jr", "RS Jr", "Sr", "RS Sr", "Grad", "5th Year"];
   const conferences = [
     "A10", "ACC", "AE", "ASun", "Amer",
     "B10", "B12", "BE", "BSky", "BSth", "BW",
@@ -209,7 +214,7 @@ export function BoardPage() {
 
 
   // Reset to page 0 whenever filters or sort change
-  useEffect(() => setPage(0), [search, posFilter, stateFilter, confFilter, sortKey, sortDir, portalOnly, includeCommitted, includeUnevaluated, advcFilters, toTeamFilter]);
+  useEffect(() => setPage(0), [search, posFilter, yearFilter, heightMin, heightMax, stateFilter, confFilter, sortKey, sortDir, portalOnly, includeCommitted, includeUnevaluated, advcFilters, toTeamFilter]);
 
   // ── Filter ──────────────────────────────────────────────────────────────────
   const filtered = useMemo(() => {
@@ -222,10 +227,17 @@ export function BoardPage() {
       if (q && !p.name.toLowerCase().includes(q) &&
                !(p.team||"").toLowerCase().includes(q) &&
                !(p.hometown||"").toLowerCase().includes(q)) return false;
-      if (posFilter !== "all" && p.pos !== posFilter) return false;
-      if (confFilter !== "all") {
+      if (posFilter.length  && !posFilter.includes(p.pos))   return false;
+      if (yearFilter.length && !yearFilter.includes(p.year)) return false;
+      if (heightMin != null || heightMax != null) {
+        const inches = playerHeightInches(p.height);
+        if (inches == null) return false;
+        if (heightMin != null && inches < heightMin) return false;
+        if (heightMax != null && inches > heightMax) return false;
+      }
+      if (confFilter.length) {
         const pConf = teamConferences[p.team] || p.conf;
-        if (pConf !== confFilter) return false;
+        if (!confFilter.includes(pConf)) return false;
       }
       if (stateTerms && !matchesState(p.hometown || "", stateTerms)) return false;
       if (!includeUnevaluated && !(p.marketHigh > 0)) return false;
@@ -245,7 +257,7 @@ export function BoardPage() {
       }
       return true;
     });
-  }, [players, search, posFilter, confFilter, stateFilter, portalOnly, includeCommitted, includeUnevaluated, advcFilters, toTeamFilter, availableIds, allPortalIds, portalInfo]);
+  }, [players, search, posFilter, yearFilter, heightMin, heightMax, confFilter, stateFilter, portalOnly, includeCommitted, includeUnevaluated, advcFilters, toTeamFilter, availableIds, allPortalIds, portalInfo]);
 
   // ── Sort (separate so filter changes don't re-sort and vice versa) ──────────
   const sorted = useMemo(() => {
@@ -331,18 +343,18 @@ export function BoardPage() {
                 style={{ flex: 1, minWidth: 160 }}
                 value={toTeamFilter} onChange={e => setToTeamFilter(e.target.value)} />
             </div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-              <select className="input" style={{ width: 150 }} value={posFilter} onChange={e => setPosFilter(e.target.value)}>
-                <option value="all">All positions</option>
-                <option value="Guard">Guard</option>
-                <option value="Wing">Wing</option>
-                <option value="Big">Big</option>
-              </select>
-              <select className="input" style={{ width: 150 }} value={confFilter} onChange={e => setConfFilter(e.target.value)}>
-                <option value="all">All conferences</option>
-                {conferences.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-              <select className="input" style={{ width: 180 }} value={stateFilter} onChange={e => setStateFilter(e.target.value)}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+              <MultiSelectFilter label="positions" options={["Guard", "Wing", "Big"]} value={posFilter}  onChange={setPosFilter}  width={130} />
+              <MultiSelectFilter label="years"     options={YEAR_OPTIONS}             value={yearFilter} onChange={setYearFilter} width={120} />
+              <MultiSelectFilter label="confs"     options={conferences}              value={confFilter} onChange={setConfFilter} width={140} />
+              <RangeFilter
+                label="Ht"
+                min={heightMin} max={heightMax}
+                onChange={(lo, hi) => { setHeightMin(lo); setHeightMax(hi); }}
+                parse={parseHeight} format={formatHeight}
+                placeholder={[`min`, `max`]} width={60}
+              />
+              <select className="input" style={{ width: 160 }} value={stateFilter} onChange={e => setStateFilter(e.target.value)}>
                 <option value="all">All locations</option>
                 {STATE_OPTIONS.map(o => <option key={o.label} value={o.label}>{o.label}</option>)}
               </select>
@@ -359,6 +371,21 @@ export function BoardPage() {
                 Show unevaluated
               </label>
             </div>
+
+            <FilterChips
+              items={[
+                ...posFilter.map(p => ({ label: `Pos: ${p}`,  onClear: () => setPosFilter(posFilter.filter(x => x !== p)) })),
+                ...yearFilter.map(y => ({ label: `Yr: ${y}`,  onClear: () => setYearFilter(yearFilter.filter(x => x !== y)) })),
+                ...confFilter.map(c => ({ label: `Conf: ${c}`, onClear: () => setConfFilter(confFilter.filter(x => x !== c)) })),
+                ...(heightMin != null ? [{ label: `Ht ≥ ${formatHeight(heightMin)}`, onClear: () => setHeightMin(null) }] : []),
+                ...(heightMax != null ? [{ label: `Ht ≤ ${formatHeight(heightMax)}`, onClear: () => setHeightMax(null) }] : []),
+                ...(stateFilter !== "all" ? [{ label: `Loc: ${stateFilter}`, onClear: () => setStateFilter("all") }] : []),
+              ]}
+              onClearAll={() => {
+                setPosFilter([]); setYearFilter([]); setConfFilter([]);
+                setHeightMin(null); setHeightMax(null); setStateFilter("all");
+              }}
+            />
           </div>
 
           {/* Advanced filter panel */}
