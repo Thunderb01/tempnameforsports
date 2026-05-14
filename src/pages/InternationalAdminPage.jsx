@@ -3,19 +3,23 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { supabase }   from "@/lib/supabase";
 
 // ── Constants ────────────────────────────────────────────────────────────────
-const TIER_LABELS  = { 1: "EuroLeague / Elite", 2: "Top Domestic", 3: "Mid Domestic", 4: "Developmental" };
+// Tier labels are now loaded from the international_tier_labels table at runtime.
+// These are fallbacks used before the fetch resolves.
+const TIER_LABELS_FALLBACK = { 1: "EuroLeague / Elite", 2: "Top Domestic", 3: "Mid Domestic", 4: "Developmental" };
 const TIER_COLORS  = { 1: "#f59e0b", 2: "#5b9cf6", 3: "#4ade80", 4: "#9ca3af" };
 const STAT_TYPES   = ["Averages", "Totals", "Per_36", "Advanced_Stats"];
 const SEASON_TYPES = ["Regular_Season", "Playoffs", "Cup", "International"];
 const POSITIONS    = ["PG", "SG", "SF", "PF", "C", "G", "F"];
 const METRIC_KEYS  = [
   "offensive_footprint", "defensive_score", "winning_impact",
-  "sos_performance",     "starter_score",   "competition_adj",
+  "sos_performance",     "translation_grade",
 ];
 
 const PROFILE_CSV_HEADERS = [
   "name", "league", "profile_url", "height", "primary_position",
+  "country_of_origin", "age", "recruiting_class",
   "agent_name", "agent_contact", "film_url", "competition_tier",
+  "scouting_notes",
   ...METRIC_KEYS,
 ];
 const STATS_CSV_FIXED = ["player_name", "league", "season", "season_type", "stat_type", "team"];
@@ -94,18 +98,22 @@ function Section({ title, children, action }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // Profile form
 // ─────────────────────────────────────────────────────────────────────────────
-function ProfileForm({ initial, onSave, onCancel, saving }) {
+function ProfileForm({ initial, onSave, onCancel, saving, tierLabels }) {
   const [form, setForm] = useState(() => ({
-    name:             initial?.name             ?? "",
-    league:           initial?.league           ?? "",
-    profile_url:      initial?.profile_url      ?? "",
-    height:           initial?.height           ?? "",
-    primary_position: initial?.primary_position ?? "",
-    agent_name:       initial?.agent_name       ?? "",
-    agent_contact:    initial?.agent_contact    ?? "",
-    film_url:         initial?.film_url         ?? "",
-    competition_tier: initial?.competition_tier ?? 2,
-    metrics:          { ...(initial?.metrics || {}) },
+    name:              initial?.name              ?? "",
+    league:            initial?.league            ?? "",
+    profile_url:       initial?.profile_url       ?? "",
+    height:            initial?.height            ?? "",
+    primary_position:  initial?.primary_position  ?? "",
+    country_of_origin: initial?.country_of_origin ?? "",
+    age:               initial?.age               ?? "",
+    recruiting_class:  initial?.recruiting_class  ?? "",
+    agent_name:        initial?.agent_name        ?? "",
+    agent_contact:     initial?.agent_contact     ?? "",
+    film_url:          initial?.film_url          ?? "",
+    competition_tier:  initial?.competition_tier  ?? 2,
+    scouting_notes:    initial?.scouting_notes    ?? "",
+    metrics:           { ...(initial?.metrics || {}) },
   }));
 
   const set    = (k, v) => setForm(f => ({ ...f, [k]: v }));
@@ -118,16 +126,20 @@ function ProfileForm({ initial, onSave, onCancel, saving }) {
     }
     onSave({
       ...form,
-      name:             form.name.trim(),
-      league:           form.league.trim(),
-      profile_url:      form.profile_url.trim()   || null,
-      height:           form.height.trim()        || null,
-      primary_position: form.primary_position     || null,
-      agent_name:       form.agent_name.trim()    || null,
-      agent_contact:    form.agent_contact.trim() || null,
-      film_url:         form.film_url.trim()      || null,
-      competition_tier: parseInt(form.competition_tier, 10) || 2,
-      metrics:          form.metrics,
+      name:              form.name.trim(),
+      league:            form.league.trim(),
+      profile_url:       form.profile_url.trim()       || null,
+      height:            form.height.trim()            || null,
+      primary_position:  form.primary_position         || null,
+      country_of_origin: form.country_of_origin.trim() || null,
+      age:               form.age === "" ? null : (parseInt(form.age, 10) || null),
+      recruiting_class:  form.recruiting_class.trim()  || null,
+      agent_name:        form.agent_name.trim()        || null,
+      agent_contact:     form.agent_contact.trim()     || null,
+      film_url:          form.film_url.trim()          || null,
+      competition_tier:  parseInt(form.competition_tier, 10) || 2,
+      scouting_notes:    form.scouting_notes.trim()    || null,
+      metrics:           form.metrics,
     });
   }
 
@@ -155,14 +167,37 @@ function ProfileForm({ initial, onSave, onCancel, saving }) {
           </select>
         </div>
         <div>
+          <label style={labelStyle}>Country of origin</label>
+          <input className="input" style={{ width: "100%" }} placeholder="e.g. Spain"
+            value={form.country_of_origin} onChange={e => set("country_of_origin", e.target.value)} />
+        </div>
+        <div>
+          <label style={labelStyle}>Age</label>
+          <input className="input" type="number" min="14" max="50" style={{ width: "100%" }}
+            value={form.age} onChange={e => set("age", e.target.value)} />
+        </div>
+        <div>
+          <label style={labelStyle}>Recruiting class</label>
+          <input className="input" style={{ width: "100%" }} placeholder="e.g. 2026"
+            value={form.recruiting_class} onChange={e => set("recruiting_class", e.target.value)} />
+        </div>
+        <div>
           <label style={labelStyle}>Competition Tier</label>
           <select className="input" style={{ width: "100%" }} value={form.competition_tier} onChange={e => set("competition_tier", e.target.value)}>
-            {[1, 2, 3, 4].map(t => <option key={t} value={t}>Tier {t} · {TIER_LABELS[t]}</option>)}
+            {[1, 2, 3, 4].map(t => (
+              <option key={t} value={t}>
+                Tier {t} · {(tierLabels && tierLabels[t]) || TIER_LABELS_FALLBACK[t]}
+              </option>
+            ))}
           </select>
         </div>
         <div>
           <label style={labelStyle}>Profile URL (RealGM, etc.)</label>
           <input className="input" style={{ width: "100%" }} value={form.profile_url} onChange={e => set("profile_url", e.target.value)} />
+        </div>
+        <div>
+          <label style={labelStyle}>Film URL (YouTube or direct video)</label>
+          <input className="input" style={{ width: "100%" }} value={form.film_url} onChange={e => set("film_url", e.target.value)} />
         </div>
         <div>
           <label style={labelStyle}>Agent Name</label>
@@ -173,8 +208,10 @@ function ProfileForm({ initial, onSave, onCancel, saving }) {
           <input className="input" style={{ width: "100%" }} value={form.agent_contact} onChange={e => set("agent_contact", e.target.value)} />
         </div>
         <div style={{ gridColumn: "1 / -1" }}>
-          <label style={labelStyle}>Film URL (YouTube or direct video)</label>
-          <input className="input" style={{ width: "100%" }} value={form.film_url} onChange={e => set("film_url", e.target.value)} />
+          <label style={labelStyle}>Scouting notes</label>
+          <textarea className="input" rows={5} style={{ width: "100%", resize: "vertical", fontFamily: "inherit" }}
+            placeholder="Strengths, weaknesses, fit, contextual flags, projection notes…"
+            value={form.scouting_notes} onChange={e => set("scouting_notes", e.target.value)} />
         </div>
       </div>
 
@@ -196,6 +233,42 @@ function ProfileForm({ initial, onSave, onCancel, saving }) {
         <button className="btn btn-primary" onClick={submit} disabled={saving}>
           {saving ? "Saving…" : "Save Profile"}
         </button>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Tier labels editor (superadmin)
+// ─────────────────────────────────────────────────────────────────────────────
+function TierLabelsEditor({ labels, onSave, saving }) {
+  const [local, setLocal] = useState(labels);
+  useEffect(() => { setLocal(labels); }, [labels]);
+
+  return (
+    <div style={{ background: "rgba(255,255,255,.02)", border: "1px solid rgba(255,255,255,.08)",
+                  borderRadius: 12, padding: 20 }}>
+      <div style={{ fontSize: 11, opacity: .5, marginBottom: 12 }}>
+        Labels for the 4 international competition tiers. These show up in the public
+        International page filter, on player profiles, and in the admin dropdown.
+      </div>
+      <div style={{ display: "grid", gap: 10 }}>
+        {[1, 2, 3, 4].map(tier => (
+          <div key={tier} style={{ display: "grid", gridTemplateColumns: "60px 1fr 120px", gap: 10, alignItems: "center" }}>
+            <span style={{
+              fontSize: 12, fontWeight: 700, textAlign: "center",
+              padding: "4px 0", borderRadius: 6,
+              background: `${TIER_COLORS[tier]}22`, color: TIER_COLORS[tier],
+            }}>Tier {tier}</span>
+            <input className="input" style={{ width: "100%" }} value={local[tier] ?? ""}
+              onChange={e => setLocal(l => ({ ...l, [tier]: e.target.value }))} />
+            <button className="btn btn-primary" style={{ fontSize: 11 }}
+              disabled={saving || (local[tier] ?? "").trim() === "" || local[tier] === labels[tier]}
+              onClick={() => onSave(tier, (local[tier] ?? "").trim())}>
+              Save
+            </button>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -341,10 +414,13 @@ function CSVImporter({ kind, onImport }) {
   function downloadTemplate() {
     if (kind === "profile") {
       downloadCSV("international_profiles_template.csv", PROFILE_CSV_HEADERS, [{
-        name: "Sample Player", league: "ACB", profile_url: "", height: "6'9\"", primary_position: "SF",
+        name: "Sample Player", league: "ACB", profile_url: "",
+        height: "6'9\"", primary_position: "SF",
+        country_of_origin: "Spain", age: "19", recruiting_class: "2026",
         agent_name: "", agent_contact: "", film_url: "", competition_tier: "2",
+        scouting_notes: "Quick first step, average defender, projects as bench guard.",
         offensive_footprint: "75", defensive_score: "68", winning_impact: "72",
-        sos_performance: "70", starter_score: "78", competition_adj: "65",
+        sos_performance: "70", translation_grade: "65",
       }]);
     } else {
       const headers = [...STATS_CSV_FIXED, "gp", "min", "pts", "reb", "ast", "stl", "blk", "to", "fg%", "3p%", "ft%"];
@@ -371,7 +447,7 @@ function CSVImporter({ kind, onImport }) {
 
       <div style={{ fontSize: 11, opacity: .5, marginBottom: 12 }}>
         {kind === "profile"
-          ? "Required: name, league. Optional: height, primary_position, agent_name, agent_contact, film_url, profile_url, competition_tier (1-4), and 6 metric columns (offensive_footprint, defensive_score, winning_impact, sos_performance, starter_score, competition_adj)."
+          ? "Required: name, league. Optional: height, primary_position, country_of_origin, age, recruiting_class, agent_name, agent_contact, film_url, profile_url, competition_tier (1-4), scouting_notes, and 5 metric columns (offensive_footprint, defensive_score, winning_impact, sos_performance, translation_grade)."
           : "Required: player_name, league, season, stat_type, team. All other columns become stat keys in the JSONB (e.g. pts, reb, fg%, ortg). Optional: season_type (defaults to Regular_Season)."}
       </div>
 
@@ -435,12 +511,13 @@ export function InternationalAdminPage() {
 }
 
 export function InternationalAdminContent() {
-  const [tab,         setTab]         = useState("profiles");  // profiles | stats | csv
+  const [tab,         setTab]         = useState("profiles");  // profiles | stats | tiers | csv
   const [profiles,    setProfiles]    = useState([]);
   const [search,      setSearch]      = useState("");
   const [editId,      setEditId]      = useState(null);  // 'new' | uuid
   const [editInitial, setEditInitial] = useState(null);
   const [saving,      setSaving]      = useState(false);
+  const [tierLabels,  setTierLabels]  = useState(TIER_LABELS_FALLBACK);
 
   const [statsProfile,    setStatsProfile]    = useState(null); // selected player for stats tab
   const [statsRows,       setStatsRows]       = useState([]);
@@ -451,13 +528,37 @@ export function InternationalAdminContent() {
   const loadProfiles = useCallback(async () => {
     const { data, error } = await supabase
       .from("international_players")
-      .select("id, name, league, profile_url, height, primary_position, agent_name, agent_contact, film_url, competition_tier, metrics")
+      .select("id, name, league, profile_url, height, primary_position, country_of_origin, age, recruiting_class, agent_name, agent_contact, film_url, competition_tier, scouting_notes, metrics")
       .order("name");
     if (error) { console.error(error); return; }
     setProfiles(data || []);
   }, []);
 
-  useEffect(() => { loadProfiles(); }, [loadProfiles]);
+  // ── Load tier labels ──────────────────────────────────────────────────────
+  const loadTierLabels = useCallback(async () => {
+    const { data, error } = await supabase
+      .from("international_tier_labels")
+      .select("tier, label");
+    if (error) { console.error("tier labels fetch:", error); return; }
+    if (data?.length) {
+      const map = { ...TIER_LABELS_FALLBACK };
+      data.forEach(r => { map[r.tier] = r.label; });
+      setTierLabels(map);
+    }
+  }, []);
+
+  async function saveTierLabel(tier, label) {
+    if (!label) return;
+    setSaving(true);
+    const { error } = await supabase
+      .from("international_tier_labels")
+      .upsert({ tier, label }, { onConflict: "tier" });
+    setSaving(false);
+    if (error) { alert("Save failed: " + error.message); return; }
+    setTierLabels(prev => ({ ...prev, [tier]: label }));
+  }
+
+  useEffect(() => { loadProfiles(); loadTierLabels(); }, [loadProfiles, loadTierLabels]);
 
   const loadStatsFor = useCallback(async (profile) => {
     if (!profile) { setStatsRows([]); return; }
@@ -544,15 +645,19 @@ export function InternationalAdminContent() {
         if (n != null) metrics[k] = n;
       });
       return {
-        name:             (r.name || "").trim(),
-        league:           (r.league || "").trim(),
-        profile_url:      r.profile_url?.trim()      || null,
-        height:           r.height?.trim()           || null,
-        primary_position: r.primary_position?.trim() || null,
-        agent_name:       r.agent_name?.trim()       || null,
-        agent_contact:    r.agent_contact?.trim()    || null,
-        film_url:         r.film_url?.trim()         || null,
-        competition_tier: parseInt(r.competition_tier, 10) || 2,
+        name:              (r.name || "").trim(),
+        league:            (r.league || "").trim(),
+        profile_url:       r.profile_url?.trim()       || null,
+        height:            r.height?.trim()            || null,
+        primary_position:  r.primary_position?.trim()  || null,
+        country_of_origin: r.country_of_origin?.trim() || null,
+        age:               r.age !== undefined && r.age !== "" ? (parseInt(r.age, 10) || null) : null,
+        recruiting_class:  r.recruiting_class?.trim()  || null,
+        agent_name:        r.agent_name?.trim()        || null,
+        agent_contact:     r.agent_contact?.trim()     || null,
+        film_url:          r.film_url?.trim()          || null,
+        competition_tier:  parseInt(r.competition_tier, 10) || 2,
+        scouting_notes:    r.scouting_notes?.trim()    || null,
         metrics,
       };
     }).filter(p => p.name && p.league);
@@ -628,6 +733,7 @@ export function InternationalAdminContent() {
             {[
               { id: "profiles", label: "Profiles" },
               { id: "stats",    label: "Stats" },
+              { id: "tiers",    label: "Tier Labels" },
               { id: "csv",      label: "CSV Import" },
             ].map(t => (
               <button key={t.id} onClick={() => setTab(t.id)} style={{
@@ -654,6 +760,7 @@ export function InternationalAdminContent() {
                 <ProfileForm
                   initial={editInitial}
                   saving={saving}
+                  tierLabels={tierLabels}
                   onSave={saveProfile}
                   onCancel={() => { setEditId(null); setEditInitial(null); }}
                 />
@@ -780,6 +887,13 @@ export function InternationalAdminContent() {
               )}
             </Section>
           )}
+
+      {/* ── TIER LABELS TAB ─────────────────────────────────────────── */}
+      {tab === "tiers" && (
+        <Section title="Competition tier labels">
+          <TierLabelsEditor labels={tierLabels} onSave={saveTierLabel} saving={saving} />
+        </Section>
+      )}
 
       {/* ── CSV TAB ────────────────────────────────────────────────── */}
       {tab === "csv" && (

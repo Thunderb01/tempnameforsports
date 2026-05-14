@@ -28,7 +28,8 @@ const PCT_KEYS         = new Set(["fg%","3p%","ft%","ts%","efg%","usg%","ast%","
 const PAGE_SIZE        = 75;
 
 // ── Competition tiers ─────────────────────────────────────────────────────────
-const TIER_LABELS = { 1: "EuroLeague / Elite", 2: "Top Domestic", 3: "Mid Domestic", 4: "Developmental" };
+// Labels are loaded at runtime from international_tier_labels (editable in admin).
+const TIER_LABELS_FALLBACK = { 1: "EuroLeague / Elite", 2: "Top Domestic", 3: "Mid Domestic", 4: "Developmental" };
 const TIER_COLORS = { 1: "#f59e0b", 2: "#5b9cf6", 3: "#4ade80", 4: "#9ca3af" };
 const TIER_BG     = { 1: "rgba(245,158,11,.15)", 2: "rgba(91,156,246,.15)", 3: "rgba(74,222,128,.15)", 4: "rgba(156,163,175,.12)" };
 
@@ -38,8 +39,7 @@ const INTL_METRICS = [
   { key: "defensive_score",     label: "Defensive Score",     desc: "Rim protection + perimeter D + disruption rate" },
   { key: "winning_impact",      label: "Winning Impact",      desc: "Performance uplift in wins vs losses" },
   { key: "sos_performance",     label: "SOS Performance",     desc: "Output scaled for strength of schedule" },
-  { key: "starter_score",       label: "Starter Grade",       desc: "Production as starter vs off the bench" },
-  { key: "competition_adj",     label: "Competition Adj.",    desc: "Score normalised to competition tier" },
+  { key: "translation_grade",   label: "Translation Grade",   desc: "Projected fit & translation to D1 college level" },
 ];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -86,20 +86,21 @@ function MetricBar({ label, desc, value }) {
   );
 }
 
-function TierBadge({ tier }) {
+function TierBadge({ tier, tierLabels }) {
   if (!tier) return null;
+  const label = (tierLabels && tierLabels[tier]) || TIER_LABELS_FALLBACK[tier];
   return (
     <span style={{
       fontSize: 11, fontWeight: 700, padding: "2px 10px", borderRadius: 20,
       background: TIER_BG[tier], color: TIER_COLORS[tier],
       border: `1px solid ${TIER_COLORS[tier]}55`,
     }}>
-      Tier {tier} · {TIER_LABELS[tier]}
+      Tier {tier} · {label}
     </span>
   );
 }
 
-function IntlPlayerModal({ playerName, allRows, profile, onClose }) {
+function IntlPlayerModal({ playerName, allRows, profile, tierLabels, onClose }) {
   const [statType, setStatType] = useState("Averages");
   const metrics  = profile?.metrics || {};
   const tier     = profile?.competition_tier;
@@ -126,10 +127,13 @@ function IntlPlayerModal({ playerName, allRows, profile, onClose }) {
             <div>
               <h2 style={{ margin: "0 0 8px", fontSize: 24 }}>{playerName}</h2>
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-                {profile?.height         && <span style={{ fontSize: 13, opacity: .55 }}>{profile.height}</span>}
+                {profile?.height           && <span style={{ fontSize: 13, opacity: .55 }}>{profile.height}</span>}
                 {profile?.primary_position && <span style={{ fontSize: 13, opacity: .55 }}>· {profile.primary_position}</span>}
-                {profile?.league          && <span style={{ fontSize: 13, opacity: .55 }}>· {profile.league}</span>}
-                {tier && <TierBadge tier={tier} />}
+                {profile?.age              && <span style={{ fontSize: 13, opacity: .55 }}>· age {profile.age}</span>}
+                {profile?.country_of_origin && <span style={{ fontSize: 13, opacity: .55 }}>· {profile.country_of_origin}</span>}
+                {profile?.recruiting_class && <span style={{ fontSize: 13, opacity: .55 }}>· class of {profile.recruiting_class}</span>}
+                {profile?.league           && <span style={{ fontSize: 13, opacity: .55 }}>· {profile.league}</span>}
+                {tier && <TierBadge tier={tier} tierLabels={tierLabels} />}
               </div>
               {profile?.profile_url && (
                 <a href={profile.profile_url} target="_blank" rel="noreferrer"
@@ -159,6 +163,18 @@ function IntlPlayerModal({ playerName, allRows, profile, onClose }) {
               </div>
             )}
           </div>
+
+          {/* ── Scouting notes ──────────────────────────────────────────────── */}
+          {profile?.scouting_notes && (
+            <div style={{ background: "rgba(255,255,255,.03)", border: "1px solid rgba(255,255,255,.07)", borderRadius: 10, padding: "16px 20px", marginBottom: 20 }}>
+              <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".07em", opacity: .35, fontWeight: 600, marginBottom: 10 }}>
+                Scouting Notes
+              </div>
+              <div style={{ fontSize: 13, lineHeight: 1.55, opacity: .85, whiteSpace: "pre-wrap" }}>
+                {profile.scouting_notes}
+              </div>
+            </div>
+          )}
 
           {/* ── Two-column: Film + Agent ────────────────────────────────────── */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
@@ -322,12 +338,26 @@ export function InternationalPage() {
   useEffect(() => {
     supabase
       .from("international_players")
-      .select("id, name, league, profile_url, height, primary_position, agent_name, agent_contact, film_url, competition_tier, metrics")
+      .select("id, name, league, profile_url, height, primary_position, country_of_origin, age, recruiting_class, agent_name, agent_contact, film_url, competition_tier, scouting_notes, metrics")
       .then(({ data }) => {
         if (!data) return;
         const map = {};
         data.forEach(p => { map[p.name] = p; });
         setProfiles(map);
+      });
+  }, []);
+
+  // ── Fetch tier labels (editable in admin) ──────────────────────────────────
+  const [tierLabels, setTierLabels] = useState(TIER_LABELS_FALLBACK);
+  useEffect(() => {
+    supabase
+      .from("international_tier_labels")
+      .select("tier, label")
+      .then(({ data }) => {
+        if (!data?.length) return;
+        const map = { ...TIER_LABELS_FALLBACK };
+        data.forEach(r => { map[r.tier] = r.label; });
+        setTierLabels(map);
       });
   }, []);
 
@@ -439,6 +469,7 @@ export function InternationalPage() {
           playerName={selected}
           allRows={rows}
           profile={profiles[selected] || null}
+          tierLabels={tierLabels}
           onClose={() => setSelected(null)}
         />
       )}
@@ -486,7 +517,7 @@ export function InternationalPage() {
 
             <select className="input" style={{ width: 150 }} value={tierFilter} onChange={e => setTierFilter(e.target.value)}>
               <option value="all">All tiers</option>
-              {[1,2,3,4].map(t => <option key={t} value={String(t)}>Tier {t} · {TIER_LABELS[t]}</option>)}
+              {[1,2,3,4].map(t => <option key={t} value={String(t)}>Tier {t} · {tierLabels[t] || TIER_LABELS_FALLBACK[t]}</option>)}
             </select>
 
             {positions.length > 0 && (
