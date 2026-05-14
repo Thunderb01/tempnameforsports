@@ -11,7 +11,7 @@ import { TeamAutocomplete } from "@/components/TeamAutocomplete";
 import { supabase }         from "@/lib/supabase";
 import { exportRosterPDF }  from "@/lib/exportRoster";
 import { track }            from "@/lib/track";
-import { money }            from "@/lib/display";
+import { money, letterGrade, gradeColor } from "@/lib/display";
 import teamConferences      from "@/data/teamConferences.json";
 
 // Absolute thresholds calibrated against portal rankings score distribution
@@ -226,44 +226,81 @@ function btpPlayerScoreDisplay(p) {
 
 function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], userTeam = "", customOrder, setCustomOrder, starterCounts, setStarterCounts }) {
   const { scoringPool = [] } = calc;
+  // Single toggle drives both the team-comparison list AND all grades on this page.
   const [cmpScope, setCmpScope] = useState("conference");
+  const POS_ORDER = ["Guard", "Wing", "Big"];
 
-  // Compute a BTP pool score for every team from the full player board
-  const teamScores = useMemo(() => {
-    if (!allPlayers.length) return [];
+  // Convert a 1-indexed rank within a pool of N to a percentile (0-100).
+  // Rank 1 → 100, rank N → 0. Smooth across the pool.
+  function percentileFromRank(rank, total) {
+    if (!total || total < 2 || !rank) return 50;
+    return ((total - rank) / (total - 1)) * 100;
+  }
+  function gradeFromPercentile(pct) {
+    const label = letterGrade(pct);
+    return { label, color: gradeColor(label) };
+  }
+
+  // ── Score every team in a pool, including per-position breakdown ─────────────
+  // `pool` is the filtered player list. `scorer` is a function from player → score.
+  function scorePool(pool, scorer) {
     const byTeam = {};
-    allPlayers.forEach(p => {
+    pool.forEach(p => {
       if (!p.team) return;
-      if (CMP_LEAVING_STATUSES.has(p.player_status)) return;
       if (!byTeam[p.team]) byTeam[p.team] = [];
       byTeam[p.team].push(p);
     });
-    return Object.entries(byTeam).map(([team, players]) => {
-      // teamConferences.json is authoritative — prevents stale conf tags on
-      // transferred players from polluting the wrong conference bucket.
+    const teams = Object.entries(byTeam).map(([team, players]) => {
       const conf = teamConferences[team] ?? players[0]?.conf ?? null;
-      const byPos = {};
+      const byPos = { Guard: [], Wing: [], Big: [] };
       players.forEach(p => {
-        const pos = p.pos || "Wing";
-        if (!byPos[pos]) byPos[pos] = [];
+        const pos = POS_ORDER.includes(p.pos) ? p.pos : "Wing";
         byPos[pos].push(p);
       });
+      const posScores = {};
       let score = 0;
-      Object.values(byPos).forEach(group => {
-        group.sort((a, b) => btpPlayerScoreDisplay(b) - btpPlayerScoreDisplay(a))
-             .forEach((p, i) => { score += btpPlayerScoreDisplay(p) * (SLOT_WEIGHTS_DISPLAY[i] ?? 0.05); });
+      POS_ORDER.forEach(pos => {
+        const group = byPos[pos].sort((a, b) => scorer(b) - scorer(a));
+        let posScore = 0;
+        group.forEach((p, i) => { posScore += scorer(p) * (SLOT_WEIGHTS_DISPLAY[i] ?? 0.05); });
+        posScores[pos] = posScore;
+        score += posScore;
       });
-      return { team, score, conf, playerCount: players.length };
-    }).sort((a, b) => b.score - a.score).map((t, i) => ({ ...t, rank: i + 1 }));
+      return { team, conf, score, posScores, playerCount: players.length };
+    });
+    return teams;
+  }
+
+  // Add overall + per-position ranks to a list of teams. Mutates and returns.
+  function addRanks(teams) {
+    const sortedTotal = [...teams].sort((a, b) => b.score - a.score);
+    const totalRank = {};
+    sortedTotal.forEach((t, i) => { totalRank[t.team] = i + 1; });
+    const posRank = {};
+    POS_ORDER.forEach(pos => {
+      const sorted = [...teams].sort((a, b) => (b.posScores[pos] || 0) - (a.posScores[pos] || 0));
+      posRank[pos] = {};
+      sorted.forEach((t, i) => { posRank[pos][t.team] = i + 1; });
+    });
+    return teams
+      .map(t => ({
+        ...t,
+        rank: totalRank[t.team],
+        posRank: Object.fromEntries(POS_ORDER.map(pos => [pos, posRank[pos][t.team]])),
+      }))
+      .sort((a, b) => a.rank - b.rank);
+  }
+
+  // ── National team scores (absolute metrics) ──────────────────────────────────
+  const teamScores = useMemo(() => {
+    if (!allPlayers.length) return [];
+    const pool = allPlayers.filter(p => p.team && !CMP_LEAVING_STATUSES.has(p.player_status));
+    return addRanks(scorePool(pool, btpPlayerScoreDisplay));
   }, [allPlayers]);
 
-  // Derive user's conference from the JSON map so it matches the same abbreviation
-  // used for all other teams in teamScores.
   const userConf = useMemo(() => teamConferences[userTeam] ?? teamScores.find(t => t.team === userTeam)?.conf ?? null, [teamScores, userTeam]);
 
-  // Conference-adjusted team scores: metrics (SEI/ATH/RIS/DDS/CDI) are min-max
-  // normalised within the conference pool so scores reflect intra-conference
-  // competition rather than national standings.
+  // ── Conference team scores (metrics min-max normalised within conf) ─────────
   const { scores: confTeamScores, ranges: confRanges } = useMemo(() => {
     if (!allPlayers.length || !userConf) return { scores: [], ranges: null };
     const confPool = allPlayers.filter(p => (teamConferences[p.team] ?? p.conf) === userConf && !CMP_LEAVING_STATUSES.has(p.player_status));
@@ -275,7 +312,6 @@ function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], userTeam = ""
       const vals = confPool.map(p => p.stats?.[k]).filter(v => v != null && !isNaN(parseFloat(v))).map(Number);
       ranges[k] = { min: Math.min(...vals, 0), max: Math.max(...vals, 1) };
     });
-
     function confNorm(val, key) {
       const { min, max } = ranges[key];
       if (max === min) return 50;
@@ -291,32 +327,8 @@ function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], userTeam = ""
       const market = (p.marketHigh || 0) * (isPriorYearEval(p) ? 0.8 : 1.0);
       return sei * 0.50 + market * 0.15 + ath * 0.13 + ris * 0.08 + dds * 0.08 + cdi * 0.06;
     }
-
-    const byTeam = {};
-    confPool.forEach(p => {
-      if (!p.team) return;
-      if (!byTeam[p.team]) byTeam[p.team] = [];
-      byTeam[p.team].push(p);
-    });
-    const scores = Object.entries(byTeam).map(([team, players]) => {
-      const conf = teamConferences[team] ?? players[0]?.conf ?? null;
-      const byPos = {};
-      players.forEach(p => {
-        const pos = p.pos || "Wing";
-        if (!byPos[pos]) byPos[pos] = [];
-        byPos[pos].push(p);
-      });
-      let score = 0;
-      Object.values(byPos).forEach(group => {
-        group.sort((a, b) => confPlayerScore(b) - confPlayerScore(a))
-             .forEach((p, i) => { score += confPlayerScore(p) * (SLOT_WEIGHTS_DISPLAY[i] ?? 0.05); });
-      });
-      return { team, score, conf, playerCount: players.length };
-    }).sort((a, b) => b.score - a.score).map((t, i) => ({ ...t, rank: i + 1 }));
-    return { scores, ranges };
+    return { scores: addRanks(scorePool(confPool, confPlayerScore)), ranges };
   }, [allPlayers, userConf]);
-
-  const POS_ORDER = ["Guard", "Wing", "Big"];
   // Depth chart state — owned by AppPage, passed in as props so it survives view switches
 
   // Plain variables (no memoization) — scoringPool is ≤20 players, compute is trivial,
@@ -343,14 +355,23 @@ function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], userTeam = ""
     return result;
   })();
 
-  let chartScore = 0;
-  POS_ORDER.forEach(pos => {
-    (chart[pos] || []).forEach((p, i) => { chartScore += btpPlayerScoreDisplay(p) * (SLOT_WEIGHTS_DISPLAY[i] ?? 0.05); });
-  });
+  // ── Live chart: per-position score + total, in both scopes ──────────────────
+  function computeLive(scorer) {
+    const posScores = {};
+    let total = 0;
+    POS_ORDER.forEach(pos => {
+      let s = 0;
+      (chart[pos] || []).forEach((p, i) => { s += scorer(p) * (SLOT_WEIGHTS_DISPLAY[i] ?? 0.05); });
+      posScores[pos] = s;
+      total += s;
+    });
+    return { score: total, posScores };
+  }
 
-  // Conf-normalized score for the live chart using the same ranges as confTeamScores
-  const liveConfScore = (() => {
-    if (!confRanges) return chartScore;
+  const liveNational = computeLive(btpPlayerScoreDisplay);
+
+  const liveConf = (() => {
+    if (!confRanges) return liveNational;
     function confNormLive(val, key) {
       const { min, max } = confRanges[key];
       if (max === min) return 50;
@@ -366,26 +387,44 @@ function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], userTeam = ""
       const market = (p.marketHigh || 0) * (isPriorYearEval(p) ? 0.8 : 1.0);
       return sei * 0.50 + market * 0.15 + ath * 0.13 + ris * 0.08 + dds * 0.08 + cdi * 0.06;
     }
-    let s = 0;
-    POS_ORDER.forEach(pos => {
-      (chart[pos] || []).forEach((p, i) => { s += confPsLive(p) * (SLOT_WEIGHTS_DISPLAY[i] ?? 0.05); });
-    });
-    return s;
+    return computeLive(confPsLive);
   })();
 
-  function injectUserScore(list, liveScore, team, conf, count) {
+  // Replace user's static entry with their live-built score, then re-rank both total & each position.
+  function injectAndRank(list, live, team, conf, count) {
     if (!list.length || !team) return list;
     const existing = list.find(t => t.team === team);
-    const entry = { ...(existing ?? { team, conf, playerCount: count }), score: liveScore };
-    return list
-      .filter(t => t.team !== team)
-      .concat([entry])
-      .sort((a, b) => b.score - a.score)
-      .map((t, i) => ({ ...t, rank: i + 1 }));
+    const entry = {
+      ...(existing ?? { team, conf, playerCount: count }),
+      score:     live.score,
+      posScores: { ...(existing?.posScores ?? {}), ...live.posScores },
+    };
+    const others = list.filter(t => t.team !== team);
+    const all    = [...others, entry];
+
+    const totalRank = {};
+    [...all].sort((a, b) => b.score - a.score).forEach((t, i) => { totalRank[t.team] = i + 1; });
+    const posRank = {};
+    POS_ORDER.forEach(pos => {
+      posRank[pos] = {};
+      [...all].sort((a, b) => (b.posScores?.[pos] || 0) - (a.posScores?.[pos] || 0))
+              .forEach((t, i) => { posRank[pos][t.team] = i + 1; });
+    });
+
+    return all
+      .map(t => ({
+        ...t,
+        rank: totalRank[t.team],
+        posRank: Object.fromEntries(POS_ORDER.map(pos => [pos, posRank[pos][t.team]])),
+      }))
+      .sort((a, b) => a.rank - b.rank);
   }
 
-  const liveTeamScores = injectUserScore(teamScores, chartScore, userTeam, userConf, scoringPool.length);
-  const liveConfTeamScores = injectUserScore(confTeamScores, liveConfScore, userTeam, userConf, scoringPool.length);
+  const liveTeamScores     = injectAndRank(teamScores,     liveNational, userTeam, userConf, scoringPool.length);
+  const liveConfTeamScores = injectAndRank(confTeamScores, liveConf,     userTeam, userConf, scoringPool.length);
+
+  // Backwards-compat shim — the comparison-list code below still reads `chartScore`.
+  const chartScore = liveNational.score;
 
   if (!scoringPool.length) {
     return <div className="empty" style={{ marginTop: 24 }}>Add players to your roster to see the strength breakdown.</div>;
@@ -415,12 +454,21 @@ function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], userTeam = ""
     });
   }
 
-  const chartGrade = rosterGrade(chartScore);
-  const chartPosScores = Object.fromEntries(POS_ORDER.map(pos => {
-    let s = 0;
-    (chart[pos] || []).forEach((p, i) => { s += btpPlayerScoreDisplay(p) * (SLOT_WEIGHTS_DISPLAY[i] ?? 0.05); });
-    return [pos, s];
+  // ── Active scope drives every grade on this panel ───────────────────────────
+  const activeList   = cmpScope === "conference" ? liveConfTeamScores : liveTeamScores;
+  const userEntry    = activeList.find(t => t.team === userTeam);
+  const activeTotal  = activeList.length;
+  const userTotalPct = userEntry ? percentileFromRank(userEntry.rank, activeTotal) : 50;
+  const chartGrade   = gradeFromPercentile(userTotalPct);
+
+  // For each position, percentile within active scope (if the user has scores there)
+  const chartPosScores = liveNational.posScores; // raw scores for the depth-chart bar fill (national basis)
+  const posPercentiles = Object.fromEntries(POS_ORDER.map(pos => {
+    const userPosRank = userEntry?.posRank?.[pos];
+    return [pos, userPosRank ? percentileFromRank(userPosRank, activeTotal) : 50];
   }));
+  const posGrades = Object.fromEntries(POS_ORDER.map(pos => [pos, gradeFromPercentile(posPercentiles[pos])]));
+
   const maxPosScore    = Math.max(...Object.values(chartPosScores), 1);
   const maxPlayerScore = Math.max(...scoringPool.map(btpPlayerScoreDisplay), 1);
   const posCount       = POS_ORDER.filter(pos => (chart[pos] || []).length > 0).length;
@@ -431,19 +479,37 @@ function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], userTeam = ""
       {/* Overall header */}
       <div style={{ background: "rgba(255,255,255,.04)", border: "1px solid var(--border)", borderRadius: 10, padding: "16px 20px", display: "flex", alignItems: "center", gap: 20, flexWrap: "wrap" }}>
         <div>
-          <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".06em", opacity: .4, marginBottom: 6 }}>Overall Roster Strength</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+            <span style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".06em", opacity: .4 }}>Overall Roster Strength</span>
+            <div style={{ display: "flex", gap: 4 }}>
+              {[["conference", "Conference"], ["all", "Country"]].map(([val, lbl]) => (
+                <button key={val} onClick={() => setCmpScope(val)} style={{
+                  fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 12, cursor: "pointer",
+                  border: "1px solid",
+                  background:  cmpScope === val ? "rgba(91,156,246,.18)" : "transparent",
+                  color:       cmpScope === val ? "#5b9cf6" : "rgba(255,255,255,.4)",
+                  borderColor: cmpScope === val ? "rgba(91,156,246,.5)"  : "rgba(255,255,255,.12)",
+                }}>{lbl}</button>
+              ))}
+            </div>
+          </div>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <span style={{ background: chartGrade.color, color: "#0e1521", fontWeight: 800, fontSize: 28, padding: "4px 18px", borderRadius: 12 }}>{chartGrade.label}</span>
             <div>
-              <div style={{ fontSize: 20, fontWeight: 700 }}>{(chartScore / 1000000).toFixed(2)}M <span style={{ fontSize: 12, opacity: .45, fontWeight: 400 }}>BTP Score</span></div>
-              <div style={{ fontSize: 12, opacity: .4 }}>{scoringPool.length} players · {posCount} position groups</div>
+              <div style={{ fontSize: 20, fontWeight: 700 }}>
+                {Math.round(userTotalPct)}<span style={{ fontSize: 12, opacity: .45, fontWeight: 400 }}> percentile · vs {cmpScope === "conference" ? (userConf || "conference") : "country"}</span>
+              </div>
+              <div style={{ fontSize: 12, opacity: .4 }}>
+                {userEntry ? `#${userEntry.rank} of ${activeTotal}` : `${activeTotal} teams in pool`} · {(chartScore / 1000000).toFixed(2)}M raw
+              </div>
             </div>
           </div>
         </div>
         <div style={{ flex: 1, minWidth: 240, display: "flex", gap: 16, flexWrap: "wrap" }}>
           {POS_ORDER.filter(pos => (chart[pos] || []).length > 0).map(pos => {
-            const pct = (chartPosScores[pos] / maxPosScore) * 100;
-            const pg  = rosterGrade(chartPosScores[pos]);
+            const fillPct = (chartPosScores[pos] / maxPosScore) * 100;
+            const pg      = posGrades[pos];
+            const posPct  = posPercentiles[pos];
             return (
               <div key={pos} style={{ flex: "1 1 100px" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
@@ -451,9 +517,11 @@ function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], userTeam = ""
                   <span style={{ background: pg.color, color: "#0e1521", fontWeight: 700, fontSize: 10, padding: "1px 7px", borderRadius: 8 }}>{pg.label}</span>
                 </div>
                 <div style={{ height: 6, background: "rgba(255,255,255,.08)", borderRadius: 3 }}>
-                  <div style={{ width: `${pct}%`, height: "100%", background: pg.color, borderRadius: 3, opacity: .8 }} />
+                  <div style={{ width: `${fillPct}%`, height: "100%", background: pg.color, borderRadius: 3, opacity: .8 }} />
                 </div>
-                <div style={{ fontSize: 11, opacity: .35, marginTop: 3 }}>{(chartPosScores[pos] / 1000000).toFixed(2)}M · {(chart[pos] || []).length} players</div>
+                <div style={{ fontSize: 11, opacity: .35, marginTop: 3 }}>
+                  {Math.round(posPct)} pct · {(chart[pos] || []).length} players
+                </div>
               </div>
             );
           })}
@@ -472,7 +540,8 @@ function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], userTeam = ""
         <div style={{ flex: 1, display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, alignItems: "start" }}>
           {POS_ORDER.map(pos => {
             const players = chart[pos] || [];
-            const pg = rosterGrade(chartPosScores[pos] || 0);
+            const pg      = posGrades[pos];
+            const posPct  = posPercentiles[pos];
             return (
               <div key={pos} style={{ background: "rgba(255,255,255,.03)", border: "1px solid var(--border)", borderRadius: 10, overflow: "hidden" }}>
                 {/* Column header */}
@@ -480,7 +549,7 @@ function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], userTeam = ""
                   <span style={{ fontWeight: 700, fontSize: 14 }}>{pos}s</span>
                   <span style={{ fontSize: 11, opacity: .35 }}>{players.length}</span>
                   <span style={{ marginLeft: "auto", background: pg.color, color: "#0e1521", fontWeight: 700, fontSize: 10, padding: "1px 7px", borderRadius: 8 }}>{pg.label}</span>
-                  <span style={{ fontSize: 12, opacity: .45 }}>{(chartPosScores[pos] / 1000000).toFixed(2)}M</span>
+                  <span style={{ fontSize: 12, opacity: .45 }} title={`${(chartPosScores[pos] / 1000000).toFixed(2)}M raw`}>{Math.round(posPct)}p</span>
                 </div>
 
                 {players.length === 0 ? (
@@ -612,7 +681,7 @@ function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], userTeam = ""
                 <span style={{ fontSize: 12, opacity: .4 }}>{userConf}</span>
               )}
               <div style={{ marginLeft: "auto", display: "flex", gap: 4 }}>
-                {[["conference", "Conference"], ["all", "All Teams"]].map(([val, lbl]) => (
+                {[["conference", "Conference"], ["all", "Country"]].map(([val, lbl]) => (
                   <button key={val} onClick={() => setCmpScope(val)} style={{
                     fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 14, cursor: "pointer",
                     border: "1px solid",
@@ -624,8 +693,8 @@ function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], userTeam = ""
               </div>
               <div style={{ width: "100%", fontSize: 11, opacity: .35 }}>
                 {cmpScope === "conference"
-                  ? `${liveConfTeamScores.length} teams · metrics scaled within ${userConf ?? "conference"}`
-                  : `Rank ${userRankAll} of ${liveTeamScores.length} teams nationally · national metrics`}
+                  ? `${liveConfTeamScores.length} teams · grades percentile-based within ${userConf ?? "conference"}`
+                  : `${liveTeamScores.length} teams · grades percentile-based against the country`}
               </div>
             </div>
 
@@ -642,7 +711,8 @@ function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], userTeam = ""
                 );
                 const isUser = t.team === userTeam;
                 const barPct = (t.score / maxScore) * 100;
-                const tg = rosterGrade(t.score);
+                const tPct   = percentileFromRank(t.rank, activeTotal);
+                const tg     = gradeFromPercentile(tPct);
                 return (
                   <div key={t.team} style={{
                     display: "flex", alignItems: "center", gap: 10,
@@ -763,12 +833,21 @@ export function AppPage() {
     const rosteredIds   = new Set(board.state.roster.map(e => e.id));
     const LEAVING       = new Set(["entering_portal", "entering_draft", "transferred", "graduating"]);
 
-    const incoming = board.incomingTransfers
-      .filter(p => !rosteredIds.has(p.id))
-      .map(p => ({ ...p, _type: "Incoming", _typeKey: "incoming", nilOffer: 0 }));
+    // Incoming transfers are auto-added to state.roster on load (see useRosterBoard).
+    // We still tag those entries as "Incoming" in the table so the user sees the distinction.
+    const incomingIdSet = new Set(board.incomingTransfers.map(p => p.id));
 
     const transfers = board.state.roster
-      .map(entry => { const p = board.byId(entry.id); return p ? { ...p, _type: "Transfer In", _typeKey: "transfer", nilOffer: entry.nilOffer } : null; })
+      .map(entry => {
+        const p = board.byId(entry.id); if (!p) return null;
+        const isIncoming = incomingIdSet.has(entry.id);
+        return {
+          ...p,
+          _type:    isIncoming ? "Incoming"    : "Transfer In",
+          _typeKey: isIncoming ? "incoming"    : "transfer",
+          nilOffer: entry.nilOffer,
+        };
+      })
       .filter(Boolean);
 
     const returning = board.returningPlayers
@@ -788,7 +867,7 @@ export function AppPage() {
       nilOffer: p.nil_offer || 0, _type: "FR/RS", _typeKey: "custom", stats: {},
     }));
 
-    return [...incoming, ...transfers, ...returning, ...undecided, ...leaving, ...custom];
+    return [...transfers, ...returning, ...undecided, ...leaving, ...custom];
   }, [board.returningPlayers, board.incomingTransfers, board.state.board, board.state.roster, board.state.retentionById, board.state.nilById, board.customPlayers]);
 
   const sortedView = useMemo(() => {
@@ -1111,55 +1190,47 @@ export function AppPage() {
                     );
                   };
 
-                  const hasAnything = board.incomingTransfers.length || board.state.roster.length || board.returningPlayers.length || board.customPlayers.length;
+                  const hasAnything = board.state.roster.length || board.returningPlayers.length || board.customPlayers.length;
+
+                  // Split rostered entries into committed-incoming vs manual portal adds.
+                  const incomingIdSet = new Set(board.incomingTransfers.map(p => p.id));
+                  const incomingEntries = board.state.roster.filter(e => incomingIdSet.has(e.id));
+                  const portalEntries   = board.state.roster.filter(e => !incomingIdSet.has(e.id));
+
+                  const renderRosterRow = (entry) => {
+                    const p = board.byId(entry.id);
+                    if (!p) return null;
+                    return (
+                      <div key={entry.id} className="row row-click"
+                        onClick={e => { if (!e.target.closest("button,input")) handleOpenModal({ ...p, _typeKey: "transfer", nilOffer: entry.nilOffer }); }}>
+                        <div className="row-main">
+                          <div className="row-title">{p.name}</div>
+                          <div className="row-sub">{p.team} · {p.pos} · {p.year}</div>
+                          <NilInput value={entry.nilOffer || 0} onCommit={val => board.updateOffer(entry.id, val)} />
+                        </div>
+                        <div className="row-actions">
+                          <button className="btn btn-ghost"
+                            onClick={e => { e.stopPropagation(); board.removeFromRoster(entry.id); }}>Remove</button>
+                        </div>
+                      </div>
+                    );
+                  };
 
                   return (
                     <>
-                      {/* 1. Incoming transfers */}
-                      {board.incomingTransfers.length > 0 && (
+                      {/* 1. Incoming transfers (auto-added from portal_transfers) */}
+                      {incomingEntries.length > 0 && (
                         <>
-                          <div className="sub-label" style={{ color: "#34d399" }}>Incoming Transfers ({board.incomingTransfers.length})</div>
-                          {board.incomingTransfers.map(p => (
-                            <div key={p.id} className="row row-click"
-                              onClick={e => { if (!e.target.closest("button")) handleOpenModal(p); }}>
-                              <div className="row-main">
-                                <div className="row-title" style={{ fontSize: 13 }}>{p.name}</div>
-                                <div className="row-sub" style={{ fontSize: 11 }}>from {p.team} · {p.pos} · {p.year}</div>
-                              </div>
-                              <div className="row-actions">
-                                <button className="btn btn-primary" style={{ fontSize: 11 }}
-                                  disabled={board.inRoster(p.id)}
-                                  onClick={e => { e.stopPropagation(); board.addToRoster(p.id); }}>
-                                  {board.inRoster(p.id) ? "Added" : "+ Roster"}
-                                </button>
-                              </div>
-                            </div>
-                          ))}
+                          <div className="sub-label" style={{ color: "#34d399" }}>Incoming Transfers ({incomingEntries.length})</div>
+                          {incomingEntries.map(renderRosterRow)}
                         </>
                       )}
 
-                      {/* 2. Portal adds */}
-                      {board.state.roster.length > 0 && (
+                      {/* 2. Manual portal adds */}
+                      {portalEntries.length > 0 && (
                         <>
-                          <div className="sub-label" style={{ color: "#5b9cf6" }}>Portal Adds ({board.state.roster.length})</div>
-                          {board.state.roster.map(entry => {
-                            const p = board.byId(entry.id);
-                            if (!p) return null;
-                            return (
-                              <div key={entry.id} className="row row-click"
-                                onClick={e => { if (!e.target.closest("button,input")) handleOpenModal({ ...p, _typeKey: "transfer", nilOffer: entry.nilOffer }); }}>
-                                <div className="row-main">
-                                  <div className="row-title">{p.name}</div>
-                                  <div className="row-sub">{p.team} · {p.pos} · {p.year}</div>
-                                  <NilInput value={entry.nilOffer || 0} onCommit={val => board.updateOffer(entry.id, val)} />
-                                </div>
-                                <div className="row-actions">
-                                  <button className="btn btn-ghost"
-                                    onClick={e => { e.stopPropagation(); board.removeFromRoster(entry.id); }}>Remove</button>
-                                </div>
-                              </div>
-                            );
-                          })}
+                          <div className="sub-label" style={{ color: "#5b9cf6" }}>Portal Adds ({portalEntries.length})</div>
+                          {portalEntries.map(renderRosterRow)}
                         </>
                       )}
 
@@ -1267,19 +1338,18 @@ export function AppPage() {
                               </div>
                             ) : col.isNil ? (
                               <NilInput value={p.nilOffer || 0} onCommit={val => {
-                                if (p._typeKey === "transfer") board.updateOffer(p.id, val);
-                                else if (p._typeKey !== "incoming" && p._typeKey !== "custom") board.updateReturningNil(p.id, val);
+                                if (p._typeKey === "transfer" || p._typeKey === "incoming") board.updateOffer(p.id, val);
+                                else if (p._typeKey !== "custom") board.updateReturningNil(p.id, val);
                               }} />
                             ) : col.get(p)}
                           </td>
                         ))}
                         <td style={{ ...tdStyle, textAlign: "right" }}>
-                          {p._typeKey === "transfer" && (
+                          {(p._typeKey === "transfer" || p._typeKey === "incoming") && (
                             <button className="btn btn-ghost"
                               style={{ fontSize: 11, padding: "2px 8px", color: "#f77", borderColor: "rgba(220,70,70,.3)" }}
                               onClick={e => { e.stopPropagation(); board.removeFromRoster(p.id); }}>Remove</button>
                           )}
-                          {p._typeKey === "incoming" && <span style={{ fontSize: 11, opacity: .35 }}>committed</span>}
                         </td>
                       </tr>
                     ))}

@@ -69,12 +69,13 @@ function saveLocal(state, team, userId) {
 function defaultState(team = "") {
   return {
     settings: { program: team, scholarships: 15, nilTotal: 4500000, maxPct: 0.30 },
-    board:         [],
-    shortlistIds:  [],
-    roster:        [],   // [{ id, nilOffer }]
-    statusById:    {},
-    retentionById: {},
-    nilById:       {},   // returning player NIL valuations { [playerId]: number }
+    board:            [],
+    shortlistIds:     [],
+    roster:           [],   // [{ id, nilOffer }]
+    statusById:       {},
+    retentionById:    {},
+    nilById:          {},   // returning player NIL valuations { [playerId]: number }
+    removedIncomings: [],   // incoming-transfer IDs the user explicitly removed (auto-add will skip)
   };
 }
 
@@ -279,14 +280,16 @@ export function useRosterBoard(team, userId) {
       .map(r => r.player_id)
       .filter(id => id && !returningIdSet.has(id));
 
+    let incomingMapped = [];
     if (_incomingCache[teamName]) {
-      setIncomingTransfers(_incomingCache[teamName]);
+      incomingMapped = _incomingCache[teamName];
+      setIncomingTransfers(incomingMapped);
     } else if (incomingIds.length > 0) {
       const { data: incomingData } = await supabase
         .from("vw_players")
         .select("*")
         .in("id", incomingIds);
-      const mapped = (incomingData || []).map(row => ({
+      incomingMapped = (incomingData || []).map(row => ({
         id:             row.id,
         name:           row.name,
         team:           row.current_team,
@@ -303,11 +306,26 @@ export function useRosterBoard(team, userId) {
           sei: row.sei, ath: row.ath, ris: row.ris, dds: row.dds, cdi: row.cdi,
         },
       })).sort((a, b) => a.name.localeCompare(b.name));
-      _incomingCache[teamName] = mapped;
-      setIncomingTransfers(mapped);
+      _incomingCache[teamName] = incomingMapped;
+      setIncomingTransfers(incomingMapped);
     } else {
       _incomingCache[teamName] = [];
       setIncomingTransfers([]);
+    }
+
+    // Auto-add incoming transfers to the roster. They're already committed to this
+    // team, so requiring a manual "+ Roster" click was redundant. We respect
+    // `removedIncomings` so a user-driven removal sticks across reloads.
+    if (incomingMapped.length > 0) {
+      setState(s => {
+        const existing = new Set(s.roster.map(r => r.id));
+        const removed  = new Set(s.removedIncomings || []);
+        const toAdd    = incomingMapped
+          .filter(p => !existing.has(p.id) && !removed.has(p.id))
+          .map(p => ({ id: p.id, nilOffer: 0 }));
+        if (toAdd.length === 0) return s;
+        return { ...s, roster: [...toAdd, ...s.roster] };
+      });
     }
 
     // Map player_id → portal retention bucket:
@@ -434,7 +452,14 @@ export function useRosterBoard(team, userId) {
   }
 
   function removeFromRoster(id) {
-    setState(s => ({ ...s, roster: s.roster.filter(r => r.id !== id) }));
+    const isIncoming = incomingTransfers.some(p => p.id === id);
+    setState(s => ({
+      ...s,
+      roster: s.roster.filter(r => r.id !== id),
+      removedIncomings: isIncoming && !(s.removedIncomings || []).includes(id)
+        ? [...(s.removedIncomings || []), id]
+        : (s.removedIncomings || []),
+    }));
   }
 
   function updateOffer(id, nilOffer) {

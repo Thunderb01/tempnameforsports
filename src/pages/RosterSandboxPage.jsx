@@ -128,18 +128,22 @@ export function RosterSandboxPage() {
         nilOffer: nilById[p.id] || 0,
       }));
 
-    const rosteredIds = new Set(board.state.roster.map(e => e.id));
+    // Incoming transfers are auto-added to state.roster on load (see useRosterBoard).
+    const incomingIdSet = new Set(board.incomingTransfers.map(p => p.id));
 
     const transfers = board.state.roster
       .map(entry => {
         const p = board.byId(entry.id);
-        return p ? { ...p, _type: "Transfer In", _typeKey: "transfer", nilOffer: entry.nilOffer } : null;
+        if (!p) return null;
+        const isIncoming = incomingIdSet.has(entry.id);
+        return {
+          ...p,
+          _type:    "Transfer In",
+          _typeKey: isIncoming ? "incoming" : "transfer",
+          nilOffer: entry.nilOffer,
+        };
       })
       .filter(Boolean);
-
-    const incoming = board.incomingTransfers
-      .filter(p => !rosteredIds.has(p.id))
-      .map(p => ({ ...p, _type: "Transfer In", _typeKey: "incoming", nilOffer: 0 }));
 
     const custom = board.customPlayers.map(p => ({
       id:       p.id,
@@ -152,7 +156,7 @@ export function RosterSandboxPage() {
       stats:    {},
     }));
 
-    return [...returning, ...transfers, ...incoming, ...custom];
+    return [...returning, ...transfers, ...custom];
   }, [board.returningPlayers, board.incomingTransfers, board.state.board, board.state.roster, board.state.retentionById, board.state.nilById, board.customPlayers]);
 
   const displayPlayers = activeRoster ? activeRoster.players : rosterPlayers;
@@ -424,7 +428,7 @@ export function RosterSandboxPage() {
                       ))}
                       {!activeRoster && (
                         <td style={{ ...tdStyle, textAlign: "right" }}>
-                          {p._typeKey === "transfer" && (
+                          {(p._typeKey === "transfer" || p._typeKey === "incoming") && (
                             <button
                               className="btn btn-ghost"
                               style={{ fontSize: 11, padding: "2px 8px", color: "#f77", borderColor: "rgba(220,70,70,.3)" }}
@@ -432,9 +436,6 @@ export function RosterSandboxPage() {
                             >
                               Remove
                             </button>
-                          )}
-                          {p._typeKey === "incoming" && (
-                            <span style={{ fontSize: 11, opacity: .35 }}>committed</span>
                           )}
                         </td>
                       )}
