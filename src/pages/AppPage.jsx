@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { SiteHeader }       from "@/components/SiteHeader";
 import { PlayerCard }       from "@/components/PlayerCard";
 import { PlayerModal }      from "@/components/PlayerModal";
+import { IntlPlayerModal }  from "@/components/IntlPlayerModal";
 import { PlayerFinder }     from "@/components/PlayerFinder";
 import { useAuth }          from "@/hooks/useAuth";
 import { useRosterBoard }   from "@/hooks/useRosterBoard";
@@ -187,10 +188,11 @@ const VIEW_COLS = [
 ];
 
 const TYPE_COLOR = {
-  "Returning":   "rgba(255,255,255,.35)",
-  "Undecided":   "#f5a623",
-  "Transfer In": "#5b9cf6",
-  "Incoming":    "#34d399",
+  "Returning":     "rgba(255,255,255,.35)",
+  "Undecided":     "#f5a623",
+  "Transfer In":   "#5b9cf6",
+  "Incoming":      "#34d399",
+  "International": "#a78bfa",
   "FR/RS":       "rgba(255,255,255,.25)",
 };
 
@@ -764,6 +766,8 @@ export function AppPage() {
   const [heightMax,     setHeightMax]     = useState(null);
   const [portalOnly,    setPortalOnly]    = useState(true);
   const [availableIds,  setAvailableIds]  = useState(new Set());
+  const [boardMode,     setBoardMode]     = useState("domestic"); // "domestic" | "international"
+  const [intlBoard,     setIntlBoard]     = useState(null);       // null until loaded
   const [modal,           setModal]           = useState(null);
   const [settings,        setSettings]        = useState(null);
   const [finderOpen,      setFinderOpen]      = useState(false);
@@ -817,6 +821,51 @@ export function AppPage() {
     setModal(p);
   }
 
+  // Lazy-load the international board the first time the user switches to it.
+  useEffect(() => {
+    if (boardMode !== "international" || intlBoard !== null) return;
+    let alive = true;
+    (async () => {
+      const all = [];
+      let page = 0;
+      while (true) {
+        const { data, error } = await supabase
+          .from("international_players")
+          .select("id, name, league, profile_url, height, primary_position, country_of_origin, age, recruiting_class, agent_name, agent_contact, film_url, competition_tier, scouting_notes, metrics")
+          .range(page * 1000, (page + 1) * 1000 - 1);
+        if (error) { console.error("intl board fetch:", error); break; }
+        all.push(...(data || []));
+        if ((data || []).length < 1000) break;
+        page++;
+      }
+      if (!alive) return;
+      setIntlBoard(all);
+    })();
+    return () => { alive = false; };
+  }, [boardMode, intlBoard]);
+
+  // Filtered international list — applies the same search/pos/year/height filters.
+  const filteredIntl = useMemo(() => {
+    if (!intlBoard) return [];
+    const q = search.trim().toLowerCase();
+    return intlBoard.filter(p => {
+      if (q && !p.name.toLowerCase().includes(q) && !(p.league || "").toLowerCase().includes(q)) return false;
+      if (posFilter.length) {
+        const raw = String(p.primary_position || "").toUpperCase();
+        const bucket = raw.includes("G") ? "Guard" : raw === "C" || raw === "PF" ? "Big" : "Wing";
+        if (!posFilter.includes(bucket)) return false;
+      }
+      if (heightMin != null || heightMax != null) {
+        const inches = playerHeightInches(p.height);
+        if (inches == null) return false;
+        if (heightMin != null && inches < heightMin) return false;
+        if (heightMax != null && inches > heightMax) return false;
+      }
+      // yearFilter doesn't apply cleanly to intl players (they're "Intl" / classes)
+      return true;
+    }).sort((a, b) => (b.metrics?.translation_grade ?? 0) - (a.metrics?.translation_grade ?? 0));
+  }, [intlBoard, search, posFilter, heightMin, heightMax]);
+
   // ── Board filter ──────────────────────────────────────────────────────────
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -852,10 +901,11 @@ export function AppPage() {
       .map(entry => {
         const p = board.byId(entry.id); if (!p) return null;
         const isIncoming = incomingIdSet.has(entry.id);
+        const isIntl     = entry.source === "intl" || p.source === "intl";
         return {
           ...p,
-          _type:    isIncoming ? "Incoming"    : "Transfer In",
-          _typeKey: isIncoming ? "incoming"    : "transfer",
+          _type:    isIntl ? "International" : isIncoming ? "Incoming" : "Transfer In",
+          _typeKey: isIntl ? "intl"          : isIncoming ? "incoming" : "transfer",
           nilOffer: entry.nilOffer,
         };
       })
@@ -1137,23 +1187,40 @@ export function AppPage() {
                     )}
                   </button>
                 </div>
-                <p className="muted">Portal targets. Status subject to change.</p>
+                <p className="muted">
+                  {boardMode === "domestic" ? "Portal targets. Status subject to change." : "International prospects (RealGM-scraped)."}
+                </p>
+                <div style={{ display: "flex", gap: 4, marginTop: 6, marginBottom: 4 }}>
+                  {[["domestic", "Domestic"], ["international", "International"]].map(([val, lbl]) => (
+                    <button key={val} onClick={() => setBoardMode(val)} style={{
+                      fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 12, cursor: "pointer",
+                      border: "1px solid",
+                      background:  boardMode === val ? "rgba(91,156,246,.18)" : "transparent",
+                      color:       boardMode === val ? "#5b9cf6" : "rgba(255,255,255,.45)",
+                      borderColor: boardMode === val ? "rgba(91,156,246,.5)" : "rgba(255,255,255,.12)",
+                    }}>{lbl}</button>
+                  ))}
+                </div>
                 <div className="panel-tools" style={{ flexWrap: "wrap" }}>
                   <input className="input" type="search" placeholder="Search…" value={search} onChange={e => setSearch(e.target.value)} />
                   <MultiSelectFilter label="positions" options={["Guard", "Wing", "Big"]}
                     value={posFilter} onChange={setPosFilter} width={130} />
-                  <MultiSelectFilter label="years"
-                    options={["Fr", "RS Fr", "So", "RS So", "Jr", "RS Jr", "Sr", "RS Sr", "Grad", "5th Year"]}
-                    value={yearFilter} onChange={setYearFilter} width={110} />
+                  {boardMode === "domestic" && (
+                    <MultiSelectFilter label="years"
+                      options={["Fr", "RS Fr", "So", "RS So", "Jr", "RS Jr", "Sr", "RS Sr", "Grad", "5th Year"]}
+                      value={yearFilter} onChange={setYearFilter} width={110} />
+                  )}
                   <RangeFilter label="Ht"
                     min={heightMin} max={heightMax}
                     onChange={(lo, hi) => { setHeightMin(lo); setHeightMax(hi); }}
                     parse={parseHeight} format={formatHeight}
                     placeholder={["min", "max"]} width={55} />
-                  <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, opacity: .7, cursor: "pointer", userSelect: "none", whiteSpace: "nowrap" }}>
-                    <input type="checkbox" checked={portalOnly} onChange={e => setPortalOnly(e.target.checked)} />
-                    Portal only
-                  </label>
+                  {boardMode === "domestic" && (
+                    <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, opacity: .7, cursor: "pointer", userSelect: "none", whiteSpace: "nowrap" }}>
+                      <input type="checkbox" checked={portalOnly} onChange={e => setPortalOnly(e.target.checked)} />
+                      Portal only
+                    </label>
+                  )}
                 </div>
                 <FilterChips
                   items={[
@@ -1166,17 +1233,46 @@ export function AppPage() {
                 />
               </div>
               <div className="list">
-                {filtered.length === 0
-                  ? <div className="empty">No players match your filters.</div>
-                  : filtered.map(p => (
-                    <PlayerCard key={p.id} player={p}
-                      inRoster={board.inRoster(p.id)} inShortlist={board.inShort(p.id)}
-                      onRoster={id => { track("roster_add", { player_id: id }); board.addToRoster(id); }}
-                      onShortlist={id => { track("shortlist_add", { player_id: id }); board.addToShortlist(id); }}
-                      onClick={handleOpenModal}
-                    />
-                  ))
-                }
+                {boardMode === "domestic" ? (
+                  filtered.length === 0
+                    ? <div className="empty">No players match your filters.</div>
+                    : filtered.map(p => (
+                      <PlayerCard key={p.id} player={p}
+                        inRoster={board.inRoster(p.id)} inShortlist={board.inShort(p.id)}
+                        onRoster={id => { track("roster_add", { player_id: id }); board.addToRoster(id); }}
+                        onShortlist={id => { track("shortlist_add", { player_id: id }); board.addToShortlist(id); }}
+                        onClick={handleOpenModal}
+                      />
+                    ))
+                ) : (
+                  intlBoard === null
+                    ? <div className="empty">Loading international board…</div>
+                    : filteredIntl.length === 0
+                      ? <div className="empty">No international players match your filters.</div>
+                      : filteredIntl.map(p => {
+                          const onRoster = board.inRoster(p.id);
+                          const tg = p.metrics?.translation_grade;
+                          return (
+                            <div key={p.id} className="row row-click"
+                              onClick={e => { if (!e.target.closest("button")) handleOpenModal(p); }}>
+                              <div className="row-main">
+                                <div className="row-title">{p.name}</div>
+                                <div className="row-sub" style={{ fontSize: 11 }}>
+                                  {[p.league, p.primary_position, p.height, p.country_of_origin].filter(Boolean).join(" · ")}
+                                  {tg != null && ` · TG ${Math.round(tg)}`}
+                                </div>
+                              </div>
+                              <div className="row-actions">
+                                <button className="btn btn-primary" style={{ fontSize: 11 }}
+                                  disabled={onRoster}
+                                  onClick={e => { e.stopPropagation(); board.addIntlToRoster(p); }}>
+                                  {onRoster ? "Added" : "+ Roster"}
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })
+                )}
               </div>
             </div>
 
@@ -1216,17 +1312,19 @@ export function AppPage() {
 
                   const hasAnything = board.state.roster.length || board.returningPlayers.length || board.customPlayers.length;
 
-                  // Split rostered entries into committed-incoming vs manual portal adds.
-                  const incomingIdSet = new Set(board.incomingTransfers.map(p => p.id));
-                  const incomingEntries = board.state.roster.filter(e => incomingIdSet.has(e.id));
-                  const portalEntries   = board.state.roster.filter(e => !incomingIdSet.has(e.id));
+                  // Split rostered entries: committed-incoming vs international vs manual portal adds.
+                  const incomingIdSet   = new Set(board.incomingTransfers.map(p => p.id));
+                  const incomingEntries = board.state.roster.filter(e => incomingIdSet.has(e.id) && e.source !== "intl");
+                  const intlEntries     = board.state.roster.filter(e => e.source === "intl");
+                  const portalEntries   = board.state.roster.filter(e => !incomingIdSet.has(e.id) && e.source !== "intl");
 
                   const renderRosterRow = (entry) => {
                     const p = board.byId(entry.id);
                     if (!p) return null;
+                    const typeKey = entry.source === "intl" || p.source === "intl" ? "intl" : "transfer";
                     return (
                       <div key={entry.id} className="row row-click"
-                        onClick={e => { if (!e.target.closest("button,input")) handleOpenModal({ ...p, _typeKey: "transfer", nilOffer: entry.nilOffer }); }}>
+                        onClick={e => { if (!e.target.closest("button,input")) handleOpenModal({ ...p, _typeKey: typeKey, nilOffer: entry.nilOffer }); }}>
                         <div className="row-main">
                           <div className="row-title">{p.name}</div>
                           <div className="row-sub">{p.team} · {p.pos} · {p.year}</div>
@@ -1255,6 +1353,14 @@ export function AppPage() {
                         <>
                           <div className="sub-label" style={{ color: "#5b9cf6" }}>Portal Adds ({portalEntries.length})</div>
                           {portalEntries.map(renderRosterRow)}
+                        </>
+                      )}
+
+                      {/* 2b. International signings */}
+                      {intlEntries.length > 0 && (
+                        <>
+                          <div className="sub-label" style={{ color: "#a78bfa" }}>International ({intlEntries.length})</div>
+                          {intlEntries.map(renderRosterRow)}
                         </>
                       )}
 
@@ -1356,20 +1462,20 @@ export function AppPage() {
                             color: col.label === "Type" ? (TYPE_COLOR[p._type] || "inherit") : "inherit",
                             fontWeight: col.label === "Type" ? 500 : "inherit",
                           }}>
-                            {col.label === "Type" && p._typeKey !== "transfer" && p._typeKey !== "incoming" && p._typeKey !== "custom" ? (
+                            {col.label === "Type" && p._typeKey !== "transfer" && p._typeKey !== "incoming" && p._typeKey !== "custom" && p._typeKey !== "intl" ? (
                               <div onClick={e => e.stopPropagation()}>
                                 <RetentionBadge value={p._typeKey} onChange={val => board.setRetention(p.id, val)} />
                               </div>
                             ) : col.isNil ? (
                               <NilInput value={p.nilOffer || 0} onCommit={val => {
-                                if (p._typeKey === "transfer" || p._typeKey === "incoming") board.updateOffer(p.id, val);
+                                if (p._typeKey === "transfer" || p._typeKey === "incoming" || p._typeKey === "intl") board.updateOffer(p.id, val);
                                 else if (p._typeKey !== "custom") board.updateReturningNil(p.id, val);
                               }} />
                             ) : col.get(p)}
                           </td>
                         ))}
                         <td style={{ ...tdStyle, textAlign: "right" }}>
-                          {(p._typeKey === "transfer" || p._typeKey === "incoming") && (
+                          {(p._typeKey === "transfer" || p._typeKey === "incoming" || p._typeKey === "intl") && (
                             <button className="btn btn-ghost"
                               style={{ fontSize: 11, padding: "2px 8px", color: "#f77", borderColor: "rgba(220,70,70,.3)" }}
                               onClick={e => { e.stopPropagation(); board.removeFromRoster(p.id); }}>Remove</button>
@@ -1485,17 +1591,27 @@ export function AppPage() {
       )}
 
       {modal && (
-        <PlayerModal
-          player={modal}
-          onClose={() => setModal(null)}
-          onReplace={["returning", "undecided", "transfer"].includes(modal._typeKey)
-            ? () => {
-                setReplacingPlayer(modal);
-                setModal(null);
-                setFinderOpen(true);
-              }
-            : undefined}
-        />
+        modal.source === "intl" || modal._typeKey === "intl" ? (
+          <IntlPlayerModal
+            profile={modal}
+            onClose={() => setModal(null)}
+            onAddToRoster={(p) => { board.addIntlToRoster(p); setModal(null); }}
+            alreadyOnRoster={board.inRoster(modal.id)}
+            canAddToRoster={!!activeTeam}
+          />
+        ) : (
+          <PlayerModal
+            player={modal}
+            onClose={() => setModal(null)}
+            onReplace={["returning", "undecided", "transfer"].includes(modal._typeKey)
+              ? () => {
+                  setReplacingPlayer(modal);
+                  setModal(null);
+                  setFinderOpen(true);
+                }
+              : undefined}
+          />
+        )
       )}
 
       {finderOpen && (

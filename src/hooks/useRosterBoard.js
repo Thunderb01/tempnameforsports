@@ -33,7 +33,7 @@ export function getBoardCache() { return _boardCache; }
 export function setBoardCache(players) { _boardCache = players; }
 
 const STORAGE_KEY_PREFIX = "bp_roster_builder";
-const STORAGE_VERSION    = 13; // bump this whenever the state shape changes
+const STORAGE_VERSION    = 14; // bump this whenever the state shape changes
 
 // Legacy keys to purge on load
 const LEGACY_KEYS = ["bp_roster_builder_v1", "bp_roster_builder"];
@@ -71,11 +71,67 @@ function defaultState(team = "") {
     settings: { program: team, scholarships: 15, nilTotal: 4500000, maxPct: 0.30 },
     board:            [],
     shortlistIds:     [],
-    roster:           [],   // [{ id, nilOffer }]
+    roster:           [],   // [{ id, nilOffer, source? }]    source: "portal" (default) | "intl"
     statusById:       {},
     retentionById:    {},
     nilById:          {},   // returning player NIL valuations { [playerId]: number }
     removedIncomings: [],   // incoming-transfer IDs the user explicitly removed (auto-add will skip)
+    intlPlayers:      {},   // cached international_players objects keyed by id (so they survive reloads without a fetch)
+  };
+}
+
+// Map an international_players row to the same shape the rest of the app uses,
+// while preserving the original intl-specific fields so the IntlPlayerModal can
+// render directly from this object without a refetch.
+function mapIntlPlayer(p) {
+  const m  = p.metrics || {};
+  const tg = m.translation_grade ?? 0;
+  const pos = (() => {
+    if (!p.primary_position) return "Wing";
+    const s = String(p.primary_position).toUpperCase();
+    if (s.includes("G")) return "Guard";
+    if (s === "C" || s === "PF") return "Big";
+    return "Wing";
+  })();
+  return {
+    id:               p.id,
+    source:           "intl",
+    name:             p.name,
+    team:             p.league,            // league shown where "team" usually goes
+    conf:             null,
+    pos,
+    year:             p.recruiting_class ? `'${String(p.recruiting_class).slice(-2)}` : "Intl",
+    height:           p.height           ?? null,
+    hometown:         p.country_of_origin ?? null,
+    espn_id:          null,
+    eligibility_years: null,
+    marketLow:        0,
+    marketHigh:       0,
+    nilValuation:     0,
+    archetype:        null,
+    player_status:    null,
+    competition_tier: p.competition_tier  ?? null,
+    stats: {
+      // Translation grade is the overall composite — use it as the primary score.
+      sei: tg,
+      ath: m.defensive_score     ?? tg,
+      ris: m.winning_impact      ?? tg,
+      dds: m.defensive_score     ?? tg,
+      cdi: m.offensive_footprint ?? tg,
+    },
+    // ── Fields preserved verbatim from the international_players row so the
+    //    IntlPlayerModal can render off this object directly.
+    league:            p.league,
+    primary_position:  p.primary_position,
+    age:               p.age,
+    country_of_origin: p.country_of_origin,
+    recruiting_class:  p.recruiting_class,
+    profile_url:       p.profile_url,
+    metrics:           m,
+    scouting_notes:    p.scouting_notes,
+    film_url:          p.film_url,
+    agent_name:        p.agent_name,
+    agent_contact:     p.agent_contact,
   };
 }
 
@@ -424,10 +480,11 @@ export function useRosterBoard(team, userId) {
   // ── Board actions ───────────────────────────────────────────────────────────
 
   const _boardById = useMemo(() => new Map(state.board.map(p => [p.id, p])), [state.board]);
+  const _intlById  = useMemo(() => new Map(Object.values(state.intlPlayers || {}).map(p => [p.id, p])), [state.intlPlayers]);
   const _rosterIds = useMemo(() => new Set(state.roster.map(r => r.id)), [state.roster]);
   const _shortIds  = useMemo(() => new Set(state.shortlistIds), [state.shortlistIds]);
 
-  const byId     = (id) => _boardById.get(id) ?? null;
+  const byId     = (id) => _boardById.get(id) ?? _intlById.get(id) ?? null;
   const inRoster = (id) => _rosterIds.has(id);
   const inShort  = (id) => _shortIds.has(id);
 
@@ -443,23 +500,46 @@ export function useRosterBoard(team, userId) {
   function addToRoster(id) {
     const p = byId(id);
     if (!p || inRoster(id)) return;
-    const offer = Math.round((p.marketLow + p.marketHigh) / 2);
+    const offer = Math.round(((p.marketLow || 0) + (p.marketHigh || 0)) / 2);
     setState(s => ({
       ...s,
       shortlistIds: s.shortlistIds.filter(x => x !== id),
-      roster: [{ id, nilOffer: offer }, ...s.roster],
+      roster: [{ id, nilOffer: offer, source: "portal" }, ...s.roster],
+    }));
+  }
+
+  /**
+   * Add an international player to the roster.
+   * Caches the mapped player object in state so it survives reloads without
+   * another Supabase fetch.
+   */
+  function addIntlToRoster(intlRow, nilOffer = 0) {
+    if (!intlRow || !intlRow.id || inRoster(intlRow.id)) return;
+    const mapped = mapIntlPlayer(intlRow);
+    setState(s => ({
+      ...s,
+      intlPlayers: { ...(s.intlPlayers || {}), [mapped.id]: mapped },
+      roster: [{ id: mapped.id, nilOffer: Math.max(0, Number(nilOffer) || 0), source: "intl" }, ...s.roster],
     }));
   }
 
   function removeFromRoster(id) {
     const isIncoming = incomingTransfers.some(p => p.id === id);
-    setState(s => ({
-      ...s,
-      roster: s.roster.filter(r => r.id !== id),
-      removedIncomings: isIncoming && !(s.removedIncomings || []).includes(id)
-        ? [...(s.removedIncomings || []), id]
-        : (s.removedIncomings || []),
-    }));
+    setState(s => {
+      const next = {
+        ...s,
+        roster: s.roster.filter(r => r.id !== id),
+        removedIncomings: isIncoming && !(s.removedIncomings || []).includes(id)
+          ? [...(s.removedIncomings || []), id]
+          : (s.removedIncomings || []),
+      };
+      // Clean up intl cache when an intl entry is removed
+      if (s.intlPlayers && s.intlPlayers[id]) {
+        const { [id]: _, ...rest } = s.intlPlayers;
+        next.intlPlayers = rest;
+      }
+      return next;
+    });
   }
 
   function updateOffer(id, nilOffer) {
@@ -551,9 +631,12 @@ export function useRosterBoard(team, userId) {
     const LEAVING_STATUSES = new Set(["graduating", "transferred", "transferring", "entering_portal", "entering_draft"]);
     const activeRosterReturners = returningPlayers.filter(p => !LEAVING_STATUSES.has(retentionById[p.id] || "returning"));
 
+    // Resolve a roster entry against the portal board first, then the intl cache.
+    const lookupRosterPlayer = (r) => _boardById.get(r.id) ?? _intlById.get(r.id) ?? null;
+
     const rosterPlayers      = [
       ...activeReturning,
-      ...roster.map(r => _boardById.get(r.id)).filter(Boolean),
+      ...roster.map(lookupRosterPlayer).filter(Boolean),
       ...incomingTransfers.filter(p => !_rosterIds.has(p.id)),
     ];
     const projectedLow       = rosterPlayers.reduce((sum, p) => sum + (p.marketLow  || 0), 0);
@@ -582,7 +665,7 @@ export function useRosterBoard(team, userId) {
     }
     const scoringPool = [
       ...activeRosterReturners.map(p => ({ ...p, _priorYearEval: isPriorYearEval(p) })),
-      ...roster.map(r => { const p = _boardById.get(r.id); return p ? { ...p, _priorYearEval: isPriorYearEval(p) } : null; }).filter(Boolean),
+      ...roster.map(r => { const p = lookupRosterPlayer(r); return p ? { ...p, _priorYearEval: isPriorYearEval(p) } : null; }).filter(Boolean),
       ...incomingTransfers.filter(p => !_rosterIds.has(p.id)).map(p => ({ ...p, _priorYearEval: isPriorYearEval(p) })),
     ];
     const byPos = {};
@@ -611,7 +694,7 @@ export function useRosterBoard(team, userId) {
     });
 
     return { totalRoster, nilCommitted, nilRemaining, scholarshipsRemaining, maxPerPlayer, projectedLow, projectedHigh, rosterScore, scoringPool, warnings };
-  }, [state, returningPlayers, incomingTransfers, customPlayers, _boardById, _rosterIds]);
+  }, [state, returningPlayers, incomingTransfers, customPlayers, _boardById, _intlById, _rosterIds]);
 
   return {
     state,
@@ -624,7 +707,7 @@ export function useRosterBoard(team, userId) {
     loadCustomPlayers,
     byId, inRoster, inShort,
     addToShortlist, removeFromShortlist,
-    addToRoster, removeFromRoster,
+    addToRoster, addIntlToRoster, removeFromRoster,
     updateOffer, setStatus, setRetention, updateReturningNil, loadFromSaved, commitSettings, reset,
     addCustomPlayer, removeCustomPlayer, updateCustomPlayerNil, persistCustomPlayerNil,
   };
