@@ -67,6 +67,43 @@ Priority order:
   No team → skipped (left null)
 
 ────────────────────────────────────────────────────────────────────────────────
+4. INTERNATIONAL PLAYER METRICS
+   Script: international_metrics.py
+────────────────────────────────────────────────────────────────────────────────
+
+Prereqs (run once if not done already):
+  - international_players + international_players_stats already exist
+  - You've scraped at least one league with liga_u_scraper.py
+    (the script reads from those tables — it doesn't scrape)
+
+Run script:
+  python international_metrics.py --dry-run                 (preview only)
+  python international_metrics.py                           (write to DB)
+  python international_metrics.py --league "Spanish Liga U" (one league only)
+  python international_metrics.py --season 2026             (one season only)
+
+What it does:
+  For every international player, computes 5 metrics — all percentile-ranked
+  within their league — and writes them to international_players.metrics:
+
+    offensive_footprint   OFP%   (FGA + 0.44·FTA + TOV + AST)·(TmMP/5)
+                                 / (MP · (TmFGA + 0.44·TmFTA + TmTOV + TmAST))
+    defensive_score       DDS-style: per-36 stl + 0.75·blk + 0.5·drb - 0.5·pf/36
+    winning_impact        Wins-minus-losses performance differential  ← needs splits
+    sos_performance       Above-.500 minus below-.500 differential    ← needs splits
+    translation_grade     (CQI·.30 + WID·.25 + DEF·.22 + OFP·.23)
+                          × tier_mult (T1=1.00, T2=0.90, T3=0.80, T4=0.70)
+                          + height_boost ((h_cm - pos_avg) × 0.1, capped ±5)
+                          Positional averages: Guard 188, Wing 195, Forward 203, Big 205
+
+Limitation:
+  winning_impact and sos_performance need per-player win/loss and opponent-
+  strength splits. These live in international_players_splits (currently empty
+  unless liga_u_scraper.py was run with split scraping enabled). If those rows
+  aren't present, the metric is left null and translation_grade is null too.
+  TODO: extend the scraper to fetch the Wins/Losses/vs-.500-Above/Below splits.
+
+────────────────────────────────────────────────────────────────────────────────
 ENV VARS (needed for all scripts)
 ────────────────────────────────────────────────────────────────────────────────
 

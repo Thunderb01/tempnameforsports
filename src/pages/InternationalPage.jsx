@@ -28,6 +28,30 @@ const STAT_TYPE_LABELS = { Averages: "Averages", Totals: "Totals", Per_36: "Per 
 const PCT_KEYS         = new Set(["fg%","3p%","ft%","ts%","efg%","usg%","ast%","to%","orb%","drb%"]);
 const PAGE_SIZE        = 75;
 
+// Stat-key aliases. RealGM's Averages tab uses per-game abbreviations (PPG/RPG/...)
+// while every other tab uses raw totals (PTS/REB/...). Rather than normalising
+// during scraping, we resolve aliases here so the DB can stay "raw RealGM".
+// Add a new alias → primary mapping any time you discover a new source convention.
+const STAT_ALIASES = {
+  pts: ["pts", "ppg"],
+  reb: ["reb", "rpg", "trb"],
+  ast: ["ast", "apg"],
+  stl: ["stl", "spg"],
+  blk: ["blk", "bpg"],
+  to:  ["to",  "topg", "tpg", "tov"],
+  min: ["min", "mpg"],
+  gp:  ["gp",  "g"],
+};
+function getStat(stats, key) {
+  if (!stats) return undefined;
+  const keys = STAT_ALIASES[key] || [key];
+  for (const k of keys) {
+    const v = stats[k];
+    if (v !== undefined && v !== null && v !== "") return v;
+  }
+  return undefined;
+}
+
 // ── Competition tiers ─────────────────────────────────────────────────────────
 // Labels are loaded at runtime from international_tier_labels (editable in admin).
 const TIER_LABELS_FALLBACK = { 1: "EuroLeague / Elite", 2: "Top Domestic", 3: "Mid Domestic", 4: "Developmental" };
@@ -270,7 +294,7 @@ function IntlPlayerModal({ playerName, allRows, profile, tierLabels, onClose }) 
                       <td style={{ padding: "7px 12px", opacity: .45, fontSize: 11, whiteSpace: "nowrap" }}>{r.season_type?.replace(/_/g, " ")}</td>
                       {statCols.map(c => (
                         <td key={c.key} style={{ padding: "7px 10px", textAlign: "center", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>
-                          {fmtStatByKey(r.stats?.[c.key], c.key)}
+                          {fmtStatByKey(getStat(r.stats, c.key), c.key)}
                         </td>
                       ))}
                     </tr>
@@ -447,8 +471,8 @@ export function InternationalPage() {
         const bt = profiles[b.player_name]?.competition_tier ?? 99;
         return sortDir === "asc" ? at - bt : bt - at;
       }
-      const av = parseFloat(a.stats?.[sortKey]);
-      const bv = parseFloat(b.stats?.[sortKey]);
+      const av = parseFloat(getStat(a.stats, sortKey));
+      const bv = parseFloat(getStat(b.stats, sortKey));
       const cmp = (isNaN(av) ? -Infinity : av) - (isNaN(bv) ? -Infinity : bv);
       return sortDir === "asc" ? cmp : -cmp;
     });
@@ -627,7 +651,7 @@ export function InternationalPage() {
                     <td style={{ ...tdStyle(), opacity: .6 }}>{r.season || "—"}</td>
                     {statCols.map(c => (
                       <td key={c.key} style={tdStyle()}>
-                        {fmtStatByKey(r.stats?.[c.key], c.key)}
+                        {fmtStatByKey(getStat(r.stats, c.key), c.key)}
                       </td>
                     ))}
                   </tr>
