@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { supabase }   from "@/lib/supabase";
+import { PROJECTED_TIER_OPTIONS, tierColor } from "@/lib/display";
 
 // ── Constants ────────────────────────────────────────────────────────────────
 // Tier labels are now loaded from the international_tier_labels table at runtime.
@@ -10,6 +11,13 @@ const TIER_COLORS  = { 1: "#f59e0b", 2: "#5b9cf6", 3: "#4ade80", 4: "#9ca3af" };
 const STAT_TYPES   = ["Averages", "Totals", "Per_36", "Advanced_Stats"];
 const SEASON_TYPES = ["Regular_Season", "Playoffs", "Cup", "International"];
 const POSITIONS    = ["PG", "SG", "SF", "PF", "C", "G", "F"];
+const STATUS_OPTIONS = ["uncommitted", "committed", "signed", "withdrawn"];
+const STATUS_COLOR   = {
+  uncommitted: "#94a3b8",
+  committed:   "#5b9cf6",
+  signed:      "#4ade80",
+  withdrawn:   "#e05c5c",
+};
 const METRIC_KEYS  = [
   "offensive_footprint", "defensive_score", "winning_impact",
   "sos_performance",     "translation_grade",
@@ -19,6 +27,7 @@ const PROFILE_CSV_HEADERS = [
   "name", "league", "profile_url", "height", "primary_position",
   "country_of_origin", "age", "recruiting_class",
   "agent_name", "agent_contact", "film_url", "competition_tier",
+  "player_status", "committed_team", "projected_tier",
   "scouting_notes",
   ...METRIC_KEYS,
 ];
@@ -112,6 +121,9 @@ function ProfileForm({ initial, onSave, onCancel, saving, tierLabels }) {
     agent_contact:     initial?.agent_contact     ?? "",
     film_url:          initial?.film_url          ?? "",
     competition_tier:  initial?.competition_tier  ?? 2,
+    player_status:     initial?.player_status     ?? "uncommitted",
+    committed_team:    initial?.committed_team    ?? "",
+    projected_tier:    initial?.projected_tier    ?? "",
     scouting_notes:    initial?.scouting_notes    ?? "",
     metrics:           { ...(initial?.metrics || {}) },
   }));
@@ -138,6 +150,9 @@ function ProfileForm({ initial, onSave, onCancel, saving, tierLabels }) {
       agent_contact:     form.agent_contact.trim()     || null,
       film_url:          form.film_url.trim()          || null,
       competition_tier:  parseInt(form.competition_tier, 10) || 2,
+      player_status:     form.player_status || "uncommitted",
+      committed_team:    form.committed_team.trim() || null,
+      projected_tier:    form.projected_tier || null,
       scouting_notes:    form.scouting_notes.trim()    || null,
       metrics:           form.metrics,
     });
@@ -188,6 +203,33 @@ function ProfileForm({ initial, onSave, onCancel, saving, tierLabels }) {
               <option key={t} value={t}>
                 Tier {t} · {(tierLabels && tierLabels[t]) || TIER_LABELS_FALLBACK[t]}
               </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label style={labelStyle}>Recruiting Status</label>
+          <select className="input" style={{ width: "100%" }} value={form.player_status}
+            onChange={e => set("player_status", e.target.value)}>
+            {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+        </div>
+        <div>
+          <label style={labelStyle}>Committed Team (D1 school)</label>
+          <input className="input" style={{ width: "100%" }}
+            placeholder={form.player_status === "committed" || form.player_status === "signed"
+              ? "e.g. Kentucky" : "—"}
+            value={form.committed_team}
+            onChange={e => set("committed_team", e.target.value)}
+            disabled={form.player_status !== "committed" && form.player_status !== "signed"} />
+        </div>
+        <div style={{ gridColumn: "1 / -1" }}>
+          <label style={labelStyle}>Projected Tier (D1 level)</label>
+          <select className="input" style={{ width: "100%" }}
+            value={form.projected_tier}
+            onChange={e => set("projected_tier", e.target.value)}>
+            <option value="">— not projected —</option>
+            {PROJECTED_TIER_OPTIONS.map(t => (
+              <option key={t} value={t}>{t}</option>
             ))}
           </select>
         </div>
@@ -418,6 +460,7 @@ function CSVImporter({ kind, onImport }) {
         height: "6'9\"", primary_position: "SF",
         country_of_origin: "Spain", age: "19", recruiting_class: "2026",
         agent_name: "", agent_contact: "", film_url: "", competition_tier: "2",
+        player_status: "uncommitted", committed_team: "", projected_tier: "HM Rotation / MM Starter",
         scouting_notes: "Quick first step, average defender, projects as bench guard.",
         offensive_footprint: "75", defensive_score: "68", winning_impact: "72",
         sos_performance: "70", translation_grade: "65",
@@ -528,7 +571,7 @@ export function InternationalAdminContent() {
   const loadProfiles = useCallback(async () => {
     const { data, error } = await supabase
       .from("international_players")
-      .select("id, name, league, profile_url, height, primary_position, country_of_origin, age, recruiting_class, agent_name, agent_contact, film_url, competition_tier, scouting_notes, metrics")
+      .select("id, name, league, profile_url, height, primary_position, country_of_origin, age, recruiting_class, agent_name, agent_contact, film_url, competition_tier, scouting_notes, player_status, committed_team, projected_tier, metrics")
       .order("name");
     if (error) { console.error(error); return; }
     setProfiles(data || []);
@@ -657,6 +700,9 @@ export function InternationalAdminContent() {
         agent_contact:     r.agent_contact?.trim()     || null,
         film_url:          r.film_url?.trim()          || null,
         competition_tier:  parseInt(r.competition_tier, 10) || 2,
+        player_status:     r.player_status?.trim()     || null,
+        committed_team:    r.committed_team?.trim()    || null,
+        projected_tier:    r.projected_tier?.trim()    || null,
         scouting_notes:    r.scouting_notes?.trim()    || null,
         metrics,
       };
@@ -777,7 +823,7 @@ export function InternationalAdminContent() {
                   </div>
                 ) : filteredProfiles.map((p, i) => (
                   <div key={p.id} style={{
-                    display: "grid", gridTemplateColumns: "1.5fr 1fr 100px 80px 90px 130px",
+                    display: "grid", gridTemplateColumns: "1.4fr 1fr 90px 70px 1.1fr 130px",
                     gap: 12, padding: "10px 14px", alignItems: "center",
                     background: i % 2 === 0 ? "transparent" : "rgba(255,255,255,.015)",
                     borderBottom: "1px solid rgba(255,255,255,.04)",
@@ -797,8 +843,18 @@ export function InternationalAdminContent() {
                     <div style={{ fontSize: 10, opacity: .5 }}>
                       {Object.keys(p.metrics || {}).length} metrics
                     </div>
-                    <div style={{ fontSize: 10, opacity: p.agent_name ? .55 : .25 }}>
-                      {p.agent_name || "no agent"}
+                    <div style={{ fontSize: 10 }}>
+                      {(() => {
+                        const st = p.player_status || "uncommitted";
+                        const c  = STATUS_COLOR[st] || "#94a3b8";
+                        return (
+                          <span style={{ padding: "2px 7px", borderRadius: 10, fontWeight: 600,
+                                          background: `${c}1f`, color: c, border: `1px solid ${c}55` }}>
+                            {st}{(st === "committed" || st === "signed") && p.committed_team
+                              ? ` → ${p.committed_team}` : ""}
+                          </span>
+                        );
+                      })()}
                     </div>
                     <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
                       <button className="btn btn-ghost" style={{ fontSize: 11, padding: "3px 10px" }}

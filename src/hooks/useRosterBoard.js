@@ -33,7 +33,7 @@ export function getBoardCache() { return _boardCache; }
 export function setBoardCache(players) { _boardCache = players; }
 
 const STORAGE_KEY_PREFIX = "bp_roster_builder";
-const STORAGE_VERSION    = 14; // bump this whenever the state shape changes
+const STORAGE_VERSION    = 15; // bump this whenever the state shape changes
 
 // Legacy keys to purge on load
 const LEGACY_KEYS = ["bp_roster_builder_v1", "bp_roster_builder"];
@@ -132,6 +132,9 @@ function mapIntlPlayer(p) {
     film_url:          p.film_url,
     agent_name:        p.agent_name,
     agent_contact:     p.agent_contact,
+    player_status:     p.player_status,
+    committed_team:    p.committed_team,
+    projected_tier:    p.projected_tier,
   };
 }
 
@@ -384,6 +387,40 @@ export function useRosterBoard(team, userId) {
       });
     }
 
+    // ── International players committed to this team ───────────────────────
+    // Mirrors the portal-transfer auto-add above: any international_players row
+    // with player_status in ("committed", "signed") AND committed_team matching
+    // this team gets auto-added to the roster as a source="intl" entry.
+    try {
+      const { data: intlCommitted } = await supabase
+        .from("international_players")
+        .select("id, name, league, profile_url, height, primary_position, country_of_origin, age, recruiting_class, agent_name, agent_contact, film_url, competition_tier, scouting_notes, metrics, player_status, committed_team, projected_tier")
+        .ilike("committed_team", teamName)
+        .in("player_status", ["committed", "signed"]);
+
+      const mappedIntl = (intlCommitted || []).map(mapIntlPlayer);
+      if (mappedIntl.length > 0) {
+        setState(s => {
+          const existing = new Set(s.roster.map(r => r.id));
+          const removed  = new Set(s.removedIncomings || []);
+          const toAdd    = mappedIntl.filter(p => !existing.has(p.id) && !removed.has(p.id));
+          if (toAdd.length === 0) return s;
+          const newIntlCache = { ...(s.intlPlayers || {}) };
+          toAdd.forEach(p => { newIntlCache[p.id] = p; });
+          return {
+            ...s,
+            intlPlayers: newIntlCache,
+            roster: [
+              ...toAdd.map(p => ({ id: p.id, nilOffer: 0, source: "intl" })),
+              ...s.roster,
+            ],
+          };
+        });
+      }
+    } catch (e) {
+      console.warn("intl committed-roster fetch failed:", e);
+    }
+
     // Map player_id → portal retention bucket:
     //   uncommitted = still in portal looking
     //   committed   = already committed to a new school (show as transferred)
@@ -526,10 +563,17 @@ export function useRosterBoard(team, userId) {
   function removeFromRoster(id) {
     const isIncoming = incomingTransfers.some(p => p.id === id);
     setState(s => {
+      // If this id was an auto-added incoming-transfer OR an auto-added committed
+      // international player, record the removal so loadReturningRoster doesn't
+      // re-add it on the next page load.
+      const entry      = s.roster.find(r => r.id === id);
+      const wasIntlAutoAdd = entry?.source === "intl" && !!(s.intlPlayers && s.intlPlayers[id]);
+      const shouldPersistRemoval = isIncoming || wasIntlAutoAdd;
+
       const next = {
         ...s,
         roster: s.roster.filter(r => r.id !== id),
-        removedIncomings: isIncoming && !(s.removedIncomings || []).includes(id)
+        removedIncomings: shouldPersistRemoval && !(s.removedIncomings || []).includes(id)
           ? [...(s.removedIncomings || []), id]
           : (s.removedIncomings || []),
       };

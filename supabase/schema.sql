@@ -157,6 +157,9 @@ create table if not exists public.international_players (
   film_url           text,
   competition_tier   integer default 2 check (competition_tier between 1 and 4),
   scouting_notes     text,
+  player_status      text default 'uncommitted',   -- uncommitted | committed | signed | withdrawn
+  committed_team     text,                          -- D1 school they've committed to (auto-roster trigger)
+  projected_tier     text,                          -- HM All-American / Pre-Draft, HM All-Conference, ... LM Rotation
   metrics            jsonb default '{}',
   created_at         timestamp with time zone default now(),
   unique (name, league)
@@ -219,3 +222,42 @@ create policy "Authenticated users can read international stats"
 create policy "Service role can upsert international stats"
   on public.international_players_stats for insert
   with check (true);
+
+
+-- ── Contact messages ───────────────────────────────────────────────────────────
+-- "Contact Us to Connect" form submissions from the international player modal.
+-- Authenticated users can INSERT; only superadmins can SELECT.
+create table if not exists public.contact_messages (
+  id          uuid primary key default gen_random_uuid(),
+  player_id   uuid references public.international_players(id) on delete set null,
+  player_name text,
+  league      text,
+  agent_name  text,
+  user_id     uuid,
+  user_name   text,
+  user_email  text not null,
+  team        text,
+  message     text not null,
+  status      text default 'pending',  -- pending | reviewed | connected | dismissed
+  created_at  timestamp with time zone default now()
+);
+alter table public.contact_messages enable row level security;
+
+create policy "Authenticated can submit contact messages"
+  on public.contact_messages for insert
+  to authenticated
+  with check (true);
+
+create policy "Anon can submit contact messages"
+  on public.contact_messages for insert
+  to anon
+  with check (true);
+
+create policy "Superadmin can read contact messages"
+  on public.contact_messages for select
+  using (exists (select 1 from public.coaches where coaches.user_id = auth.uid() and coaches.role = 'superadmin'));
+
+create policy "Superadmin can update contact messages"
+  on public.contact_messages for update
+  using      (exists (select 1 from public.coaches where coaches.user_id = auth.uid() and coaches.role = 'superadmin'))
+  with check (exists (select 1 from public.coaches where coaches.user_id = auth.uid() and coaches.role = 'superadmin'));

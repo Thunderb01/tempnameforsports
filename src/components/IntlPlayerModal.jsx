@@ -1,5 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
+import { useAuth }  from "@/hooks/useAuth";
+import { tierColor } from "@/lib/display";
 
 // ── Stat column definitions (re-exported for InternationalPage's main table) ──
 export const AVERAGES_COLS = [
@@ -116,6 +118,139 @@ export function TierBadge({ tier, tierLabels }) {
   );
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Contact form popup — captures a message about an intl player and writes a
+// row to `contact_messages`. Rendered on top of the IntlPlayerModal so its
+// backdrop click doesn't dismiss the parent modal.
+// ─────────────────────────────────────────────────────────────────────────────
+function ContactForm({ profile, onClose }) {
+  const { user } = useAuth();
+  const [name,    setName]    = useState("");
+  const [email,   setEmail]   = useState("");
+  const [team,    setTeam]    = useState("");
+  const [message, setMessage] = useState("");
+  const [busy,    setBusy]    = useState(false);
+  const [sent,    setSent]    = useState(false);
+  const [error,   setError]   = useState("");
+
+  // Prefill from auth user when available
+  useEffect(() => {
+    if (user?.email && !email) setEmail(user.email);
+    if (user?.user_metadata?.full_name && !name) setName(user.user_metadata.full_name);
+  }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function submit() {
+    setError("");
+    if (!email.trim()) { setError("Email is required."); return; }
+    if (!message.trim()) { setError("Please add a short message."); return; }
+    setBusy(true);
+    const payload = {
+      player_id:   profile?.id ?? null,
+      player_name: profile?.name ?? null,
+      league:      profile?.league ?? null,
+      agent_name:  profile?.agent_name ?? null,
+      user_id:     user?.id ?? null,
+      user_name:   name.trim() || null,
+      user_email:  email.trim(),
+      team:        team.trim() || null,
+      message:     message.trim(),
+    };
+    const { error: err } = await supabase.from("contact_messages").insert(payload);
+    setBusy(false);
+    if (err) {
+      console.error("contact_messages insert:", err);
+      setError("Couldn't send — " + err.message);
+      return;
+    }
+    setSent(true);
+  }
+
+  return (
+    <div
+      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.85)", zIndex: 1100, overflowY: "auto", padding: "32px 16px" }}
+      onClick={onClose}
+    >
+      <div style={{ maxWidth: 480, margin: "0 auto" }} onClick={e => e.stopPropagation()}>
+        <div style={{ background: "var(--bg, #0e1521)", border: "1px solid rgba(255,255,255,.1)", borderRadius: 14, padding: 24 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+            <h3 style={{ margin: 0, fontSize: 18 }}>Connect with {profile?.agent_name || "agent"}</h3>
+            <button onClick={onClose} style={{
+              background: "none", border: "1px solid rgba(255,255,255,.12)", borderRadius: 8,
+              color: "rgba(255,255,255,.5)", cursor: "pointer", fontSize: 14, padding: "2px 8px",
+            }}>✕</button>
+          </div>
+
+          <div style={{ fontSize: 12, opacity: .55, marginBottom: 16 }}>
+            Inquiry about <strong>{profile?.name}</strong>{profile?.league ? ` · ${profile.league}` : ""}.
+            We'll forward your details and connect you with the agent.
+          </div>
+
+          {sent ? (
+            <div style={{
+              padding: 16, borderRadius: 10, textAlign: "center",
+              background: "rgba(74,222,128,.10)", border: "1px solid rgba(74,222,128,.35)",
+              color: "#4ade80",
+            }}>
+              <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 6 }}>✓ Message sent</div>
+              <div style={{ fontSize: 12, opacity: .8 }}>We'll be in touch soon at {email}.</div>
+              <button onClick={onClose} style={{
+                marginTop: 14, fontSize: 12, padding: "5px 14px", borderRadius: 6, cursor: "pointer",
+                background: "transparent", color: "#4ade80", border: "1px solid rgba(74,222,128,.4)",
+              }}>Close</button>
+            </div>
+          ) : (
+            <>
+              <div style={{ display: "grid", gap: 10 }}>
+                <label style={{ display: "block" }}>
+                  <span style={{ fontSize: 10, opacity: .5, textTransform: "uppercase", letterSpacing: ".05em" }}>Your name</span>
+                  <input className="input" style={{ width: "100%", marginTop: 4 }}
+                    value={name} onChange={e => setName(e.target.value)} placeholder="—" />
+                </label>
+                <label style={{ display: "block" }}>
+                  <span style={{ fontSize: 10, opacity: .5, textTransform: "uppercase", letterSpacing: ".05em" }}>Email *</span>
+                  <input className="input" style={{ width: "100%", marginTop: 4 }} type="email"
+                    value={email} onChange={e => setEmail(e.target.value)} placeholder="you@school.edu" />
+                </label>
+                <label style={{ display: "block" }}>
+                  <span style={{ fontSize: 10, opacity: .5, textTransform: "uppercase", letterSpacing: ".05em" }}>Program / Team</span>
+                  <input className="input" style={{ width: "100%", marginTop: 4 }}
+                    value={team} onChange={e => setTeam(e.target.value)} placeholder="e.g. Kentucky" />
+                </label>
+                <label style={{ display: "block" }}>
+                  <span style={{ fontSize: 10, opacity: .5, textTransform: "uppercase", letterSpacing: ".05em" }}>Message *</span>
+                  <textarea className="input" rows={4} style={{ width: "100%", marginTop: 4, resize: "vertical", fontFamily: "inherit" }}
+                    value={message} onChange={e => setMessage(e.target.value)}
+                    placeholder="What's your interest in this player? Timeline, fit, NIL range, etc." />
+                </label>
+              </div>
+
+              {error && (
+                <div style={{ marginTop: 10, padding: "6px 10px", borderRadius: 6, fontSize: 12,
+                              background: "rgba(224,92,92,.10)", border: "1px solid rgba(224,92,92,.35)",
+                              color: "#f87171" }}>{error}</div>
+              )}
+
+              <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 16 }}>
+                <button onClick={onClose} disabled={busy} style={{
+                  fontSize: 12, padding: "6px 14px", borderRadius: 8, cursor: "pointer",
+                  background: "transparent", color: "rgba(255,255,255,.55)",
+                  border: "1px solid rgba(255,255,255,.12)",
+                }}>Cancel</button>
+                <button onClick={submit} disabled={busy} style={{
+                  fontSize: 12, fontWeight: 600, padding: "6px 16px", borderRadius: 8,
+                  cursor: busy ? "wait" : "pointer",
+                  background: "rgba(91,156,246,.18)", color: "#5b9cf6",
+                  border: "1px solid rgba(91,156,246,.5)",
+                }}>{busy ? "Sending…" : "Send message"}</button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /**
  * Rich modal for an international player.
  *
@@ -139,6 +274,7 @@ export function IntlPlayerModal({
   canAddToRoster,
 }) {
   const [statType,         setStatType]         = useState("Averages");
+  const [contactOpen,      setContactOpen]      = useState(false);
   const [fetchedRows,      setFetchedRows]      = useState(null);
   const [fetchedTierLabels, setFetchedTierLabels] = useState(null);
 
@@ -209,6 +345,17 @@ export function IntlPlayerModal({
                 {profile?.recruiting_class  && <span style={{ fontSize: 13, opacity: .55 }}>· class of {profile.recruiting_class}</span>}
                 {profile?.league            && <span style={{ fontSize: 13, opacity: .55 }}>· {profile.league}</span>}
                 {tier && <TierBadge tier={tier} tierLabels={effectiveTierLabels} />}
+                {profile?.projected_tier && (() => {
+                  const c = tierColor(profile.projected_tier);
+                  return (
+                    <span style={{
+                      fontSize: 11, fontWeight: 700, padding: "2px 10px", borderRadius: 20,
+                      background: `${c}1f`, color: c, border: `1px solid ${c}55`,
+                    }}>
+                      Projection · {profile.projected_tier}
+                    </span>
+                  );
+                })()}
               </div>
               {profile?.profile_url && (
                 <a href={profile.profile_url} target="_blank" rel="noreferrer"
@@ -315,7 +462,7 @@ export function IntlPlayerModal({
                       CONTACT INFO PROTECTED
                     </div>
                   </div>
-                  <button style={{
+                  <button onClick={() => setContactOpen(true)} style={{
                     fontSize: 12, fontWeight: 600, padding: "6px 16px", borderRadius: 8, cursor: "pointer",
                     background: "rgba(91,156,246,.15)", color: "#5b9cf6", border: "1px solid rgba(91,156,246,.4)",
                   }}>
@@ -377,6 +524,10 @@ export function IntlPlayerModal({
 
         </div>
       </div>
+
+      {contactOpen && (
+        <ContactForm profile={profile} onClose={() => setContactOpen(false)} />
+      )}
     </div>
   );
 }

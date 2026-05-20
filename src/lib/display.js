@@ -38,6 +38,18 @@ export function tierColor(label) {
   return TIER_COLORS[label] || "#64748b";
 }
 
+// Canonical ordered list of projected-tier labels — shared by the domestic
+// dropdown in AdminPage and the new international one. Order matches the value
+// threshold ladder in projectedTier() below.
+export const PROJECTED_TIER_OPTIONS = [
+  "HM All-American / Pre-Draft",
+  "HM All-Conference",
+  "HM Starter / MM All-Conference",
+  "HM Rotation / MM Starter",
+  "MM Starter / LM All-Conference",
+  "LM Rotation",
+];
+
 export function projectedTier(v) {
   v = Number(v) || 0;
   if (v >= 2_000_000) return "HM All-American / Pre-Draft";

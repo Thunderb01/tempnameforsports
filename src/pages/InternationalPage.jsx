@@ -5,6 +5,7 @@ import { useAuth }       from "@/hooks/useAuth";
 import { useAdminTeam }  from "@/hooks/useAdminTeam";
 import { useRosterBoard } from "@/hooks/useRosterBoard";
 import { MultiSelectFilter, RangeFilter, FilterChips, parseHeight, formatHeight, playerHeightInches } from "@/components/Filters";
+import { tierColor, PROJECTED_TIER_OPTIONS } from "@/lib/display";
 import {
   IntlPlayerModal,
   AVERAGES_COLS, STAT_TYPE_COLS, STAT_TYPES, STAT_TYPE_LABELS,
@@ -41,6 +42,7 @@ export function InternationalPage() {
   const [seasonFilter, setSeasonFilter] = useState("all");
   const [posFilter,    setPosFilter]    = useState([]);
   const [classFilter,  setClassFilter]  = useState([]);
+  const [projFilter,   setProjFilter]   = useState([]);
   const [heightMin,    setHeightMin]    = useState(null);
   const [heightMax,    setHeightMax]    = useState(null);
   const [ageMin,       setAgeMin]       = useState(null);
@@ -56,7 +58,7 @@ export function InternationalPage() {
     return () => clearTimeout(t);
   }, [searchInput]);
 
-  useEffect(() => setPage(0), [search, leagueFilter, teamFilter, tierFilter, seasonFilter, posFilter, classFilter, heightMin, heightMax, ageMin, ageMax, statType, sortKey, sortDir]);
+  useEffect(() => setPage(0), [search, leagueFilter, teamFilter, tierFilter, seasonFilter, posFilter, classFilter, projFilter, heightMin, heightMax, ageMin, ageMax, statType, sortKey, sortDir]);
 
   // ── Fetch stats ────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -85,7 +87,7 @@ export function InternationalPage() {
   useEffect(() => {
     supabase
       .from("international_players")
-      .select("id, name, league, profile_url, height, primary_position, country_of_origin, age, recruiting_class, agent_name, agent_contact, film_url, competition_tier, scouting_notes, metrics")
+      .select("id, name, league, profile_url, height, primary_position, country_of_origin, age, recruiting_class, agent_name, agent_contact, film_url, competition_tier, scouting_notes, player_status, committed_team, projected_tier, metrics")
       .then(({ data }) => {
         if (!data) return;
         const map = {};
@@ -156,6 +158,7 @@ export function InternationalPage() {
       if (tierFilter.length && !tierFilter.includes(String(prof?.competition_tier))) return false;
       if (posFilter.length  && !posFilter.includes(prof?.primary_position))         return false;
       if (classFilter.length && !classFilter.includes(prof?.recruiting_class))      return false;
+      if (projFilter.length  && !projFilter.includes(prof?.projected_tier))         return false;
       if (heightMin != null || heightMax != null) {
         const inches = playerHeightInches(prof?.height);
         if (inches == null) return false;
@@ -170,7 +173,7 @@ export function InternationalPage() {
       }
       return true;
     });
-  }, [combinedRows, profiles, search, leagueFilter, teamFilter, tierFilter, seasonFilter, posFilter, classFilter, heightMin, heightMax, ageMin, ageMax, statType]);
+  }, [combinedRows, profiles, search, leagueFilter, teamFilter, tierFilter, seasonFilter, posFilter, classFilter, projFilter, heightMin, heightMax, ageMin, ageMax, statType]);
 
   // ── Sort ───────────────────────────────────────────────────────────────────
   const sorted = useMemo(() => {
@@ -187,6 +190,16 @@ export function InternationalPage() {
         const at = profiles[a.player_name]?.competition_tier ?? 99;
         const bt = profiles[b.player_name]?.competition_tier ?? 99;
         return sortDir === "asc" ? at - bt : bt - at;
+      }
+      if (sortKey === "projection") {
+        // Higher tier (HM All-American) sorts first when desc; rely on the
+        // canonical PROJECTED_TIER_OPTIONS order from display.js.
+        const order = PROJECTED_TIER_OPTIONS;
+        const ar = order.indexOf(profiles[a.player_name]?.projected_tier ?? "");
+        const br = order.indexOf(profiles[b.player_name]?.projected_tier ?? "");
+        const ax = ar === -1 ? Infinity : ar;
+        const bx = br === -1 ? Infinity : br;
+        return sortDir === "asc" ? ax - bx : bx - ax;
       }
       const av = parseFloat(getStat(a.stats, sortKey));
       const bv = parseFloat(getStat(b.stats, sortKey));
@@ -277,6 +290,8 @@ export function InternationalPage() {
             {classes.length > 0 && (
               <MultiSelectFilter label="classes" options={classes} value={classFilter} onChange={setClassFilter} width={120} />
             )}
+            <MultiSelectFilter label="projection" options={PROJECTED_TIER_OPTIONS}
+              value={projFilter} onChange={setProjFilter} width={210} />
             <RangeFilter label="Ht"  min={heightMin} max={heightMax}
               onChange={(lo, hi) => { setHeightMin(lo); setHeightMax(hi); }}
               parse={parseHeight} format={formatHeight} placeholder={["min","max"]} width={55} />
@@ -296,6 +311,7 @@ export function InternationalPage() {
               ...tierFilter.map(v   => ({ label: `Tier ${v}`,    onClear: () => setTierFilter(tierFilter.filter(x => x !== v)) })),
               ...posFilter.map(v    => ({ label: `Pos: ${v}`,    onClear: () => setPosFilter(posFilter.filter(x => x !== v)) })),
               ...classFilter.map(v  => ({ label: `Class: ${v}`,  onClear: () => setClassFilter(classFilter.filter(x => x !== v)) })),
+              ...projFilter.map(v   => ({ label: `Proj: ${v}`,   onClear: () => setProjFilter(projFilter.filter(x => x !== v)) })),
               ...(heightMin != null ? [{ label: `Ht ≥ ${formatHeight(heightMin)}`, onClear: () => setHeightMin(null) }] : []),
               ...(heightMax != null ? [{ label: `Ht ≤ ${formatHeight(heightMax)}`, onClear: () => setHeightMax(null) }] : []),
               ...(ageMin != null    ? [{ label: `Age ≥ ${ageMin}`,                onClear: () => setAgeMin(null)    }] : []),
@@ -304,7 +320,7 @@ export function InternationalPage() {
               ...(seasonFilter !== "all" ? [{ label: `Season: ${seasonFilter}`,  onClear: () => setSeasonFilter("all") }] : []),
             ]}
             onClearAll={() => {
-              setLeagueFilter([]); setTierFilter([]); setPosFilter([]); setClassFilter([]);
+              setLeagueFilter([]); setTierFilter([]); setPosFilter([]); setClassFilter([]); setProjFilter([]);
               setHeightMin(null); setHeightMax(null); setAgeMin(null); setAgeMax(null);
               setTeamFilter(""); setSeasonFilter("all");
             }}
@@ -325,6 +341,7 @@ export function InternationalPage() {
                 <th style={thStyle("team")}        onClick={() => handleSort("team")}>Team{sortArrow("team")}</th>
                 <th style={thStyle("league")}      onClick={() => handleSort("league")}>League{sortArrow("league")}</th>
                 <th style={thStyle("tier")}        onClick={() => handleSort("tier")}>Tier{sortArrow("tier")}</th>
+                <th style={thStyle("projection")}  onClick={() => handleSort("projection")}>Projection{sortArrow("projection")}</th>
                 <th style={thStyle("season")}      onClick={() => handleSort("season")}>Season{sortArrow("season")}</th>
                 {statCols.map(c => (
                   <th key={c.key} style={thStyle(c.key)} onClick={() => handleSort(c.key)}>
@@ -366,6 +383,18 @@ export function InternationalPage() {
                           background: TIER_BG[tier], color: TIER_COLORS[tier],
                         }}>T{tier}</span>
                       ) : "—"}
+                    </td>
+                    <td style={{ ...tdStyle("left"), opacity: .8 }}>
+                      {prof?.projected_tier ? (() => {
+                        const c = tierColor(prof.projected_tier);
+                        return (
+                          <span style={{
+                            fontSize: 10, fontWeight: 600, padding: "2px 7px", borderRadius: 10,
+                            background: `${c}1f`, color: c, border: `1px solid ${c}55`,
+                            whiteSpace: "nowrap",
+                          }}>{prof.projected_tier}</span>
+                        );
+                      })() : <span style={{ opacity: .25 }}>—</span>}
                     </td>
                     <td style={{ ...tdStyle(), opacity: .6 }}>{r.season || "—"}</td>
                     {statCols.map(c => (
