@@ -87,7 +87,8 @@ export function InternationalPage() {
   useEffect(() => {
     supabase
       .from("international_players")
-      .select("id, name, league, profile_url, height, primary_position, country_of_origin, age, recruiting_class, agent_name, agent_contact, film_url, competition_tier, scouting_notes, player_status, committed_team, projected_tier, metrics")
+      // SELECT * so adding/removing columns in the DB doesn't break this fetch.
+      .select("*")
       .then(({ data }) => {
         if (!data) return;
         const map = {};

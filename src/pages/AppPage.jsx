@@ -831,7 +831,7 @@ export function AppPage() {
       while (true) {
         const { data, error } = await supabase
           .from("international_players")
-          .select("id, name, league, profile_url, height, primary_position, country_of_origin, age, recruiting_class, agent_name, agent_contact, film_url, competition_tier, scouting_notes, metrics")
+          .select("*")
           .range(page * 1000, (page + 1) * 1000 - 1);
         if (error) { console.error("intl board fetch:", error); break; }
         all.push(...(data || []));
