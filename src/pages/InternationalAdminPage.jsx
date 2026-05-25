@@ -460,7 +460,7 @@ function CSVImporter({ kind, onImport }) {
         height: "6'9\"", primary_position: "SF",
         country_of_origin: "Spain", age: "19", recruiting_class: "2026",
         agent_name: "", agent_contact: "", film_url: "", competition_tier: "2",
-        player_status: "uncommitted", committed_team: "", projected_tier: "HM Rotation / MM Starter",
+        player_status: "uncommitted", committed_team: "", projected_tier: "Mid Major",
         scouting_notes: "Quick first step, average defender, projects as bench guard.",
         offensive_footprint: "75", defensive_score: "68", winning_impact: "72",
         sos_performance: "70", translation_grade: "65",

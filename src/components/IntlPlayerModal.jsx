@@ -123,6 +123,102 @@ export function TierBadge({ tier, tierLabels }) {
 // row to `contact_messages`. Rendered on top of the IntlPlayerModal so its
 // backdrop click doesn't dismiss the parent modal.
 // ─────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// Agent clients popup — lists every international_players row sharing this
+// agent_name. Clicking a client (when onSelectPlayer is provided) navigates
+// the parent modal to that profile.
+// ─────────────────────────────────────────────────────────────────────────────
+export function AgentClientsPopup({ agentName, currentPlayerId, onClose, onSelectPlayer }) {
+  const [clients, setClients] = useState(null);
+
+  useEffect(() => {
+    if (!agentName) return;
+    let alive = true;
+    supabase
+      .from("international_players")
+      .select("*")
+      .eq("agent_name", agentName)
+      .order("name")
+      .then(({ data, error }) => {
+        if (!alive) return;
+        if (error) { console.error("agent clients fetch:", error); setClients([]); return; }
+        setClients(data || []);
+      });
+    return () => { alive = false; };
+  }, [agentName]);
+
+  return (
+    <div
+      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.80)", zIndex: 1100, overflowY: "auto", padding: "32px 16px" }}
+      onClick={onClose}
+    >
+      <div style={{ maxWidth: 560, margin: "0 auto" }} onClick={e => e.stopPropagation()}>
+        <div style={{ background: "var(--bg, #0e1521)", border: "1px solid rgba(255,255,255,.1)", borderRadius: 14, padding: 24 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+            <div>
+              <h3 style={{ margin: 0, fontSize: 18 }}>{agentName}</h3>
+              <div style={{ fontSize: 11, opacity: .5, marginTop: 4 }}>Client list</div>
+            </div>
+            <button onClick={onClose} style={{
+              background: "none", border: "1px solid rgba(255,255,255,.12)", borderRadius: 8,
+              color: "rgba(255,255,255,.5)", cursor: "pointer", fontSize: 14, padding: "2px 8px",
+            }}>✕</button>
+          </div>
+
+          {clients === null ? (
+            <div style={{ padding: 24, textAlign: "center", opacity: .4, fontSize: 13 }}>Loading…</div>
+          ) : clients.length === 0 ? (
+            <div style={{ padding: 24, textAlign: "center", opacity: .4, fontSize: 13 }}>No clients on file.</div>
+          ) : (
+            <div style={{ border: "1px solid rgba(255,255,255,.07)", borderRadius: 10, overflow: "hidden" }}>
+              {clients.map((c, i) => {
+                const isCurrent = c.id === currentPlayerId;
+                const tg = c.metrics?.translation_grade;
+                const canSelect = !!onSelectPlayer && !isCurrent;
+                return (
+                  <div key={c.id}
+                    onClick={() => canSelect && onSelectPlayer(c)}
+                    style={{
+                      display: "grid", gridTemplateColumns: "1.4fr 1fr 60px 90px",
+                      gap: 12, alignItems: "center",
+                      padding: "10px 14px",
+                      background: isCurrent ? "rgba(91,156,246,.08)" : (i % 2 === 0 ? "transparent" : "rgba(255,255,255,.015)"),
+                      borderBottom: i < clients.length - 1 ? "1px solid rgba(255,255,255,.05)" : "none",
+                      cursor: canSelect ? "pointer" : "default",
+                    }}
+                    onMouseEnter={e => { if (canSelect) e.currentTarget.style.background = "rgba(91,156,246,.10)"; }}
+                    onMouseLeave={e => { if (canSelect) e.currentTarget.style.background = isCurrent ? "rgba(91,156,246,.08)" : (i % 2 === 0 ? "transparent" : "rgba(255,255,255,.015)"); }}
+                  >
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 600 }}>{c.name}{isCurrent && <span style={{ marginLeft: 8, fontSize: 10, opacity: .55 }}>(viewing)</span>}</div>
+                      <div style={{ fontSize: 10, opacity: .45, marginTop: 2 }}>
+                        {[c.primary_position, c.height, c.country_of_origin].filter(Boolean).join(" · ")}
+                      </div>
+                    </div>
+                    <div style={{ fontSize: 11, opacity: .55 }}>{c.league}</div>
+                    <div style={{ fontSize: 10, opacity: .55, textAlign: "center" }}>
+                      {tg != null ? `TG ${Math.round(tg)}` : ""}
+                    </div>
+                    <div style={{ fontSize: 10, opacity: .65, textAlign: "right" }}>
+                      {c.projected_tier || "—"}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {onSelectPlayer && clients && clients.length > 1 && (
+            <div style={{ fontSize: 11, opacity: .35, marginTop: 10, textAlign: "center" }}>
+              Click a client to view their profile.
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ContactForm({ profile, onClose }) {
   const { user } = useAuth();
   const [name,    setName]    = useState("");
@@ -272,11 +368,13 @@ export function IntlPlayerModal({
   onAddToRoster,
   alreadyOnRoster,
   canAddToRoster,
+  onSelectPlayer  = null,  // optional callback when a client is picked from the agent popup
 }) {
-  const [statType,         setStatType]         = useState("Averages");
-  const [contactOpen,      setContactOpen]      = useState(false);
-  const [fetchedRows,      setFetchedRows]      = useState(null);
-  const [fetchedTierLabels, setFetchedTierLabels] = useState(null);
+  const [statType,           setStatType]           = useState("Averages");
+  const [contactOpen,        setContactOpen]        = useState(false);
+  const [agentClientsOpen,   setAgentClientsOpen]   = useState(false);
+  const [fetchedRows,        setFetchedRows]        = useState(null);
+  const [fetchedTierLabels,  setFetchedTierLabels]  = useState(null);
 
   // Lazy-fetch stat rows if the caller didn't pre-load them.
   useEffect(() => {
@@ -450,7 +548,17 @@ export function IntlPlayerModal({
               <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".07em", opacity: .35, fontWeight: 600, marginBottom: 12 }}>Agent</div>
               {profile?.agent_name ? (
                 <div>
-                  <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>{profile.agent_name}</div>
+                  <button onClick={() => setAgentClientsOpen(true)}
+                    title="View client list"
+                    style={{
+                      fontSize: 14, fontWeight: 600, marginBottom: 8, padding: 0,
+                      background: "none", border: "none", cursor: "pointer",
+                      color: "#5b9cf6", textAlign: "left",
+                      textDecoration: "underline", textDecorationStyle: "dotted",
+                      textUnderlineOffset: 3,
+                    }}>
+                    {profile.agent_name}
+                  </button>
                   <div style={{ position: "relative", marginBottom: 12 }}>
                     <div style={{ fontSize: 12, opacity: .6, filter: "blur(5px)", userSelect: "none", pointerEvents: "none" }}>
                       {profile.agent_contact || "contact@agency.com"}
@@ -527,6 +635,17 @@ export function IntlPlayerModal({
 
       {contactOpen && (
         <ContactForm profile={profile} onClose={() => setContactOpen(false)} />
+      )}
+
+      {agentClientsOpen && (
+        <AgentClientsPopup
+          agentName={profile?.agent_name}
+          currentPlayerId={profile?.id}
+          onClose={() => setAgentClientsOpen(false)}
+          onSelectPlayer={onSelectPlayer
+            ? (clientProfile) => { setAgentClientsOpen(false); onSelectPlayer(clientProfile); }
+            : null}
+        />
       )}
     </div>
   );

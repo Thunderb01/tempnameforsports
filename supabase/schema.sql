@@ -159,7 +159,7 @@ create table if not exists public.international_players (
   scouting_notes     text,
   player_status      text default 'uncommitted',   -- uncommitted | committed | signed | withdrawn
   committed_team     text,                          -- D1 school they've committed to (auto-roster trigger)
-  projected_tier     text,                          -- HM All-American / Pre-Draft, HM All-Conference, ... LM Rotation
+  projected_tier     text,                          -- High Major + / Pre-Draft, High Major, High Major -/ Mid Major +, Mid Major, Mid Major -/ Low Major +, Low Major
   metrics            jsonb default '{}',
   created_at         timestamp with time zone default now(),
   unique (name, league)
@@ -221,6 +221,35 @@ create policy "Authenticated users can read international stats"
 
 create policy "Service role can upsert international stats"
   on public.international_players_stats for insert
+  with check (true);
+
+
+-- ── International player splits ────────────────────────────────────────────────
+-- Per-player per-season splits (Wins/Losses, Above/Below .500). Required by
+-- international_metrics.py for Winning Impact + SOS Performance.
+-- `split` values used by the metrics script: 'win', 'loss', 'above', 'below'.
+create table if not exists public.international_players_splits (
+  id          uuid primary key default gen_random_uuid(),
+  player_id   uuid references public.international_players(id) on delete cascade,
+  player_name text not null,
+  league      text not null,
+  season      integer not null,
+  split       text not null,
+  team        text,
+  stats       jsonb not null default '{}',
+  scraped_at  timestamp with time zone default now(),
+  unique (player_name, league, season, split)
+);
+
+alter table public.international_players_splits enable row level security;
+
+create policy "Authenticated users can read international splits"
+  on public.international_players_splits for select
+  to authenticated
+  using (true);
+
+create policy "Service role can upsert international splits"
+  on public.international_players_splits for insert
   with check (true);
 
 

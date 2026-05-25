@@ -239,6 +239,142 @@ def scrape_splits(
     return split_records
 
 
+# ── Metric splits (Wins/Losses + Above-/Below-.500) ─────────────────────────────
+# Used by international_metrics.py to compute Winning Impact and SOS Performance.
+# RealGM exposes these on each player's profile page under a "Splits" sub-path.
+
+# Maps every variation of split-label text we've seen → canonical bucket.
+# Anything not in this map is ignored (e.g. Home/Away, By Month).
+SPLIT_LABEL_MAP = {
+    # win / loss
+    "win":   "win",  "wins":   "win",  "w": "win",
+    "loss":  "loss", "losses": "loss", "l": "loss",
+    "in wins":   "win",
+    "in losses": "loss",
+    # above / below .500
+    "above .500":         "above",  ">.500":            "above",
+    "above 500":          "above",  "vs above .500":    "above",
+    "vs >.500":           "above",  "winning teams":    "above",
+    "vs winning teams":   "above",  "vs winning":       "above",
+    "below .500":         "below",  "≤.500":            "below",
+    "below 500":          "below",  "<.500":            "below",
+    "vs below .500":      "below",  "vs <.500":         "below",
+    "losing teams":       "below",  "vs losing teams":  "below",
+    "vs losing":          "below",
+}
+
+def normalize_split_label(label: str) -> str | None:
+    return SPLIT_LABEL_MAP.get((label or "").strip().lower())
+
+
+def parse_split_tables(soup: BeautifulSoup) -> list[dict]:
+    """
+    Parse every <table> on a splits page. Treats the first column of each row
+    as the split label and the rest as a stats dict. Returns:
+        [{ "label": "Wins", "stats": {pts: "16.5", ...} }, ...]
+    """
+    out = []
+    for table in soup.find_all("table"):
+        thead = table.find("thead")
+        if not thead:
+            continue
+        headers = [th.get_text(strip=True).lower() for th in thead.select("th")]
+        if len(headers) < 3:
+            continue
+        for tr in table.select("tbody tr"):
+            cells = [td.get_text(strip=True) for td in tr.find_all("td")]
+            if len(cells) < len(headers):
+                continue
+            label = cells[0]
+            stats = dict(zip(headers[1:], cells[1:]))
+            out.append({"label": label, "stats": stats})
+    return out
+
+
+def scrape_metric_splits(
+    rows: list[dict], season: int, league_id: int, league_slug: str, league_name: str,
+    debug_html: str | None = None,
+) -> list[dict]:
+    """
+    For each unique player in `rows`, fetch their splits page and extract
+    win/loss + above/below-.500 split rows. The result feeds international_metrics.py.
+
+    RealGM URL patterns vary; we try a small list of candidates per player and
+    use whichever one returns recognisable split labels. If everything fails,
+    pass --metric-splits-debug a path to dump the first player's HTML so you
+    can inspect the page structure.
+    """
+    seen: dict[str, str] = {}
+    for r in rows:
+        url = r.get("profile_url")
+        if url and url not in seen:
+            seen[url] = r["player_name"]
+
+    if not seen:
+        log.error("No profile URLs found — can't scrape metric splits.")
+        return []
+
+    log.info(f"Scraping metric splits for {len(seen)} unique player(s).")
+
+    records: list[dict] = []
+    saved_debug = False
+
+    for i, (profile_url, player_name) in enumerate(seen.items(), 1):
+        m = re.search(r"/player/([^/]+)/[^/]+/(\d+)", profile_url)
+        if not m:
+            log.warning(f"[{i}/{len(seen)}] Can't parse profile URL: {profile_url}")
+            continue
+        slug, pid = m.group(1), m.group(2)
+
+        # Candidate URLs in order — first one that returns a recognised label wins.
+        candidates = [
+            # Season-scoped international splits (most likely to work)
+            f"{BASE_URL}/player/{slug}/International/{pid}/{season}/Splits/Per_Game/{league_id}/{league_slug}",
+            f"{BASE_URL}/player/{slug}/International/{pid}/{season}/By_Result/Per_Game/{league_id}/{league_slug}",
+            # Generic player splits hub (no league scope)
+            f"{BASE_URL}/player/{slug}/Splits/Per_Game/{pid}/{season}",
+            f"{BASE_URL}/player/{slug}/Splits/Per_Game/{pid}",
+        ]
+
+        found: dict[str, dict] = {}
+        last_soup = None
+        for url in candidates:
+            log.info(f"[{i}/{len(seen)}] {player_name}: {url}")
+            soup = fetch(url)
+            if soup is None:
+                continue
+            last_soup = soup
+            for s in parse_split_tables(soup):
+                canonical = normalize_split_label(s["label"])
+                if canonical and canonical not in found:
+                    found[canonical] = s["stats"]
+            if found:
+                break  # got at least one canonical bucket — stop trying URLs
+
+        # Dump HTML of the first player if nothing matched, so the user can debug.
+        if not found and debug_html and not saved_debug and last_soup is not None:
+            with open(debug_html, "w", encoding="utf-8") as f:
+                f.write(last_soup.prettify())
+            log.warning(f"  Saved raw splits HTML to {debug_html} (no canonical labels matched).")
+            saved_debug = True
+
+        if not found:
+            log.warning(f"  No win/loss splits found for {player_name}")
+            continue
+
+        for split, stats in found.items():
+            records.append({
+                "player_name": player_name,
+                "league":      league_name,
+                "season":      season,
+                "split":       split,
+                "split_stats": stats,
+            })
+        log.info(f"  ✓ {player_name}: {sorted(found.keys())}")
+
+    return records
+
+
 def has_next_page(soup: BeautifulSoup, current_page: int) -> bool:
     pagination = soup.find("div", class_="pages")
     if not pagination:
@@ -437,7 +573,10 @@ def write_supabase_splits(split_records: list[dict], url: str, key: str) -> None
     split_dups = 0
     for r in split_records:
         stats = dict(r.get("split_stats", {}))
-        split_label = stats.pop("split", None)
+        # Accept the canonical label as either a top-level field (new
+        # scrape_metric_splits flow) or popped out of the stats dict (older
+        # By-Season scrape_splits flow).
+        split_label = r.get("split") or stats.pop("split", None)
         key = (r["player_name"], r["league"], r["season"], split_label)
         if key in split_by_key:
             split_dups += 1
@@ -497,9 +636,13 @@ def main():
     parser.add_argument("--out",         default=None,
                         help="Output CSV path for main stats (omit to skip CSV)")
     parser.add_argument("--splits",      action="store_true",
-                        help="Also scrape each player's individual splits page")
+                        help="Also scrape each player's individual splits page (per-season breakdown)")
     parser.add_argument("--splits-out",  default=None, metavar="FILE",
                         help="Output CSV path for splits data")
+    parser.add_argument("--metric-splits", action="store_true",
+                        help="Scrape per-player Wins/Losses and Above-/Below-.500 splits (needed by international_metrics.py)")
+    parser.add_argument("--metric-splits-debug", default=None, metavar="FILE",
+                        help="If no recognised split labels are found, dump the first player's splits-page HTML to this file for inspection.")
     parser.add_argument("--save-html",   default=None, metavar="FILE",
                         help="Save raw HTML of first page to FILE for debugging")
     parser.add_argument("--supabase",    action="store_true",
@@ -542,6 +685,22 @@ def main():
 
         if args.supabase:
             write_supabase_splits(split_records, args.supabase_url, args.supabase_key)
+
+    # ── Metric splits (Win/Loss + Above/Below .500) ───────────────────────────
+    if args.metric_splits:
+        ms_season = seasons[0]
+        if len(seasons) > 1:
+            log.warning(f"--metric-splits only supports one season at a time; using {ms_season}.")
+        metric_records = scrape_metric_splits(
+            rows, ms_season, args.league_id, args.league_slug, args.league_name,
+            debug_html=args.metric_splits_debug,
+        )
+        log.info(f"Collected {len(metric_records)} metric-split row(s) total.")
+
+        if args.supabase and metric_records:
+            if not args.supabase_url or not args.supabase_key:
+                parser.error("--supabase requires SUPABASE_URL and SUPABASE_SERVICE_KEY env vars (or --supabase-url / --supabase-key flags).")
+            write_supabase_splits(metric_records, args.supabase_url, args.supabase_key)
 
 
 if __name__ == "__main__":

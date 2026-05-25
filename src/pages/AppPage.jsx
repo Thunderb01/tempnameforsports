@@ -1598,6 +1598,7 @@ export function AppPage() {
             onAddToRoster={(p) => { board.addIntlToRoster(p); setModal(null); }}
             alreadyOnRoster={board.inRoster(modal.id)}
             canAddToRoster={!!activeTeam}
+            onSelectPlayer={(client) => setModal(client)}
           />
         ) : (
           <PlayerModal

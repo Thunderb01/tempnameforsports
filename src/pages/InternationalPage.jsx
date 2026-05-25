@@ -7,7 +7,7 @@ import { useRosterBoard } from "@/hooks/useRosterBoard";
 import { MultiSelectFilter, RangeFilter, FilterChips, parseHeight, formatHeight, playerHeightInches } from "@/components/Filters";
 import { tierColor, PROJECTED_TIER_OPTIONS } from "@/lib/display";
 import {
-  IntlPlayerModal,
+  IntlPlayerModal, AgentClientsPopup,
   AVERAGES_COLS, STAT_TYPE_COLS, STAT_TYPES, STAT_TYPE_LABELS,
   TIER_LABELS_FALLBACK, TIER_COLORS, TIER_BG,
   fmtStatByKey, getStat,
@@ -51,6 +51,10 @@ export function InternationalPage() {
   const [sortKey,      setSortKey]      = useState("pts");
   const [sortDir,      setSortDir]      = useState("desc");
   const [page,         setPage]         = useState(0);
+  // "players" = the existing player-stats table; "agents" = browse by agent
+  const [viewMode,     setViewMode]     = useState("players");
+  const [agentSearch,  setAgentSearch]  = useState("");
+  const [openAgent,    setOpenAgent]    = useState(null);   // agent_name whose client list popup is open
 
   // Debounce search
   useEffect(() => {
@@ -125,6 +129,34 @@ export function InternationalPage() {
     return [...cs].sort();
   }, [profiles]);
 
+  // Unique agents derived from profiles. Each entry tracks its client list +
+  // a few summary stats so we can show "N clients · top tier" inline.
+  const agents = useMemo(() => {
+    const map = {};
+    Object.values(profiles).forEach(p => {
+      const name = (p.agent_name || "").trim();
+      if (!name) return;
+      if (!map[name]) map[name] = { name, contact: p.agent_contact || null, clients: [] };
+      map[name].clients.push(p);
+    });
+    return Object.values(map)
+      .map(a => {
+        // Best-projected client and top translation grade for at-a-glance ranking
+        const tgs = a.clients.map(c => c.metrics?.translation_grade).filter(v => v != null);
+        return { ...a, topTG: tgs.length ? Math.max(...tgs) : null };
+      })
+      .sort((a, b) => b.clients.length - a.clients.length);
+  }, [profiles]);
+
+  const filteredAgents = useMemo(() => {
+    const q = agentSearch.trim().toLowerCase();
+    if (!q) return agents;
+    return agents.filter(a =>
+      a.name.toLowerCase().includes(q) ||
+      a.clients.some(c => (c.name || "").toLowerCase().includes(q))
+    );
+  }, [agents, agentSearch]);
+
   // ── Combine stat rows + profile-only orphans ──────────────────────────────
   // Every profile gets at least one row on the board, even if it has no stats yet.
   const combinedRows = useMemo(() => {
@@ -193,7 +225,7 @@ export function InternationalPage() {
         return sortDir === "asc" ? at - bt : bt - at;
       }
       if (sortKey === "projection") {
-        // Higher tier (HM All-American) sorts first when desc; rely on the
+        // Higher tier (High Major + / Pre-Draft) sorts first when desc; rely on the
         // canonical PROJECTED_TIER_OPTIONS order from display.js.
         const order = PROJECTED_TIER_OPTIONS;
         const ar = order.indexOf(profiles[a.player_name]?.projected_tier ?? "");
@@ -247,6 +279,28 @@ export function InternationalPage() {
           onAddToRoster={handleAddIntlToRoster}
           alreadyOnRoster={!!(profiles[selected] && rosterIds.has(profiles[selected].id))}
           canAddToRoster={canAddToRoster}
+          onSelectPlayer={(client) => {
+            // Make sure the freshly-selected client's profile is in our local map
+            // even if a slightly different copy lives there.
+            if (client?.name) {
+              setProfiles(prev => ({ ...prev, [client.name]: client }));
+              setSelected(client.name);
+            }
+          }}
+        />
+      )}
+
+      {openAgent && (
+        <AgentClientsPopup
+          agentName={openAgent}
+          onClose={() => setOpenAgent(null)}
+          onSelectPlayer={(client) => {
+            setOpenAgent(null);
+            if (client?.name) {
+              setProfiles(prev => ({ ...prev, [client.name]: client }));
+              setSelected(client.name);
+            }
+          }}
         />
       )}
 
@@ -254,9 +308,64 @@ export function InternationalPage() {
         <div className="app-top">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
             <h1 style={{ margin: 0 }}>International Players</h1>
+            <div style={{ display: "flex", gap: 4 }}>
+              {[["players", "Players"], ["agents", "Agents"]].map(([val, lbl]) => (
+                <button key={val} onClick={() => setViewMode(val)} style={{
+                  fontSize: 12, fontWeight: 600, padding: "4px 14px", borderRadius: 18, cursor: "pointer",
+                  border: "1px solid",
+                  background:  viewMode === val ? "rgba(91,156,246,.18)" : "transparent",
+                  color:       viewMode === val ? "#5b9cf6" : "rgba(255,255,255,.45)",
+                  borderColor: viewMode === val ? "rgba(91,156,246,.5)" : "rgba(255,255,255,.12)",
+                }}>{lbl}</button>
+              ))}
+            </div>
           </div>
 
+          {/* ── Agents view ─────────────────────────────────────────────────── */}
+          {viewMode === "agents" && (
+            <div>
+              <input className="input" type="search" placeholder="Search agents or clients…"
+                style={{ width: "100%", maxWidth: 360, marginBottom: 14 }}
+                value={agentSearch} onChange={e => setAgentSearch(e.target.value)} />
+              <div style={{ fontSize: 12, opacity: .4, marginBottom: 10 }}>
+                {filteredAgents.length} agent{filteredAgents.length === 1 ? "" : "s"} · click to view client list
+              </div>
+              <div style={{ border: "1px solid rgba(255,255,255,.07)", borderRadius: 10, overflow: "hidden" }}>
+                {filteredAgents.length === 0 ? (
+                  <div style={{ padding: 32, textAlign: "center", opacity: .35, fontSize: 13 }}>
+                    {loading ? "Loading…" : "No agents on file yet."}
+                  </div>
+                ) : filteredAgents.map((a, i) => (
+                  <div key={a.name}
+                    onClick={() => setOpenAgent(a.name)}
+                    style={{
+                      display: "grid", gridTemplateColumns: "1.6fr 90px 100px 1fr",
+                      gap: 12, alignItems: "center",
+                      padding: "12px 16px",
+                      background: i % 2 === 0 ? "transparent" : "rgba(255,255,255,.015)",
+                      borderBottom: i < filteredAgents.length - 1 ? "1px solid rgba(255,255,255,.04)" : "none",
+                      cursor: "pointer",
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = "rgba(91,156,246,.06)"}
+                    onMouseLeave={e => e.currentTarget.style.background = i % 2 === 0 ? "transparent" : "rgba(255,255,255,.015)"}
+                  >
+                    <div style={{ fontWeight: 600, fontSize: 14 }}>{a.name}</div>
+                    <div style={{ fontSize: 11, opacity: .55 }}>{a.clients.length} client{a.clients.length === 1 ? "" : "s"}</div>
+                    <div style={{ fontSize: 11, opacity: .55 }}>
+                      {a.topTG != null ? `top TG ${Math.round(a.topTG)}` : ""}
+                    </div>
+                    <div style={{ fontSize: 11, opacity: .45, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {a.clients.slice(0, 4).map(c => c.name).join(" · ")}
+                      {a.clients.length > 4 && ` · +${a.clients.length - 4} more`}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Stat type tabs */}
+          {viewMode === "players" && (<>
           <div style={{ display: "flex", gap: 6, marginBottom: 14, flexWrap: "wrap" }}>
             {STAT_TYPES.map(t => (
               <button key={t} onClick={() => setStatType(t)} style={{
@@ -331,9 +440,12 @@ export function InternationalPage() {
             {loading ? "Loading…" : `${sorted.length} player-seasons`}
             {" · click a row to view profile"}
           </div>
+          </>
+          )}
         </div>
 
         {/* Table */}
+        {viewMode === "players" && (<>
         <div style={{ overflowX: "auto" }}>
           <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 13 }}>
             <thead>
@@ -418,6 +530,7 @@ export function InternationalPage() {
             <button className="btn btn-ghost" style={{ fontSize: 12 }} disabled={page >= totalPages - 1} onClick={() => setPage(p => p + 1)}>Next →</button>
           </div>
         )}
+        </>)}
       </div>
     </>
   );

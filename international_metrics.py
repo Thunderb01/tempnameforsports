@@ -409,7 +409,7 @@ def load_splits(db, league=None):
         rows, page, page_size = [], 0, 1000
         while True:
             q = db.table("international_players_splits").select(
-                "player_name, league, season, split, split_stats"
+                "player_name, league, season, split, stats"
             )
             if league:
                 q = q.eq("league", league)
@@ -467,7 +467,7 @@ def main():
         elif split in ("below", "below_500", "≤.500", "below .500", "at_or_below"): bucket = "below"
         else:
             continue
-        splits_index[key][bucket] = r.get("split_stats") or {}
+        splits_index[key][bucket] = r.get("stats") or {}
 
     # Group profiles by league for per-league percentiling.
     by_league = defaultdict(list)

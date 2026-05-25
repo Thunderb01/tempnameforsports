@@ -25,7 +25,20 @@ export function heightToInches(h) {
 }
 
 // ── NIL tiers ─────────────────────────────────────────────────────────────────
+// New canonical labels are the ones produced by projectedTier() and listed in
+// PROJECTED_TIER_OPTIONS below. The legacy "HM All-American / Pre-Draft" style
+// keys are kept here so anything still in the DB with the old labels (older
+// torvik runs) still renders with the right color until that data is migrated.
 export const TIER_COLORS = {
+  // New (canonical)
+  "High Major + / Pre-Draft":           "#4ade80",
+  "High Major":                         "#5b9cf6",
+  "High Major -/ Mid Major +":          "#f5c542",
+  "Mid Major":                          "#fb923c",
+  "Mid Major -/ Low Major +":           "#e05c5c",
+  "Low Major":                          "#94a3b8",
+
+  // Legacy (kept for back-compat with pre-migration DB rows)
   "HM All-American / Pre-Draft":        "#4ade80",
   "HM All-Conference":                  "#5b9cf6",
   "HM Starter / MM All-Conference":     "#f5c542",
@@ -42,22 +55,22 @@ export function tierColor(label) {
 // dropdown in AdminPage and the new international one. Order matches the value
 // threshold ladder in projectedTier() below.
 export const PROJECTED_TIER_OPTIONS = [
-  "HM All-American / Pre-Draft",
-  "HM All-Conference",
-  "HM Starter / MM All-Conference",
-  "HM Rotation / MM Starter",
-  "MM Starter / LM All-Conference",
-  "LM Rotation",
+  "High Major + / Pre-Draft",
+  "High Major",
+  "High Major -/ Mid Major +",
+  "Mid Major",
+  "Mid Major -/ Low Major +",
+  "Low Major",
 ];
 
 export function projectedTier(v) {
   v = Number(v) || 0;
-  if (v >= 2_000_000) return "HM All-American / Pre-Draft";
-  if (v >= 1_200_000) return "HM All-Conference";
-  if (v >=   400_000) return "HM Starter / MM All-Conference";
-  if (v >=   200_000) return "HM Rotation / MM Starter";
-  if (v >=   100_000) return "MM Starter / LM All-Conference";
-  return "LM Rotation";
+  if (v >= 2_000_000) return "High Major + / Pre-Draft";
+  if (v >= 1_200_000) return "High Major";
+  if (v >=   400_000) return "High Major -/ Mid Major +";
+  if (v >=   200_000) return "Mid Major";
+  if (v >=   100_000) return "Mid Major -/ Low Major +";
+  return "Low Major";
 }
 
 // ── Metric grades ─────────────────────────────────────────────────────────────
