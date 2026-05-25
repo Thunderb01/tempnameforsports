@@ -252,15 +252,27 @@ SPLIT_LABEL_MAP = {
     "in wins":   "win",
     "in losses": "loss",
     # above / below .500
-    "above .500":         "above",  ">.500":            "above",
-    "above 500":          "above",  "vs above .500":    "above",
-    "vs >.500":           "above",  "winning teams":    "above",
-    "vs winning teams":   "above",  "vs winning":       "above",
-    "below .500":         "below",  "≤.500":            "below",
-    "below 500":          "below",  "<.500":            "below",
-    "vs below .500":      "below",  "vs <.500":         "below",
-    "losing teams":       "below",  "vs losing teams":  "below",
-    "vs losing":          "below",
+    "above .500":              "above",
+    "above 500":               "above",
+    ">.500":                   "above",
+    "vs above .500":           "above",
+    "vs >.500":                "above",
+    "v. opp. above .500":      "above",   # RealGM international
+    "vs. opp. above .500":     "above",
+    "winning teams":           "above",
+    "vs winning teams":        "above",
+    "vs winning":              "above",
+    "below .500":              "below",
+    "below 500":               "below",
+    "≤.500":                   "below",
+    "<.500":                   "below",
+    "vs below .500":           "below",
+    "vs <.500":                "below",
+    "v. opp. at or below .500":  "below", # RealGM international
+    "vs. opp. at or below .500": "below",
+    "losing teams":            "below",
+    "vs losing teams":         "below",
+    "vs losing":               "below",
 }
 
 def normalize_split_label(label: str) -> str | None:
@@ -326,17 +338,19 @@ def scrape_metric_splits(
             continue
         slug, pid = m.group(1), m.group(2)
 
-        # Candidate URLs in order — first one that returns a recognised label wins.
+        # The bare International profile URL is where RealGM renders the current
+        # season's splits table inline. Try it first; fall back to a couple of
+        # alternates in case future leagues render splits elsewhere.
         candidates = [
-            # Season-scoped international splits (most likely to work)
-            f"{BASE_URL}/player/{slug}/International/{pid}/{season}/Splits/Per_Game/{league_id}/{league_slug}",
-            f"{BASE_URL}/player/{slug}/International/{pid}/{season}/By_Result/Per_Game/{league_id}/{league_slug}",
-            # Generic player splits hub (no league scope)
-            f"{BASE_URL}/player/{slug}/Splits/Per_Game/{pid}/{season}",
+            f"{BASE_URL}/player/{slug}/International/{pid}",
+            f"{BASE_URL}/player/{slug}/International/{pid}/{season}",
             f"{BASE_URL}/player/{slug}/Splits/Per_Game/{pid}",
         ]
 
-        found: dict[str, dict] = {}
+        # We collect ALL matching rows then pick the best one per canonical bucket.
+        # RealGM lists per-team rows AND an aggregated "All Teams" row — we prefer
+        # the aggregate. Order of preference: All Teams → first encountered.
+        matches: dict[str, list[dict]] = {}   # canonical → [stats dicts]
         last_soup = None
         for url in candidates:
             log.info(f"[{i}/{len(seen)}] {player_name}: {url}")
@@ -346,10 +360,20 @@ def scrape_metric_splits(
             last_soup = soup
             for s in parse_split_tables(soup):
                 canonical = normalize_split_label(s["label"])
-                if canonical and canonical not in found:
-                    found[canonical] = s["stats"]
-            if found:
+                if not canonical:
+                    continue
+                matches.setdefault(canonical, []).append(s["stats"])
+            if matches:
                 break  # got at least one canonical bucket — stop trying URLs
+
+        # Reduce per-canonical lists → single best row.
+        found: dict[str, dict] = {}
+        for canonical, rows_for_bucket in matches.items():
+            picked = next(
+                (r for r in rows_for_bucket if (r.get("team") or "").strip().lower() == "all teams"),
+                rows_for_bucket[0],
+            )
+            found[canonical] = picked
 
         # Dump HTML of the first player if nothing matched, so the user can debug.
         if not found and debug_html and not saved_debug and last_soup is not None:
