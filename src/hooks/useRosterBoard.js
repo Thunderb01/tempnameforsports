@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
-import { money } from "@/lib/display";
+import { money, bucketPosition } from "@/lib/display";
 
 
 // Module-level caches so data survives page navigation without re-fetching.
@@ -83,23 +83,22 @@ function defaultState(team = "") {
 // Map an international_players row to the same shape the rest of the app uses,
 // while preserving the original intl-specific fields so the IntlPlayerModal can
 // render directly from this object without a refetch.
+//
+// BTP metric mapping rationale: translation_grade is the overall composite, so
+// it feeds sei (the dominant slot at 50% weight). Direct intl metrics fill the
+// slots they best correspond to. For slots without a direct proxy (ath, ris),
+// we default to 50 (median) NOT to translation_grade — copying TG into every
+// slot was inflating intl player scores ~70% above what they should be.
 function mapIntlPlayer(p) {
   const m  = p.metrics || {};
   const tg = m.translation_grade ?? 0;
-  const pos = (() => {
-    if (!p.primary_position) return "Wing";
-    const s = String(p.primary_position).toUpperCase();
-    if (s.includes("G")) return "Guard";
-    if (s === "C" || s === "PF") return "Big";
-    return "Wing";
-  })();
   return {
     id:               p.id,
     source:           "intl",
     name:             p.name,
     team:             p.league,            // league shown where "team" usually goes
     conf:             null,
-    pos,
+    pos:              bucketPosition(p.primary_position),
     year:             p.recruiting_class ? `'${String(p.recruiting_class).slice(-2)}` : "Intl",
     height:           p.height           ?? null,
     hometown:         p.country_of_origin ?? null,
@@ -112,12 +111,11 @@ function mapIntlPlayer(p) {
     player_status:    null,
     competition_tier: p.competition_tier  ?? null,
     stats: {
-      // Translation grade is the overall composite — use it as the primary score.
-      sei: tg,
-      ath: m.defensive_score     ?? tg,
-      ris: m.winning_impact      ?? tg,
-      dds: m.defensive_score     ?? tg,
-      cdi: m.offensive_footprint ?? tg,
+      sei: tg,                                                // primary scoring projection
+      ath: 50,                                                // no intl proxy → assume median
+      ris: m.winning_impact      ?? 50,                       // closest intl analog
+      dds: m.defensive_score     ?? 50,                       // direct match
+      cdi: m.offensive_footprint ?? 50,                       // creation / usage proxy
     },
     // ── Fields preserved verbatim from the international_players row so the
     //    IntlPlayerModal can render off this object directly.
@@ -714,7 +712,7 @@ export function useRosterBoard(team, userId) {
     ];
     const byPos = {};
     scoringPool.forEach(p => {
-      const pos = p.pos || "Wing";
+      const pos = bucketPosition(p.pos);
       if (!byPos[pos]) byPos[pos] = [];
       byPos[pos].push(p);
     });

@@ -12,7 +12,7 @@ import { TeamAutocomplete } from "@/components/TeamAutocomplete";
 import { supabase }         from "@/lib/supabase";
 import { exportRosterPDF }  from "@/lib/exportRoster";
 import { track }            from "@/lib/track";
-import { money, letterGrade, gradeColor } from "@/lib/display";
+import { money, letterGrade, gradeColor, bucketPosition } from "@/lib/display";
 import { MultiSelectFilter, RangeFilter, FilterChips, parseHeight, formatHeight, playerHeightInches } from "@/components/Filters";
 import teamConferences      from "@/data/teamConferences.json";
 
@@ -223,7 +223,9 @@ function btpPlayerScoreDisplay(p) {
   const ris    = (s.ris || 0) * 4000;
   const dds    = (s.dds || 0) * 4000;
   const cdi    = (s.cdi || 0) * 4000;
-  const market = (p.marketHigh || 0) * (p._priorYearEval ?? isPriorYearEval(p) ? 0.8 : 1.0);
+  // NB: parens around the boolean OR — without them the `??` binds the wrong side
+  // and `_priorYearEval === false` short-circuits to `false`, zeroing market entirely.
+  const market = (p.marketHigh || 0) * ((p._priorYearEval || isPriorYearEval(p)) ? 0.8 : 1.0);
   return sei * 0.50 + market * 0.15 + ath * 0.13 + ris * 0.08 + dds * 0.08 + cdi * 0.06;
 }
 
@@ -257,8 +259,7 @@ function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], userTeam = ""
       const conf = teamConferences[team] ?? players[0]?.conf ?? null;
       const byPos = { Guard: [], Wing: [], Big: [] };
       players.forEach(p => {
-        const pos = POS_ORDER.includes(p.pos) ? p.pos : "Wing";
-        byPos[pos].push(p);
+        byPos[bucketPosition(p.pos)].push(p);
       });
       const posScores = {};
       let score = 0;
@@ -303,34 +304,21 @@ function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], userTeam = ""
 
   const userConf = useMemo(() => teamConferences[userTeam] ?? teamScores.find(t => t.team === userTeam)?.conf ?? null, [teamScores, userTeam]);
 
-  // ── Conference team scores (metrics min-max normalised within conf) ─────────
-  const { scores: confTeamScores, ranges: confRanges } = useMemo(() => {
-    if (!allPlayers.length || !userConf) return { scores: [], ranges: null };
-    const confPool = allPlayers.filter(p => (teamConferences[p.team] ?? p.conf) === userConf && !CMP_LEAVING_STATUSES.has(p.player_status));
-    if (confPool.length < 2) return { scores: [], ranges: null };
-
-    const METRIC_KEYS = ["sei", "ath", "ris", "dds", "cdi"];
-    const ranges = {};
-    METRIC_KEYS.forEach(k => {
-      const vals = confPool.map(p => p.stats?.[k]).filter(v => v != null && !isNaN(parseFloat(v))).map(Number);
-      ranges[k] = { min: Math.min(...vals, 0), max: Math.max(...vals, 1) };
-    });
-    function confNorm(val, key) {
-      const { min, max } = ranges[key];
-      if (max === min) return 50;
-      return Math.max(0, Math.min(100, ((val - min) / (max - min)) * 100));
-    }
-    function confPlayerScore(p) {
-      const s = p.stats || {};
-      const sei    = confNorm(s.sei  || 0, "sei") * 15000;
-      const ath    = confNorm(s.ath  || 0, "ath") *  5000;
-      const ris    = confNorm(s.ris  || 0, "ris") *  4000;
-      const dds    = confNorm(s.dds  || 0, "dds") *  4000;
-      const cdi    = confNorm(s.cdi  || 0, "cdi") *  4000;
-      const market = (p.marketHigh || 0) * (isPriorYearEval(p) ? 0.8 : 1.0);
-      return sei * 0.50 + market * 0.15 + ath * 0.13 + ris * 0.08 + dds * 0.08 + cdi * 0.06;
-    }
-    return { scores: addRanks(scorePool(confPool, confPlayerScore)), ranges };
+  // ── Conference team scores ────────────────────────────────────────────────
+  // We use the SAME scorer as national (`btpPlayerScoreDisplay`), just filtered
+  // to the conference pool. The previous version min-max-normalised metrics
+  // within the conference, which inflated weak-conference bench players and
+  // made conf vs national scores live on incompatible scales. With raw scoring,
+  // the absolute numbers are comparable across scopes; only the rank/pool
+  // changes between Conference and Country views.
+  const confTeamScores = useMemo(() => {
+    if (!allPlayers.length || !userConf) return [];
+    const confPool = allPlayers.filter(p =>
+      (teamConferences[p.team] ?? p.conf) === userConf &&
+      !CMP_LEAVING_STATUSES.has(p.player_status)
+    );
+    if (confPool.length < 2) return [];
+    return addRanks(scorePool(confPool, btpPlayerScoreDisplay));
   }, [allPlayers, userConf]);
   // Depth chart state — owned by AppPage, passed in as props so it survives view switches
 
@@ -339,7 +327,7 @@ function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], userTeam = ""
   const defaultChart = (() => {
     const groups = { Guard: [], Wing: [], Big: [] };
     scoringPool.forEach(p => {
-      const pos = POS_ORDER.includes(p.pos) ? p.pos : "Wing";
+      const pos = bucketPosition(p.pos);
       groups[pos].push(p);
     });
     POS_ORDER.forEach(pos => groups[pos].sort((a, b) => btpPlayerScoreDisplay(b) - btpPlayerScoreDisplay(a)));
@@ -372,26 +360,9 @@ function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], userTeam = ""
   }
 
   const liveNational = computeLive(btpPlayerScoreDisplay);
-
-  const liveConf = (() => {
-    if (!confRanges) return liveNational;
-    function confNormLive(val, key) {
-      const { min, max } = confRanges[key];
-      if (max === min) return 50;
-      return Math.max(0, Math.min(100, ((val - min) / (max - min)) * 100));
-    }
-    function confPsLive(p) {
-      const s = p.stats || {};
-      const sei    = confNormLive(s.sei  || 0, "sei") * 15000;
-      const ath    = confNormLive(s.ath  || 0, "ath") *  5000;
-      const ris    = confNormLive(s.ris  || 0, "ris") *  4000;
-      const dds    = confNormLive(s.dds  || 0, "dds") *  4000;
-      const cdi    = confNormLive(s.cdi  || 0, "cdi") *  4000;
-      const market = (p.marketHigh || 0) * (isPriorYearEval(p) ? 0.8 : 1.0);
-      return sei * 0.50 + market * 0.15 + ath * 0.13 + ris * 0.08 + dds * 0.08 + cdi * 0.06;
-    }
-    return computeLive(confPsLive);
-  })();
+  // Conference scoring now uses the same raw formula, so the user's live score
+  // is identical between scopes — only the pool / rank differs.
+  const liveConf = liveNational;
 
   // Replace user's static entry with their live-built score, then re-rank both total & each position.
   function injectAndRank(list, live, team, conf, count) {

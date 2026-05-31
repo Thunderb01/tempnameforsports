@@ -17,6 +17,22 @@ export function nilRange(low, high) {
   return low > 0 || high > 0 ? `${money(low)} – ${money(high)}` : "N/A";
 }
 
+// ── Position bucketing ────────────────────────────────────────────────────────
+// Canonical 3-bucket grouping used by roster strength + depth charts. The
+// domestic data already stores Guard/Wing/Big in players.primary_position, but
+// the helper also handles raw RealGM-style positions (PG/SG/SF/PF/C) so a
+// single source of truth lives here. Power forwards bucket as Big.
+export const POSITION_BUCKETS = ["Guard", "Wing", "Big"];
+
+export function bucketPosition(pos) {
+  if (!pos) return "Wing";
+  if (POSITION_BUCKETS.includes(pos)) return pos;
+  const p = String(pos).trim().toUpperCase();
+  if (p === "PG" || p === "SG" || p === "G")  return "Guard";
+  if (p === "C"  || p === "PF")                return "Big";
+  return "Wing"; // SF, F, anything else
+}
+
 // ── Height ────────────────────────────────────────────────────────────────────
 export function heightToInches(h) {
   if (!h || h === "—") return -1;
