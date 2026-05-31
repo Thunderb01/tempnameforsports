@@ -105,6 +105,15 @@ def fetch(url: str) -> BeautifulSoup | None:
 # aliasing. The frontend handles per-page header differences (PPG vs PTS, RPG vs
 # REB, etc.) so re-scraping isn't required when conventions change.
 
+# RealGM junior-league listings sometimes append a recruiting-class year to the
+# player cell (e.g. "Abdrahamane Kone (2027)"). Strip it so name is consistent
+# across stat-type tabs and matches the profiles table.
+_NAME_YEAR_SUFFIX = re.compile(r"\s*\((?:19|20)\d{2}\)\s*$")
+
+def clean_player_name(name: str) -> str:
+    return _NAME_YEAR_SUFFIX.sub("", (name or "").strip())
+
+
 def parse_rows(
     soup:        BeautifulSoup,
     league_name: str,
@@ -138,7 +147,7 @@ def parse_rows(
 
         raw = dict(zip(col_headers, cells))
 
-        player_name = raw.get("player") or raw.get("name") or ""
+        player_name = clean_player_name(raw.get("player") or raw.get("name") or "")
         team        = raw.get("team", "")
 
         stat_cols = {k: v for k, v in raw.items() if k not in ("player", "name", "team", "#", "rank")}

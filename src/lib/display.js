@@ -51,9 +51,13 @@ export function tierColor(label) {
   return TIER_COLORS[label] || "#64748b";
 }
 
-// Canonical ordered list of projected-tier labels — shared by the domestic
-// dropdown in AdminPage and the new international one. Order matches the value
-// threshold ladder in projectedTier() below.
+// Ordered list of projected-tier labels for the INTERNATIONAL admin dropdown.
+// Domestic and international intentionally use different tier vocabularies:
+//   • Domestic mixes player-level + program-level ("HM Starter / MM All-Conference")
+//   • International is program-level only ("High Major", "Mid Major", etc.)
+// projectedTier() below maps NIL valuations to the DOMESTIC labels and is only
+// called from domestic pages (PortalPage, BoardPage, PlayerModal,
+// PlayerComparison). International uses this options array directly.
 export const PROJECTED_TIER_OPTIONS = [
   "High Major + / Pre-Draft",
   "High Major",
@@ -63,14 +67,17 @@ export const PROJECTED_TIER_OPTIONS = [
   "Low Major",
 ];
 
+// Domestic: NIL valuation → tier label. The labels below MUST stay in sync with
+// torvik_metrics.py's assign_tier(), since the DB column players.projected_tier
+// is populated by that script.
 export function projectedTier(v) {
   v = Number(v) || 0;
-  if (v >= 2_000_000) return "High Major + / Pre-Draft";
-  if (v >= 1_200_000) return "High Major";
-  if (v >=   400_000) return "High Major -/ Mid Major +";
-  if (v >=   200_000) return "Mid Major";
-  if (v >=   100_000) return "Mid Major -/ Low Major +";
-  return "Low Major";
+  if (v >= 2_000_000) return "HM All-American / Pre-Draft";
+  if (v >= 1_200_000) return "HM All-Conference";
+  if (v >=   400_000) return "HM Starter / MM All-Conference";
+  if (v >=   200_000) return "HM Rotation / MM Starter";
+  if (v >=   100_000) return "MM Starter / LM All-Conference";
+  return "LM Rotation";
 }
 
 // ── Metric grades ─────────────────────────────────────────────────────────────
