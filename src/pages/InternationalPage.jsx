@@ -48,7 +48,7 @@ export function InternationalPage() {
   const [ageMin,       setAgeMin]       = useState(null);
   const [ageMax,       setAgeMax]       = useState(null);
   const [statType,     setStatType]     = useState("Averages");
-  const [sortKey,      setSortKey]      = useState("pts");
+  const [sortKey,      setSortKey]      = useState("Projection");
   const [sortDir,      setSortDir]      = useState("desc");
   const [page,         setPage]         = useState(0);
   // "players" = the existing player-stats table; "agents" = browse by agent
