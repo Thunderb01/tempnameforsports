@@ -48,7 +48,7 @@ export function InternationalPage() {
   const [ageMin,       setAgeMin]       = useState(null);
   const [ageMax,       setAgeMax]       = useState(null);
   const [statType,     setStatType]     = useState("Averages");
-  const [sortKey,      setSortKey]      = useState("Projection");
+  const [sortKey,      setSortKey]      = useState("projection");
   const [sortDir,      setSortDir]      = useState("desc");
   const [page,         setPage]         = useState(0);
   // "players" = the existing player-stats table; "agents" = browse by agent
@@ -259,14 +259,15 @@ export function InternationalPage() {
         return sortDir === "asc" ? at - bt : bt - at;
       }
       if (sortKey === "projection") {
-        // Higher tier (High Major + / Pre-Draft) sorts first when desc; rely on the
-        // canonical PROJECTED_TIER_OPTIONS order from display.js.
+        // PROJECTED_TIER_OPTIONS is ordered best→worst (index 0 = top tier).
+        // For "desc" (the intuitive "highest first") we want best at the top,
+        // i.e. lower index first. Missing tier sorts to the bottom either way.
         const order = PROJECTED_TIER_OPTIONS;
         const ar = order.indexOf(profiles[a.player_name]?.projected_tier ?? "");
         const br = order.indexOf(profiles[b.player_name]?.projected_tier ?? "");
         const ax = ar === -1 ? Infinity : ar;
         const bx = br === -1 ? Infinity : br;
-        return sortDir === "asc" ? ax - bx : bx - ax;
+        return sortDir === "desc" ? ax - bx : bx - ax;
       }
       const av = parseFloat(getStat(a.stats, sortKey));
       const bv = parseFloat(getStat(b.stats, sortKey));
