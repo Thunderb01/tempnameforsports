@@ -27,7 +27,7 @@ const PROFILE_CSV_HEADERS = [
   "name", "league", "profile_url", "height", "primary_position",
   "country_of_origin", "age", "recruiting_class",
   "agent_name", "agent_contact", "film_url", "competition_tier",
-  "player_status", "committed_team", "projected_tier",
+  "player_status", "committed_team", "us_interest_level", "projected_tier",
   "scouting_notes",
   ...METRIC_KEYS,
 ];
@@ -123,10 +123,17 @@ function ProfileForm({ initial, onSave, onCancel, saving, tierLabels }) {
     competition_tier:  initial?.competition_tier  ?? 2,
     player_status:     initial?.player_status     ?? "uncommitted",
     committed_team:    initial?.committed_team    ?? "",
+    us_interest_level: initial?.us_interest_level ?? "",
     projected_tier:    initial?.projected_tier    ?? "",
     scouting_notes:    initial?.scouting_notes    ?? "",
     metrics:           { ...(initial?.metrics || {}) },
   }));
+
+  // Toggle for the "Recruiting Status" sub-field: "interest" (US college interest level)
+  // vs "committed" (specific committed school). Initial choice based on what's set.
+  const [recruitMode, setRecruitMode] = useState(() =>
+    initial?.committed_team ? "committed" : "interest"
+  );
 
   const set    = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const setMet = (k, v) => setForm(f => ({ ...f, metrics: { ...f.metrics, [k]: parseNum(v) } }));
@@ -151,7 +158,9 @@ function ProfileForm({ initial, onSave, onCancel, saving, tierLabels }) {
       film_url:          form.film_url.trim()          || null,
       competition_tier:  parseInt(form.competition_tier, 10) || 2,
       player_status:     form.player_status || "uncommitted",
-      committed_team:    form.committed_team.trim() || null,
+      // Toggle decides which of these two is saved; the other is cleared.
+      committed_team:    recruitMode === "committed" ? (form.committed_team.trim() || null) : null,
+      us_interest_level: recruitMode === "interest"  ? (form.us_interest_level || null)    : null,
       projected_tier:    form.projected_tier || null,
       scouting_notes:    form.scouting_notes.trim()    || null,
       metrics:           form.metrics,
@@ -214,13 +223,38 @@ function ProfileForm({ initial, onSave, onCancel, saving, tierLabels }) {
           </select>
         </div>
         <div>
-          <label style={labelStyle}>Committed Team (D1 school)</label>
-          <input className="input" style={{ width: "100%" }}
-            placeholder={form.player_status === "committed" || form.player_status === "signed"
-              ? "e.g. Kentucky" : "—"}
-            value={form.committed_team}
-            onChange={e => set("committed_team", e.target.value)}
-            disabled={form.player_status !== "committed" && form.player_status !== "signed"} />
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 5 }}>
+            <label style={{ ...labelStyle, marginBottom: 0 }}>
+              {recruitMode === "interest" ? "US college interest" : "Committed team (D1)"}
+            </label>
+            <div style={{ display: "inline-flex", border: "1px solid rgba(255,255,255,.12)", borderRadius: 14, overflow: "hidden" }}>
+              {[["interest", "Interest"], ["committed", "Committed"]].map(([val, lbl]) => (
+                <button type="button" key={val}
+                  onClick={() => setRecruitMode(val)}
+                  style={{
+                    fontSize: 10, fontWeight: 600, padding: "2px 9px", cursor: "pointer",
+                    border: "none",
+                    background:  recruitMode === val ? "rgba(91,156,246,.18)" : "transparent",
+                    color:       recruitMode === val ? "#5b9cf6" : "rgba(255,255,255,.45)",
+                  }}>{lbl}</button>
+              ))}
+            </div>
+          </div>
+          {recruitMode === "interest" ? (
+            <select className="input" style={{ width: "100%" }}
+              value={form.us_interest_level}
+              onChange={e => set("us_interest_level", e.target.value)}>
+              <option value="">— not set —</option>
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
+            </select>
+          ) : (
+            <input className="input" style={{ width: "100%" }}
+              placeholder="e.g. Kentucky"
+              value={form.committed_team}
+              onChange={e => set("committed_team", e.target.value)} />
+          )}
         </div>
         <div style={{ gridColumn: "1 / -1" }}>
           <label style={labelStyle}>Projected Tier (D1 level)</label>
@@ -460,7 +494,7 @@ function CSVImporter({ kind, onImport }) {
         height: "6'9\"", primary_position: "SF",
         country_of_origin: "Spain", age: "19", recruiting_class: "2026",
         agent_name: "", agent_contact: "", film_url: "", competition_tier: "2",
-        player_status: "uncommitted", committed_team: "", projected_tier: "Mid Major",
+        player_status: "uncommitted", committed_team: "", us_interest_level: "medium", projected_tier: "Mid Major",
         scouting_notes: "Quick first step, average defender, projects as bench guard.",
         offensive_footprint: "75", defensive_score: "68", winning_impact: "72",
         sos_performance: "70", translation_grade: "65",
@@ -702,6 +736,7 @@ export function InternationalAdminContent() {
         competition_tier:  parseInt(r.competition_tier, 10) || 2,
         player_status:     r.player_status?.trim()     || null,
         committed_team:    r.committed_team?.trim()    || null,
+        us_interest_level: r.us_interest_level?.trim() || null,
         projected_tier:    r.projected_tier?.trim()    || null,
         scouting_notes:    r.scouting_notes?.trim()    || null,
         metrics,

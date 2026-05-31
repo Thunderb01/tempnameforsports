@@ -157,15 +157,33 @@ export function InternationalPage() {
     );
   }, [agents, agentSearch]);
 
-  // ── Combine stat rows + profile-only orphans ──────────────────────────────
-  // Every profile gets at least one row on the board, even if it has no stats yet.
+  // ── Exactly one row per player profile. ────────────────────────────────────
+  // Profiles drive the list (they're the source of truth — one row per
+  // {name, league}). For each profile, attach the latest season's stats for
+  // the active stat-type tab; if no matching stat row exists, render with
+  // empty stats. Stat rows for the same (name, league) on OTHER seasons or
+  // stat-types are NOT shown on the board — they're visible inside the modal,
+  // which lists every season filtered by stat-type.
+  //
+  // Stat rows whose (name, league) doesn't match any profile (rare; usually a
+  // scraper-side typo) still appear so nothing gets silently dropped.
   const combinedRows = useMemo(() => {
-    const hasStatsForType = new Set(
-      rows.filter(r => r.stat_type === statType).map(r => r.player_name)
-    );
-    const orphans = Object.values(profiles)
-      .filter(p => !hasStatsForType.has(p.name))
-      .map(p => ({
+    // Step 1: index every stat row by (name|league|stat_type), keeping latest season.
+    const statsByKey = new Map();
+    for (const r of rows) {
+      const key = `${r.player_name}|${r.league}|${r.stat_type}`;
+      const cur = statsByKey.get(key);
+      if (!cur || (r.season || 0) > (cur.season || 0)) {
+        statsByKey.set(key, r);
+      }
+    }
+
+    // Step 2: one row per profile.
+    const profileRows = Object.values(profiles).map(p => {
+      const key  = `${p.name}|${p.league}|${statType}`;
+      const stat = statsByKey.get(key);
+      if (stat) return stat;
+      return {
         player_name: p.name,
         league:      p.league,
         team:        null,
@@ -174,8 +192,24 @@ export function InternationalPage() {
         stat_type:   statType,
         stats:       {},
         _profileOnly: true,
-      }));
-    return [...rows, ...orphans];
+      };
+    });
+
+    // Step 3: any stat rows that don't match a profile by (name, league).
+    const profileKeys = new Set(Object.values(profiles).map(p => `${p.name}|${p.league}`));
+    const seenOrphans = new Set();
+    const orphanStats = [];
+    for (const r of rows) {
+      if (r.stat_type !== statType) continue;
+      const idKey = `${r.player_name}|${r.league}`;
+      if (profileKeys.has(idKey)) continue;
+      if (seenOrphans.has(idKey)) continue;
+      seenOrphans.add(idKey);
+      const statKey = `${r.player_name}|${r.league}|${statType}`;
+      orphanStats.push(statsByKey.get(statKey));
+    }
+
+    return [...profileRows, ...orphanStats];
   }, [rows, profiles, statType]);
 
   // ── Filter ─────────────────────────────────────────────────────────────────
@@ -437,7 +471,7 @@ export function InternationalPage() {
           />
 
           <div style={{ fontSize: 12, opacity: .4, marginBottom: 10 }}>
-            {loading ? "Loading…" : `${sorted.length} player-seasons`}
+            {loading ? "Loading…" : `${sorted.length} player${sorted.length === 1 ? "" : "s"}`}
             {" · click a row to view profile"}
           </div>
           </>

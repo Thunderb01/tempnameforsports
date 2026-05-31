@@ -132,6 +132,7 @@ function mapIntlPlayer(p) {
     agent_contact:     p.agent_contact,
     player_status:     p.player_status,
     committed_team:    p.committed_team,
+    us_interest_level: p.us_interest_level,
     projected_tier:    p.projected_tier,
   };
 }

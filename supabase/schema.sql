@@ -159,6 +159,7 @@ create table if not exists public.international_players (
   scouting_notes     text,
   player_status      text default 'uncommitted',   -- uncommitted | committed | signed | withdrawn
   committed_team     text,                          -- D1 school they've committed to (auto-roster trigger)
+  us_interest_level  text,                          -- high | medium | low — soft signal when not yet committed
   projected_tier     text,                          -- High Major + / Pre-Draft, High Major, High Major -/ Mid Major +, Mid Major, Mid Major -/ Low Major +, Low Major
   metrics            jsonb default '{}',
   created_at         timestamp with time zone default now(),

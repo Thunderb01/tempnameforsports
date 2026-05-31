@@ -454,6 +454,33 @@ export function IntlPlayerModal({
                     </span>
                   );
                 })()}
+                {profile?.committed_team
+                  && (profile.player_status === "committed" || profile.player_status === "signed")
+                  && (() => {
+                    const isSigned = profile.player_status === "signed";
+                    const c = isSigned ? "#4ade80" : "#5b9cf6";
+                    return (
+                      <span style={{
+                        fontSize: 11, fontWeight: 700, padding: "2px 10px", borderRadius: 20,
+                        background: `${c}1f`, color: c, border: `1px solid ${c}55`,
+                      }}>
+                        {isSigned ? "Signed to" : "Committed to"} · {profile.committed_team}
+                      </span>
+                    );
+                  })()}
+                {!profile?.committed_team && profile?.us_interest_level && (() => {
+                  const lvl = profile.us_interest_level;
+                  const c = lvl === "high" ? "#4ade80" : lvl === "medium" ? "#fcd34d" : "#94a3b8";
+                  return (
+                    <span style={{
+                      fontSize: 11, fontWeight: 700, padding: "2px 10px", borderRadius: 20,
+                      background: `${c}1f`, color: c, border: `1px solid ${c}55`,
+                      textTransform: "capitalize",
+                    }}>
+                      US interest · {lvl}
+                    </span>
+                  );
+                })()}
               </div>
               {profile?.profile_url && (
                 <a href={profile.profile_url} target="_blank" rel="noreferrer"
