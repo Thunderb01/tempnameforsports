@@ -249,9 +249,13 @@ export function InternationalPage() {
         const cmp = (a[sortKey] || "").toLowerCase().localeCompare((b[sortKey] || "").toLowerCase());
         return sortDir === "asc" ? cmp : -cmp;
       }
-      if (sortKey === "season") {
-        const cmp = (a.season || 0) - (b.season || 0);
-        return sortDir === "asc" ? cmp : -cmp;
+      if (sortKey === "class") {
+        // Numeric where possible — recruiting class is usually a 4-digit year.
+        const ac = parseInt(profiles[a.player_name]?.recruiting_class, 10);
+        const bc = parseInt(profiles[b.player_name]?.recruiting_class, 10);
+        const av = isNaN(ac) ?  Infinity : ac;
+        const bv = isNaN(bc) ?  Infinity : bc;
+        return sortDir === "asc" ? av - bv : bv - av;
       }
       if (sortKey === "tier") {
         const at = profiles[a.player_name]?.competition_tier ?? 99;
@@ -490,7 +494,7 @@ export function InternationalPage() {
                 <th style={thStyle("league")}      onClick={() => handleSort("league")}>League{sortArrow("league")}</th>
                 <th style={thStyle("tier")}        onClick={() => handleSort("tier")}>Tier{sortArrow("tier")}</th>
                 <th style={thStyle("projection")}  onClick={() => handleSort("projection")}>Projection{sortArrow("projection")}</th>
-                <th style={thStyle("season")}      onClick={() => handleSort("season")}>Season{sortArrow("season")}</th>
+                <th style={thStyle("class")}       onClick={() => handleSort("class")}>Class{sortArrow("class")}</th>
                 {statCols.map(c => (
                   <th key={c.key} style={thStyle(c.key)} onClick={() => handleSort(c.key)}>
                     {c.label}{sortArrow(c.key)}
@@ -544,7 +548,7 @@ export function InternationalPage() {
                         );
                       })() : <span style={{ opacity: .25 }}>—</span>}
                     </td>
-                    <td style={{ ...tdStyle(), opacity: .6 }}>{r.season || "—"}</td>
+                    <td style={{ ...tdStyle(), opacity: .6 }}>{prof?.recruiting_class || "—"}</td>
                     {statCols.map(c => (
                       <td key={c.key} style={tdStyle()}>
                         {fmtStatByKey(getStat(r.stats, c.key), c.key)}
