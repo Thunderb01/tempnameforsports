@@ -668,9 +668,54 @@ function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], userTeam = ""
                   {total !== 5 && (
                     <div style={{ fontSize: 10, color: "#fbbf24", marginTop: 4, opacity: .8 }}>standard is 5</div>
                   )}
+                  <button
+                    title="Picks the top 5 players by score with at least one Guard, Wing, and Big."
+                    onClick={() => {
+                      // Auto-optimize the starting 5:
+                      //   1) guarantee one starter from each position (highest-scoring there)
+                      //   2) fill the remaining 2 slots with the next-highest scorers
+                      //      across any position
+                      const topByPos = {};
+                      POS_ORDER.forEach(pos => {
+                        topByPos[pos] = (chart[pos] || [])
+                          .filter(p => p?.source !== "intl")
+                          .slice()
+                          .sort((a, b) => btpPlayerScoreDisplay(b) - btpPlayerScoreDisplay(a));
+                      });
+                      const next = { Guard: 0, Wing: 0, Big: 0 };
+                      // Step 1: one starter per position (if available).
+                      POS_ORDER.forEach(pos => {
+                        if (topByPos[pos].length > 0) next[pos] = 1;
+                      });
+                      // Step 2: greedy fill the remaining slots up to 5.
+                      const used = { Guard: next.Guard, Wing: next.Wing, Big: next.Big };
+                      while (next.Guard + next.Wing + next.Big < 5) {
+                        // Candidate from each position = the player at `used[pos]` index.
+                        let bestPos = null, bestScore = -Infinity;
+                        POS_ORDER.forEach(pos => {
+                          const idx = used[pos];
+                          const p   = topByPos[pos][idx];
+                          if (!p) return;
+                          const s = btpPlayerScoreDisplay(p);
+                          if (s > bestScore) { bestScore = s; bestPos = pos; }
+                        });
+                        if (!bestPos) break;  // no more players in any position
+                        next[bestPos] += 1;
+                        used[bestPos] += 1;
+                      }
+                      setStarterCounts(next);
+                    }}
+                    style={{
+                      marginTop: 8, fontSize: 11, fontWeight: 600, cursor: "pointer", width: "100%",
+                      padding: "6px 8px", borderRadius: 6,
+                      background: "rgba(91,156,246,.12)", color: "#5b9cf6",
+                      border: "1px solid rgba(91,156,246,.4)",
+                    }}>
+                    ⚡ Auto-optimize
+                  </button>
                   {total !== 5 && (
                     <button onClick={() => setStarterCounts({ Guard: 2, Wing: 2, Big: 1 })}
-                      style={{ marginTop: 8, fontSize: 10, opacity: .45, background: "none", border: "1px solid rgba(255,255,255,.1)", borderRadius: 6, padding: "3px 8px", cursor: "pointer", color: "inherit" }}>Reset</button>
+                      style={{ marginTop: 6, fontSize: 10, opacity: .45, background: "none", border: "1px solid rgba(255,255,255,.1)", borderRadius: 6, padding: "3px 8px", cursor: "pointer", color: "inherit" }}>Reset to 2-2-1</button>
                   )}
                 </>
               );
