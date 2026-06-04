@@ -197,8 +197,47 @@ const TYPE_COLOR = {
 };
 
 // ── Roster Strength breakdown panel ──────────────────────────────────────────
-const SLOT_WEIGHTS_DISPLAY  = [1.0, 0.55, 0.30, 0.15, 0.08];
+// One algorithm, used identically for static team scores AND the user's live
+// score. Within each position group (Guard / Wing / Big):
+//   slots [0 .. startersN)               → weight 1.00   (the starters)
+//   slots [startersN .. startersN + 3)   → weight 0.20   (next 3 off the bench)
+//   everyone deeper                       → weight 0.04   (depth — almost nothing)
+//
+// International players are excluded from both pools so the comparison is
+// strictly between domestic D1 rosters.
+//
+//   Static lineup = 2 Guards + 2 Wings + 1 Big (always) → every team is
+//                   scored on the same yardstick.
+//   Live lineup   = whatever you set in the sidebar (starterCounts).
+const STATIC_LINEUP = { Guard: 2, Wing: 2, Big: 1 };
 const CMP_LEAVING_STATUSES  = new Set(["declared", "transferring", "graduating"]);
+
+function slotWeightFor(slotIndex, startersN) {
+  if (slotIndex < startersN)         return 1.00;   // starter
+  if (slotIndex < startersN + 3)     return 0.20;   // first 3 off the bench
+  return 0.04;                                       // depth
+}
+
+// Position-bucketed, weighted-slot scoring. Same function powers static team
+// scores and the user's live score; only `lineup` differs.
+function scoreTeamPlayers(players, scorer, lineup) {
+  const byPos = { Guard: [], Wing: [], Big: [] };
+  for (const p of players) {
+    if (!p || p.source === "intl") continue;
+    byPos[bucketPosition(p.pos)].push(p);
+  }
+  const posScores = {};
+  let total = 0;
+  for (const pos of ["Guard", "Wing", "Big"]) {
+    const n = lineup[pos] ?? 0;
+    const sorted = byPos[pos].map(scorer).sort((a, b) => b - a);
+    let posTotal = 0;
+    sorted.forEach((s, i) => { posTotal += s * slotWeightFor(i, n); });
+    posScores[pos] = posTotal;
+    total += posTotal;
+  }
+  return { score: total, posScores };
+}
 const BTP_METRICS = [
   { key: "sei", label: "SEI", desc: "Scoring Efficiency" },
   { key: "ath", label: "ATH", desc: "Athleticism" },
@@ -247,32 +286,21 @@ function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], userTeam = ""
   }
 
   // ── Score every team in a pool, including per-position breakdown ─────────────
-  // `pool` is the filtered player list. `scorer` is a function from player → score.
-  function scorePool(pool, scorer) {
+  // Wraps `scoreTeamPlayers` — groups the global pool by team and applies the
+  // same scoring rule to each. Default lineup is the fixed 2-2-1 used for
+  // every-team static comparison.
+  function scorePool(pool, scorer, lineup = STATIC_LINEUP) {
     const byTeam = {};
     pool.forEach(p => {
-      if (!p.team) return;
+      if (!p.team || p.source === "intl") return;
       if (!byTeam[p.team]) byTeam[p.team] = [];
       byTeam[p.team].push(p);
     });
-    const teams = Object.entries(byTeam).map(([team, players]) => {
+    return Object.entries(byTeam).map(([team, players]) => {
       const conf = teamConferences[team] ?? players[0]?.conf ?? null;
-      const byPos = { Guard: [], Wing: [], Big: [] };
-      players.forEach(p => {
-        byPos[bucketPosition(p.pos)].push(p);
-      });
-      const posScores = {};
-      let score = 0;
-      POS_ORDER.forEach(pos => {
-        const group = byPos[pos].sort((a, b) => scorer(b) - scorer(a));
-        let posScore = 0;
-        group.forEach((p, i) => { posScore += scorer(p) * (SLOT_WEIGHTS_DISPLAY[i] ?? 0.05); });
-        posScores[pos] = posScore;
-        score += posScore;
-      });
+      const { score, posScores } = scoreTeamPlayers(players, scorer, lineup);
       return { team, conf, score, posScores, playerCount: players.length };
     });
-    return teams;
   }
 
   // Add overall + per-position ranks to a list of teams. Mutates and returns.
@@ -296,27 +324,35 @@ function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], userTeam = ""
   }
 
   // ── National team scores (absolute metrics) ──────────────────────────────────
+  // A player counts toward their COMMITTED destination if they've committed;
+  // otherwise toward their current_team unless they're explicitly leaving.
+  // Committed transfers override the leaving-status filter (they're "leaving"
+  // their old school but going somewhere we should credit).
   const teamScores = useMemo(() => {
     if (!allPlayers.length) return [];
-    const pool = allPlayers.filter(p => p.team && !CMP_LEAVING_STATUSES.has(p.player_status));
+    const pool = allPlayers.filter(p => {
+      if (!p.team) return false;
+      if (p._committed_to) return true;
+      return !CMP_LEAVING_STATUSES.has(p.player_status);
+    });
     return addRanks(scorePool(pool, btpPlayerScoreDisplay));
   }, [allPlayers]);
 
   const userConf = useMemo(() => teamConferences[userTeam] ?? teamScores.find(t => t.team === userTeam)?.conf ?? null, [teamScores, userTeam]);
 
   // ── Conference team scores ────────────────────────────────────────────────
-  // We use the SAME scorer as national (`btpPlayerScoreDisplay`), just filtered
-  // to the conference pool. The previous version min-max-normalised metrics
-  // within the conference, which inflated weak-conference bench players and
-  // made conf vs national scores live on incompatible scales. With raw scoring,
-  // the absolute numbers are comparable across scopes; only the rank/pool
-  // changes between Conference and Country views.
+  // Same scorer as national, just filtered to the conference pool. Committed
+  // players are evaluated against their NEW team's conference (so a commit
+  // crossing conferences moves to the new conference here too).
   const confTeamScores = useMemo(() => {
     if (!allPlayers.length || !userConf) return [];
-    const confPool = allPlayers.filter(p =>
-      (teamConferences[p.team] ?? p.conf) === userConf &&
-      !CMP_LEAVING_STATUSES.has(p.player_status)
-    );
+    const confPool = allPlayers.filter(p => {
+      if (!p.team) return false;
+      const playerConf = teamConferences[p.team] ?? p.conf;
+      if (playerConf !== userConf) return false;
+      if (p._committed_to) return true;
+      return !CMP_LEAVING_STATUSES.has(p.player_status);
+    });
     if (confPool.length < 2) return [];
     return addRanks(scorePool(confPool, btpPlayerScoreDisplay));
   }, [allPlayers, userConf]);
@@ -324,9 +360,12 @@ function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], userTeam = ""
 
   // Plain variables (no memoization) — scoringPool is ≤20 players, compute is trivial,
   // and avoiding useMemo ensures these always reflect the latest scoringPool on every render.
+  // International players are excluded from the strength chart since they're
+  // also excluded from scoring. They still appear in the Roster tab.
   const defaultChart = (() => {
     const groups = { Guard: [], Wing: [], Big: [] };
     scoringPool.forEach(p => {
+      if (p?.source === "intl") return;
       const pos = bucketPosition(p.pos);
       groups[pos].push(p);
     });
@@ -346,13 +385,18 @@ function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], userTeam = ""
     return result;
   })();
 
-  // ── Live chart: per-position score + total, in both scopes ──────────────────
+  // ── Live chart: per-position score + total ─────────────────────────────────
+  // Identical algorithm to static. Uses chart order so a manual drag promotes
+  // a player into the starting lineup (slot weight 1.0), demotes another to
+  // bench (0.20 if top-3, else 0.04). Intl excluded.
   function computeLive(scorer) {
     const posScores = {};
     let total = 0;
     POS_ORDER.forEach(pos => {
+      const n = starterCounts[pos] ?? 0;
+      const players = (chart[pos] || []).filter(p => p?.source !== "intl");
       let s = 0;
-      (chart[pos] || []).forEach((p, i) => { s += scorer(p) * (SLOT_WEIGHTS_DISPLAY[i] ?? 0.05); });
+      players.forEach((p, i) => { s += scorer(p) * slotWeightFor(i, n); });
       posScores[pos] = s;
       total += s;
     });
@@ -530,7 +574,7 @@ function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], userTeam = ""
                   <div style={{ padding: "20px 14px", fontSize: 12, opacity: .3, textAlign: "center" }}>No players</div>
                 ) : players.map((p, i) => {
                   const score        = btpPlayerScoreDisplay(p);
-                  const weight       = SLOT_WEIGHTS_DISPLAY[i] ?? 0.05;
+                  const weight       = slotWeightFor(i, starterCounts[pos] ?? 0);
                   const contribution = score * weight;
                   const barPct       = (score / maxPlayerScore) * 100;
                   const s            = p.stats || {};
@@ -636,15 +680,27 @@ function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], userTeam = ""
       </div>
 
       {/* ── Conference / League comparison ─────────────────────────────────── */}
-      {liveTeamScores.length > 0 && (() => {
-        const displayList = cmpScope === "conference" ? liveConfTeamScores : (() => {
-          const userRank = liveTeamScores.findIndex(t => t.team === userTeam);
-          if (userRank <= 24) return liveTeamScores.slice(0, Math.max(25, userRank + 1));
-          return [...liveTeamScores.slice(0, 5), null, ...liveTeamScores.slice(userRank - 2, userRank + 3)];
+      {teamScores.length > 0 && (() => {
+        // List shows STATIC scores for every team (with commits already reassigned
+        // to their destination in loadPortalBoard). The user's own custom build
+        // gets a separate "Your build" row above the list so their live score
+        // can be seen alongside, without making the same team's score look
+        // different depending on which team is currently selected.
+        const baseList = cmpScope === "conference" ? confTeamScores : teamScores;
+        const displayList = cmpScope === "conference" ? baseList : (() => {
+          const userIdx = baseList.findIndex(t => t.team === userTeam);
+          if (userIdx === -1 || userIdx <= 24) return baseList.slice(0, 25);
+          return [...baseList.slice(0, 5), null, ...baseList.slice(userIdx - 2, userIdx + 3)];
         })();
-        const maxScore = Math.max(...displayList.filter(Boolean).map(t => t.score), 1);
-        const userRankAll  = liveTeamScores.findIndex(t => t.team === userTeam) + 1;
-        const userRankConf = liveConfTeamScores.findIndex(t => t.team === userTeam) + 1;
+        const maxScore = Math.max(
+          liveNational.score,
+          ...displayList.filter(Boolean).map(t => t.score),
+          1,
+        );
+
+        // Where the user's LIVE build would slot in (uses the live-injected list).
+        const userLiveRankAll  = liveTeamScores.findIndex(t => t.team === userTeam) + 1;
+        const userLiveRankConf = liveConfTeamScores.findIndex(t => t.team === userTeam) + 1;
 
         return (
           <div style={{ background: "rgba(255,255,255,.03)", border: "1px solid var(--border)", borderRadius: 10, overflow: "hidden" }}>
@@ -667,16 +723,42 @@ function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], userTeam = ""
               </div>
               <div style={{ width: "100%", fontSize: 11, opacity: .35 }}>
                 {cmpScope === "conference"
-                  ? `${liveConfTeamScores.length} teams · grades percentile-based within ${userConf ?? "conference"}`
-                  : `${liveTeamScores.length} teams · grades percentile-based against the country`}
+                  ? `${confTeamScores.length} teams · static scores (transfer commits credited to destination)`
+                  : `${teamScores.length} teams · static scores (transfer commits credited to destination)`}
               </div>
             </div>
 
             {/* Ranked list */}
             <div style={{ padding: "10px 16px", display: "flex", flexDirection: "column", gap: 6 }}>
-              {cmpScope === "conference" && userRankConf > 0 && (
-                <div style={{ fontSize: 11, opacity: .4, marginBottom: 4 }}>
-                  #{userRankConf} in {userConf} · #{userRankAll} nationally
+              {/* "Your build" row — uses the user's LIVE score so they can see
+                  where their custom roster would slot in vs the static league. */}
+              {userTeam && (
+                <div style={{
+                  display: "flex", alignItems: "center", gap: 10,
+                  padding: "8px 8px", borderRadius: 6,
+                  background: "rgba(245,158,11,.10)",
+                  border: "1px solid rgba(245,158,11,.30)",
+                }}>
+                  <span style={{ width: 22, fontSize: 11, opacity: .55, textAlign: "right", flexShrink: 0, color: "#f59e0b" }}>
+                    ▶
+                  </span>
+                  <span style={{ minWidth: 0, flex: "0 0 auto", maxWidth: 200, fontSize: 13, fontWeight: 700, color: "#f59e0b", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    Your {userTeam} build
+                  </span>
+                  <div style={{ flex: 1, height: 5, background: "rgba(255,255,255,.07)", borderRadius: 3, minWidth: 40 }}>
+                    <div style={{ width: `${(liveNational.score / maxScore) * 100}%`, height: "100%", background: "#f59e0b", borderRadius: 3 }} />
+                  </div>
+                  <span style={{ fontSize: 11, opacity: .85, flexShrink: 0, fontVariantNumeric: "tabular-nums", color: "#f59e0b" }}>
+                    {(liveNational.score / 1000000).toFixed(2)}M
+                  </span>
+                  <span style={{ background: chartGrade.color, color: "#0e1521", fontWeight: 700, fontSize: 10, padding: "1px 6px", borderRadius: 6, flexShrink: 0 }}>
+                    {chartGrade.label}
+                  </span>
+                </div>
+              )}
+              {userTeam && (
+                <div style={{ fontSize: 10, opacity: .4, marginBottom: 6, marginLeft: 32 }}>
+                  Would rank #{userLiveRankAll} nationally{userConf ? ` · #${userLiveRankConf} in ${userConf}` : ""}
                 </div>
               )}
               {displayList.map((t, idx) => {

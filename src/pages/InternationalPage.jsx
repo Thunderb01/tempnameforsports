@@ -212,6 +212,24 @@ export function InternationalPage() {
     return [...profileRows, ...orphanStats];
   }, [rows, profiles, statType]);
 
+  // Latest-Averages row per (name, league), used for low-impact filtering
+  // regardless of which stat-type tab is active.
+  const avgsByPlayer = useMemo(() => {
+    const m = new Map();
+    for (const r of rows) {
+      if (r.stat_type !== "Averages") continue;
+      const key = `${r.player_name}|${r.league}`;
+      const cur = m.get(key);
+      if (!cur || (r.season || 0) > (cur.season || 0)) m.set(key, r);
+    }
+    return m;
+  }, [rows]);
+
+  // Hide players who average <4 combined PTS + REB. Skip-filter only when we
+  // actually have averages data — profile-only entries with no stats yet
+  // remain visible so they aren't silently dropped.
+  const MIN_PTS_PLUS_REB = 4;
+
   // ── Filter ─────────────────────────────────────────────────────────────────
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -238,9 +256,18 @@ export function InternationalPage() {
         if (ageMin != null && a < ageMin) return false;
         if (ageMax != null && a > ageMax) return false;
       }
+
+      // Low-impact filter — uses Averages stats even when viewing other tabs.
+      const avgs = avgsByPlayer.get(`${r.player_name}|${r.league}`);
+      if (avgs) {
+        const pts = parseFloat(getStat(avgs.stats, "pts")) || 0;
+        const reb = parseFloat(getStat(avgs.stats, "reb")) || 0;
+        if (pts + reb < MIN_PTS_PLUS_REB) return false;
+      }
+
       return true;
     });
-  }, [combinedRows, profiles, search, leagueFilter, teamFilter, tierFilter, seasonFilter, posFilter, classFilter, projFilter, heightMin, heightMax, ageMin, ageMax, statType]);
+  }, [combinedRows, profiles, avgsByPlayer, search, leagueFilter, teamFilter, tierFilter, seasonFilter, posFilter, classFilter, projFilter, heightMin, heightMax, ageMin, ageMax, statType]);
 
   // ── Sort ───────────────────────────────────────────────────────────────────
   const sorted = useMemo(() => {

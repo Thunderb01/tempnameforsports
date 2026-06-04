@@ -6,7 +6,7 @@ import { money, bucketPosition } from "@/lib/display";
 // Module-level caches so data survives page navigation without re-fetching.
 const SESSION_BOARD_KEY = "bp_board_cache";
 const SESSION_BOARD_TTL  = 4 * 60 * 60 * 1000; // 4 hours
-const SESSION_BOARD_VER  = 5; // bump to invalidate all cached sessions
+const SESSION_BOARD_VER  = 6; // bump to invalidate all cached sessions
 
 function loadSessionCache() {
   try {
@@ -38,14 +38,26 @@ const STORAGE_VERSION    = 15; // bump this whenever the state shape changes
 // Legacy keys to purge on load
 const LEGACY_KEYS = ["bp_roster_builder_v1", "bp_roster_builder"];
 
-function storageKey(userId) {
-  return userId ? `${STORAGE_KEY_PREFIX}_${userId}` : STORAGE_KEY_PREFIX;
+// Each (user, team) pair gets its own slot so switching teams loads the right
+// roster and edits to one team don't bleed into another.
+function storageKey(team, userId) {
+  const u = userId || "anon";
+  const t = (team || "no_team").replace(/[^a-zA-Z0-9]/g, "_");
+  return `${STORAGE_KEY_PREFIX}_v${STORAGE_VERSION}_${u}_${t}`;
+}
+
+// One-time cleanup of older single-key-per-user blobs (they conflated teams).
+function purgeOldUserKey(userId) {
+  if (!userId) return;
+  const old = `${STORAGE_KEY_PREFIX}_${userId}`;
+  if (localStorage.getItem(old)) localStorage.removeItem(old);
 }
 
 function loadLocal(team, userId) {
   try {
     LEGACY_KEYS.forEach(k => localStorage.removeItem(k));
-    const key = storageKey(userId);
+    purgeOldUserKey(userId);
+    const key = storageKey(team, userId);
     const raw = localStorage.getItem(key);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
@@ -53,17 +65,15 @@ function loadLocal(team, userId) {
       localStorage.removeItem(key); // stale schema — discard
       return null;
     }
-    // If the saved state belongs to a different team, discard it
-    if (team && parsed._team && parsed._team !== team) {
-      localStorage.removeItem(key);
-      return null;
-    }
     return { ...parsed, board: [] };
   } catch { return null; }
 }
 
 function saveLocal(state, team, userId) {
-  localStorage.setItem(storageKey(userId), JSON.stringify({ ...state, _team: team, _version: STORAGE_VERSION }));
+  localStorage.setItem(
+    storageKey(team, userId),
+    JSON.stringify({ ...state, _team: team, _version: STORAGE_VERSION }),
+  );
 }
 
 function defaultState(team = "") {
@@ -147,15 +157,22 @@ export function useRosterBoard(team, userId) {
     return saved ?? defaultState(team);
   });
 
-  // When team or userId resolves (e.g. auth finishes), reload from localStorage
+  // When team or userId resolves (e.g. auth finishes) OR the team changes,
+  // reload that team's saved roster — or fully reset to defaults if none.
+  // Previously this only patched `settings.program`, which left the prior
+  // team's roster, retention, intl cache, etc. in memory after switching.
   useEffect(() => {
     if (!team && !userId) return;
     const saved = loadLocal(team, userId);
-    if (saved) {
-      _setState(prev => ({ ...saved, board: prev.board }));
-    } else if (!state.settings.program && team) {
-      setState(s => ({ ...s, settings: { ...s.settings, program: team } }));
-    }
+    _setState(prev => {
+      const base = saved ?? defaultState(team);
+      return { ...base, board: prev.board };  // keep the in-memory portal board cache
+    });
+    // Clear the non-state caches that don't belong to the new team. They'll
+    // refill when loadReturningRoster / loadCustomPlayers run for the new team.
+    setReturningPlayers([]);
+    setIncomingTransfers([]);
+    setCustomPlayers([]);
   }, [team, userId]);
 
   function setState(updater) {
@@ -243,6 +260,36 @@ export function useRosterBoard(team, userId) {
       }
       players.forEach(p => { if (statusMap[p.id]) p.player_status = statusMap[p.id]; });
     } catch (_) { /* RLS or column missing — comparison includes all players */ }
+
+    // Reassign committed transfers to their destination team for scoring purposes.
+    // Without this, a player committed to Texas but still in vw_players under his
+    // old school counts toward the old school's roster strength, not Texas's —
+    // so every team's static score systematically misses their incoming class.
+    try {
+      const commitsMap = {};   // player_id → to_team
+      let cPage = 0;
+      while (true) {
+        const { data: cData } = await supabase
+          .from("portal_transfers")
+          .select("player_id, to_team")
+          .gte("season_year", 2026)
+          .eq("status", "committed")
+          .not("to_team", "is", null)
+          .not("player_id", "is", null)
+          .range(cPage * 1000, (cPage + 1) * 1000 - 1);
+        (cData || []).forEach(r => { commitsMap[r.player_id] = r.to_team; });
+        if ((cData || []).length < 1000) break;
+        cPage++;
+      }
+      players.forEach(p => {
+        const dest = commitsMap[p.id];
+        if (dest) {
+          p._original_team = p.team;
+          p.team           = dest;
+          p._committed_to  = dest;
+        }
+      });
+    } catch (_) { /* RLS or table missing — fall back to current_team only */ }
 
     _boardCache = players;
     saveSessionCache(players);
@@ -671,7 +718,13 @@ export function useRosterBoard(team, userId) {
     const maxPerPlayer       = settings.nilTotal * settings.maxPct;
 
     // All returners not definitively leaving — includes undecided/portal/returning
-    const LEAVING_STATUSES = new Set(["graduating", "transferred", "transferring", "entering_portal", "entering_draft"]);
+    // Mirror CMP_LEAVING_STATUSES from AppPage by adding "declared" alongside
+    // its retention-mapped form "entering_draft". Keeps the user's pool and
+    // the every-team baseline filtering on equivalent sets.
+    const LEAVING_STATUSES = new Set([
+      "graduating", "transferred", "transferring",
+      "entering_portal", "entering_draft", "declared",
+    ]);
     const activeRosterReturners = returningPlayers.filter(p => !LEAVING_STATUSES.has(retentionById[p.id] || "returning"));
 
     // Resolve a roster entry against the portal board first, then the intl cache.
@@ -685,8 +738,16 @@ export function useRosterBoard(team, userId) {
     const projectedLow       = rosterPlayers.reduce((sum, p) => sum + (p.marketLow  || 0), 0);
     const projectedHigh      = rosterPlayers.reduce((sum, p) => sum + (p.marketHigh || 0), 0);
 
-    // BTP Roster Score — same formula as Portal Rankings, adapted to p.stats shape
-    const SLOT_WEIGHTS = [1.0, 0.55, 0.30, 0.15, 0.08];
+    // BTP Roster Score — matches RosterStrengthPanel exactly.
+    // Starter slots get weight 1.00, next 3 off the bench get 0.20, depth 0.04.
+    // International players are excluded from this score; they appear in the
+    // roster table but not in the strength calc.
+    const STARTERS = { Guard: 2, Wing: 2, Big: 1 };
+    function slotWeight(i, n) {
+      if (i < n)         return 1.00;
+      if (i < n + 3)     return 0.20;
+      return 0.04;
+    }
     // Players whose most recent stats are from a prior season (didn't play enough this year)
     // but had meaningful minutes that year get an 80% NIL discount to reflect uncertainty.
     const CURRENT_STATS_YEAR = 2025;  // most recently completed season's calendar_year
@@ -706,21 +767,30 @@ export function useRosterBoard(team, userId) {
       const market = (p.marketHigh || 0) * (isPriorYearEval(p) ? 0.8 : 1.0);
       return sei * 0.50 + market * 0.15 + ath * 0.13 + ris * 0.08 + dds * 0.08 + cdi * 0.06;
     }
+    // Build the scoring pool, then dedupe by id so no player is ever counted
+    // twice through slot weights — accidental overlap between activeReturners
+    // and state.roster (or any other source) would otherwise inflate the
+    // weighted contribution.
+    const _seen = new Set();
     const scoringPool = [
       ...activeRosterReturners.map(p => ({ ...p, _priorYearEval: isPriorYearEval(p) })),
       ...roster.map(r => { const p = lookupRosterPlayer(r); return p ? { ...p, _priorYearEval: isPriorYearEval(p) } : null; }).filter(Boolean),
       ...incomingTransfers.filter(p => !_rosterIds.has(p.id)).map(p => ({ ...p, _priorYearEval: isPriorYearEval(p) })),
-    ];
-    const byPos = {};
+    ].filter(p => {
+      if (!p?.id || _seen.has(p.id)) return false;
+      _seen.add(p.id);
+      return true;
+    });
+    const byPos = { Guard: [], Wing: [], Big: [] };
     scoringPool.forEach(p => {
-      const pos = bucketPosition(p.pos);
-      if (!byPos[pos]) byPos[pos] = [];
-      byPos[pos].push(p);
+      if (p?.source === "intl") return;
+      byPos[bucketPosition(p.pos)].push(p);
     });
     let rosterScore = 0;
-    Object.values(byPos).forEach(group => {
+    Object.entries(byPos).forEach(([pos, group]) => {
+      const n = STARTERS[pos] ?? 0;
       group.sort((a, b) => btpPlayerScore(b) - btpPlayerScore(a))
-           .forEach((p, i) => { rosterScore += btpPlayerScore(p) * (SLOT_WEIGHTS[i] ?? 0.05); });
+           .forEach((p, i) => { rosterScore += btpPlayerScore(p) * slotWeight(i, n); });
     });
 
     const warnings           = [];
