@@ -14,7 +14,7 @@ import { exportRosterPDF }  from "@/lib/exportRoster";
 import { track }            from "@/lib/track";
 import { money, letterGrade, gradeColor, bucketPosition } from "@/lib/display";
 import { MultiSelectFilter, RangeFilter, FilterChips, parseHeight, formatHeight, playerHeightInches } from "@/components/Filters";
-import teamConferences      from "@/data/teamConferences.json";
+import { getTeamConference } from "@/lib/teamLookup";
 
 // Absolute thresholds calibrated against portal rankings score distribution
 function rosterGrade(score) {
@@ -297,7 +297,7 @@ function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], userTeam = ""
       byTeam[p.team].push(p);
     });
     return Object.entries(byTeam).map(([team, players]) => {
-      const conf = teamConferences[team] ?? players[0]?.conf ?? null;
+      const conf = getTeamConference(team) ?? players[0]?.conf ?? null;
       const { score, posScores } = scoreTeamPlayers(players, scorer, lineup);
       return { team, conf, score, posScores, playerCount: players.length };
     });
@@ -338,7 +338,7 @@ function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], userTeam = ""
     return addRanks(scorePool(pool, btpPlayerScoreDisplay));
   }, [allPlayers]);
 
-  const userConf = useMemo(() => teamConferences[userTeam] ?? teamScores.find(t => t.team === userTeam)?.conf ?? null, [teamScores, userTeam]);
+  const userConf = useMemo(() => getTeamConference(userTeam) ?? teamScores.find(t => t.team === userTeam)?.conf ?? null, [teamScores, userTeam]);
 
   // ── Conference team scores ────────────────────────────────────────────────
   // Same scorer as national, just filtered to the conference pool. Committed
@@ -348,7 +348,7 @@ function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], userTeam = ""
     if (!allPlayers.length || !userConf) return [];
     const confPool = allPlayers.filter(p => {
       if (!p.team) return false;
-      const playerConf = teamConferences[p.team] ?? p.conf;
+      const playerConf = getTeamConference(p.team) ?? p.conf;
       if (playerConf !== userConf) return false;
       if (p._committed_to) return true;
       return !CMP_LEAVING_STATUSES.has(p.player_status);

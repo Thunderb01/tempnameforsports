@@ -6,7 +6,7 @@ import { useAuth }         from "@/hooks/useAuth";
 import { useAdminTeam }    from "@/hooks/useAdminTeam";
 import { useRosterBoard }  from "@/hooks/useRosterBoard";
 import { supabase }        from "@/lib/supabase";
-import teamConferences from "@/data/teamConferences.json";
+import { getTeamConference } from "@/lib/teamLookup";
 import { useTeamLogos } from "@/hooks/useTeamLogos";
 import { money, nilValue, nilRange, heightToInches, tierColor, projectedTier } from "@/lib/display";
 import { MultiSelectFilter, RangeFilter, FilterChips, parseHeight, formatHeight, playerHeightInches } from "@/components/Filters";
@@ -236,7 +236,7 @@ export function BoardPage() {
         if (heightMax != null && inches > heightMax) return false;
       }
       if (confFilter.length) {
-        const pConf = teamConferences[p.team] || p.conf;
+        const pConf = getTeamConference(p.team) || p.conf;
         if (!confFilter.includes(pConf)) return false;
       }
       if (stateTerms && !matchesState(p.hometown || "", stateTerms)) return false;
