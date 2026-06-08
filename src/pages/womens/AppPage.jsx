@@ -6,7 +6,7 @@ import { PlayerModal }      from "@/components/PlayerModal";
 import { IntlPlayerModal }  from "@/components/IntlPlayerModal";
 import { PlayerFinder }     from "@/components/PlayerFinder";
 import { useAuth }          from "@/hooks/useAuth";
-import { useRosterBoard }   from "@/hooks/useRosterBoard";
+import { useWomensRosterBoard as useRosterBoard }   from "@/hooks/useWomensRosterBoard";
 import { useAdminTeam }     from "@/hooks/useAdminTeam";
 import { TeamAutocomplete } from "@/components/TeamAutocomplete";
 import { supabase }         from "@/lib/supabase";
@@ -894,7 +894,7 @@ function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], userTeam = ""
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
-export function AppPage() {
+export function WomensAppPage() {
   const { profile, user } = useAuth();
   const userId = user?.id || "";
   const { isAdmin, isNonAffiliate, activeTeam, selectedTeam, setSelectedTeam, allTeams } = useAdminTeam(profile);
@@ -949,7 +949,7 @@ export function AppPage() {
   }, [activeTeam, userId]);
 
   useEffect(() => {
-    supabase.from("portal_transfers").select("player_id, status")
+    supabase.from("w_portal_transfers").select("player_id, status")
       .eq("season_year", 2026).neq("status", "withdrawn").not("player_id", "is", null)
       .then(({ data }) => {
         const uncommitted = new Set();
@@ -974,7 +974,7 @@ export function AppPage() {
       let page = 0;
       while (true) {
         const { data, error } = await supabase
-          .from("international_players")
+          .from("w_international_players")
           .select("*")
           .range(page * 1000, (page + 1) * 1000 - 1);
         if (error) { console.error("intl board fetch:", error); break; }
@@ -1113,7 +1113,7 @@ export function AppPage() {
     if (!drawerOpen || !activeTeam) return;
     setLoadingDrawer(true);
     Promise.all([
-      supabase.from("saved_rosters").select("id, name, created_at, user_id, nil_budget, roster_size, nil_max_pct").eq("team", activeTeam).order("created_at", { ascending: false }),
+      supabase.from("w_saved_rosters").select("id, name, created_at, user_id, nil_budget, roster_size, nil_max_pct").eq("team", activeTeam).order("created_at", { ascending: false }),
       supabase.from("coaches").select("user_id, display_name").eq("team", activeTeam),
     ]).then(([{ data: rosters }, { data: coachRows }]) => {
       const coachMap = {};
@@ -1131,7 +1131,7 @@ export function AppPage() {
     setSaving(true);
     try {
       const { data: row, error: rErr } = await supabase
-        .from("saved_rosters")
+        .from("w_saved_rosters")
         .insert({ name: saveName.trim(), team: activeTeam, user_id: userId, nil_budget: board.state.settings.nilTotal, roster_size: board.state.settings.scholarships, nil_max_pct: board.state.settings.maxPct })
         .select("id").single();
       if (rErr) throw rErr;
@@ -1153,7 +1153,7 @@ export function AppPage() {
 
   async function handleDeleteRoster(rosterId) {
     if (!confirm("Delete this saved roster?")) return;
-    await supabase.from("saved_rosters").delete().eq("id", rosterId);
+    await supabase.from("w_saved_rosters").delete().eq("id", rosterId);
     setMyRosters(prev => prev.filter(r => r.id !== rosterId));
   }
 

@@ -5,8 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
+    "build": "vite build && npm run check:lookups",
+    "preview": "vite preview",
+    "check:lookups": "node scripts/check-lookups.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.2",

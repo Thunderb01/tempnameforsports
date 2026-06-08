@@ -94,3 +94,26 @@ export function SuperAdminRoute() {
 
   return <Outlet />;
 }
+
+/**
+ * Wraps the /w/* women's routes. Admins and superadmins can enter; everyone
+ * else is bounced to /app. Match the M/W toggle's visibility rule in
+ * SiteHeader so the gate and the toggle stay in sync.
+ */
+export function AdminRoute() {
+  const { session, profile, loading } = useAuth();
+  const { isAdmin, isSuperAdmin } = useAdminTeam(profile);
+
+  if (loading) {
+    return (
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", opacity: .4 }}>
+        Loading…
+      </div>
+    );
+  }
+
+  if (!session) return <Navigate to="/login" replace />;
+  if (!isAdmin && !isSuperAdmin) return <Navigate to="/app" replace />;
+
+  return <Outlet />;
+}

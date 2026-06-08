@@ -1,0 +1,609 @@
+import { useState, useEffect, useMemo } from "react";
+import { SiteHeader }      from "@/components/SiteHeader";
+import { PlayerModal }     from "@/components/PlayerModal";
+import { TeamAutocomplete } from "@/components/TeamAutocomplete";
+import { useAuth }         from "@/hooks/useAuth";
+import { useAdminTeam }    from "@/hooks/useAdminTeam";
+import { useWomensRosterBoard as useRosterBoard }  from "@/hooks/useWomensRosterBoard";
+import { supabase }        from "@/lib/supabase";
+import { getTeamConference } from "@/lib/teamLookup";
+import { useTeamLogos } from "@/hooks/useTeamLogos";
+import { money, nilValue, nilRange, heightToInches, tierColor, projectedTier } from "@/lib/display";
+import { MultiSelectFilter, RangeFilter, FilterChips, parseHeight, formatHeight, playerHeightInches } from "@/components/Filters";
+
+// label → getter(player)
+const COLS = [
+  { label: "Player",    get: p => p.name },
+  { label: "Team",      get: p => p.team },
+  { label: "Pos",       get: p => p.pos },
+  { label: "Yr",        get: p => p.year },
+  { label: "Ht",        get: p => p.height   || "—" },
+  { label: "Hometown",  get: p => p.hometown || "—" },
+  { label: "PPG",       get: p => p.stats?.ppg    ?? "—" },
+  { label: "RPG",       get: p => p.stats?.rpg    ?? "—" },
+  { label: "APG",       get: p => p.stats?.apg    ?? "—" },
+  { label: "Mkt Low",   get: p => nilValue(p.marketLow) },
+  { label: "Mkt High",  get: p => nilValue(p.marketHigh) },
+  { label: "To Team",   get: p => p._toTeam || "—" },
+];
+
+
+export function WomensBoardPage() {
+  const { profile, user } = useAuth();
+  const userId = user?.id || "";
+  const { isAdmin, activeTeam, selectedTeam, setSelectedTeam, allTeams } = useAdminTeam(profile);
+  const board = useRosterBoard(activeTeam, userId);
+  const teamLogos = useTeamLogos();
+
+  const [loading,      setLoading]     = useState(true);
+  const [searchInput,  setSearchInput] = useState("");
+  const [search,       setSearch]      = useState("");
+
+  // Debounce search input so the filter doesn't rerun on every keystroke
+  useEffect(() => {
+    const t = setTimeout(() => setSearch(searchInput), 200);
+    return () => clearTimeout(t);
+  }, [searchInput]);
+  const [posFilter,    setPosFilter]   = useState([]);
+  const [yearFilter,   setYearFilter]  = useState([]);
+  const [heightMin,    setHeightMin]   = useState(null);
+  const [heightMax,    setHeightMax]   = useState(null);
+  const [stateFilter,  setStateFilter] = useState("all");
+  const [viewMode,     setViewMode]    = useState("cards"); // "cards" | "table"
+  const [sortKey,   setSortKey]   = useState("Mkt High");
+  const [sortDir,   setSortDir]   = useState("desc");
+  const [modal,     setModal]     = useState(null);
+  const [page,        setPage]        = useState(0);
+  const [portalOnly,        setPortalOnly]        = useState(true);
+  const [includeCommitted,  setIncludeCommitted]  = useState(false);
+  const [includeUnevaluated, setIncludeUnevaluated] = useState(false);
+  const [toTeamFilter,      setToTeamFilter]      = useState("");
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [confFilter,  setConfFilter]  = useState([]);
+  const YEAR_OPTIONS = ["Fr", "RS Fr", "So", "RS So", "Jr", "RS Jr", "Sr", "RS Sr", "Grad", "5th Year"];
+  const conferences = [
+    "A10", "ACC", "AE", "ASun", "Amer",
+    "B10", "B12", "BE", "BSky", "BSth", "BW",
+    "CAA", "CUSA",
+    "Horz",
+    "Ivy",
+    "MAAC", "MAC", "MEAC", "MVC", "MWC",
+    "NEC",
+    "OVC",
+    "Pat",
+    "SB", "SC", "SEC", "SWAC", "Slnd", "Sum",
+    "WAC", "WCC",
+  ];
+
+  const ADVC_FIELDS = [
+    { key: "sei",        label: "Scoring Efficiency", src: "metric" },
+    { key: "ath",        label: "Athleticism",        src: "metric" },
+    { key: "ris",        label: "Rim Impact",         src: "metric" },
+    { key: "dds",        label: "Defending",          src: "metric" },
+    { key: "cdi",        label: "Playmaking",         src: "metric" },
+    { key: "usg",        label: "USG%",                     src: "stat"   },
+    { key: "ppg",        label: "PPG",                      src: "stat"   },
+    { key: "rpg",        label: "RPG",                      src: "stat"   },
+    { key: "apg",        label: "APG",                      src: "stat"   },
+    { key: "marketLow",  label: "NIL Market Low ($)",       src: "player" },
+    { key: "marketHigh", label: "NIL Market High ($)",      src: "player" },
+  ];
+  const emptyAdvc = () => Object.fromEntries(ADVC_FIELDS.map(f => [f.key, { min: "", max: "" }]));
+  const [advcFilters, setAdvcFilters] = useState(emptyAdvc);
+
+  function setAdvc(key, side, val) {
+    setAdvcFilters(prev => ({ ...prev, [key]: { ...prev[key], [side]: val } }));
+  }
+  const advcActive = Object.values(advcFilters).some(f => f.min !== "" || f.max !== "");
+
+  const PAGE_SIZE = 50;
+
+  const players = board.state.board;
+
+  // IDs of portal players who are currently available (uncommitted)
+  const [availableIds, setAvailableIds] = useState(new Set());
+  // IDs of all portal players (uncommitted + committed)
+  const [allPortalIds, setAllPortalIds] = useState(new Set());
+  // from_team / to_team keyed by player_id
+  const [portalInfo, setPortalInfo] = useState({});
+
+  // ── Load board via shared hook ───────────────────────────────────────────────
+  useEffect(() => {
+    setLoading(true);
+    board.loadPortalBoard().then(() => setLoading(false));
+
+    supabase
+      .from("w_portal_transfers")
+      .select("player_id, from_team, to_team, status")
+      .eq("season_year", 2026)
+      .neq("status", "withdrawn")
+      .not("player_id", "is", null)
+      .then(({ data }) => {
+        const uncommitted = new Set();
+        const all = new Set();
+        const info = {};
+        (data || []).forEach(r => {
+          all.add(r.player_id);
+          info[r.player_id] = { from_team: r.from_team, to_team: r.to_team };
+          if (r.status === "uncommitted") uncommitted.add(r.player_id);
+        });
+        setAvailableIds(uncommitted);
+        setAllPortalIds(all);
+        setPortalInfo(info);
+      });
+  }, []);
+
+  // ── Tags ────────────────────────────────────────────────────────────────────
+  // ── State/region → search terms ─────────────────────────────────────────────
+  const STATE_OPTIONS = [
+    { label: "Alabama",        terms: ["AL", "Alabama"] },
+    { label: "Alaska",         terms: ["AK", "Alaska"] },
+    { label: "Arizona",        terms: ["AZ", "Arizona"] },
+    { label: "Arkansas",       terms: ["AR", "Arkansas"] },
+    { label: "California",     terms: ["CA", "California"] },
+    { label: "Colorado",       terms: ["CO", "Colorado"] },
+    { label: "Connecticut",    terms: ["CT", "Connecticut"] },
+    { label: "Delaware",       terms: ["DE", "Delaware"] },
+    { label: "Florida",        terms: ["FL", "Florida"] },
+    { label: "Georgia",        terms: ["GA", "Georgia"] },
+    { label: "Hawaii",         terms: ["HI", "Hawaii"] },
+    { label: "Idaho",          terms: ["ID", "Idaho"] },
+    { label: "Illinois",       terms: ["IL", "Illinois"] },
+    { label: "Indiana",        terms: ["IN", "Indiana"] },
+    { label: "Iowa",           terms: ["IA", "Iowa"] },
+    { label: "Kansas",         terms: ["KS", "Kansas"] },
+    { label: "Kentucky",       terms: ["KY", "Kentucky"] },
+    { label: "Louisiana",      terms: ["LA", "Louisiana"] },
+    { label: "Maine",          terms: ["ME", "Maine"] },
+    { label: "Maryland",       terms: ["MD", "Maryland"] },
+    { label: "Massachusetts",  terms: ["MA", "Massachusetts"] },
+    { label: "Michigan",       terms: ["MI", "Michigan"] },
+    { label: "Minnesota",      terms: ["MN", "Minnesota"] },
+    { label: "Mississippi",    terms: ["MS", "Mississippi"] },
+    { label: "Missouri",       terms: ["MO", "Missouri"] },
+    { label: "Montana",        terms: ["MT", "Montana"] },
+    { label: "Nebraska",       terms: ["NE", "Nebraska"] },
+    { label: "Nevada",         terms: ["NV", "Nevada"] },
+    { label: "New Hampshire",  terms: ["NH", "New Hampshire"] },
+    { label: "New Jersey",     terms: ["NJ", "New Jersey"] },
+    { label: "New Mexico",     terms: ["NM", "New Mexico"] },
+    { label: "New York",       terms: ["NY", "New York"] },
+    { label: "North Carolina", terms: ["NC", "North Carolina"] },
+    { label: "North Dakota",   terms: ["ND", "North Dakota"] },
+    { label: "Ohio",           terms: ["OH", "Ohio"] },
+    { label: "Oklahoma",       terms: ["OK", "Oklahoma"] },
+    { label: "Oregon",         terms: ["OR", "Oregon"] },
+    { label: "Pennsylvania",   terms: ["PA", "Pennsylvania"] },
+    { label: "Rhode Island",   terms: ["RI", "Rhode Island"] },
+    { label: "South Carolina", terms: ["SC", "South Carolina"] },
+    { label: "South Dakota",   terms: ["SD", "South Dakota"] },
+    { label: "Tennessee",      terms: ["TN", "Tennessee"] },
+    { label: "Texas",          terms: ["TX", "Texas"] },
+    { label: "Utah",           terms: ["UT", "Utah"] },
+    { label: "Vermont",        terms: ["VT", "Vermont"] },
+    { label: "Virginia",       terms: ["VA", "Virginia"] },
+    { label: "Washington",     terms: ["WA", "Washington"] },
+    { label: "West Virginia",  terms: ["WV", "West Virginia"] },
+    { label: "Wisconsin",      terms: ["WI", "Wisconsin"] },
+    { label: "Wyoming",        terms: ["WY", "Wyoming"] },
+    { label: "Washington D.C.",terms: ["D.C.", "Washington DC", "Washington, DC"] },
+    // International
+    { label: "Australia",      terms: ["Australia"] },
+    { label: "Bahamas",        terms: ["Bahamas"] },
+    { label: "Cameroon",       terms: ["Cameroon"] },
+    { label: "Canada",         terms: ["Canada"] },
+    { label: "Congo / DRC",    terms: ["Congo", "Kinshasa"] },
+    { label: "France",         terms: ["France"] },
+    { label: "Germany",        terms: ["Germany"] },
+    { label: "Ghana",          terms: ["Ghana"] },
+    { label: "Guinea",         terms: ["Guinea"] },
+    { label: "Lithuania",      terms: ["Lithuania"] },
+    { label: "Mali",           terms: ["Mali"] },
+    { label: "Nigeria",        terms: ["Nigeria"] },
+    { label: "Senegal",        terms: ["Senegal"] },
+    { label: "Serbia",         terms: ["Serbia"] },
+    { label: "South Sudan",    terms: ["South Sudan"] },
+    { label: "Spain",          terms: ["Spain"] },
+    { label: "United Kingdom", terms: ["England", "United Kingdom", "UK"] },
+  ];
+
+  function matchesState(hometown, terms) {
+    if (!hometown) return false;
+    return terms.some(t => hometown.includes(t));
+  }
+
+
+  // Reset to page 0 whenever filters or sort change
+  useEffect(() => setPage(0), [search, posFilter, yearFilter, heightMin, heightMax, stateFilter, confFilter, sortKey, sortDir, portalOnly, includeCommitted, includeUnevaluated, advcFilters, toTeamFilter]);
+
+  // ── Filter ──────────────────────────────────────────────────────────────────
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const stateTerms = stateFilter !== "all"
+      ? STATE_OPTIONS.find(o => o.label === stateFilter)?.terms ?? []
+      : null;
+
+    return players.filter(p => {
+      if (q && !p.name.toLowerCase().includes(q) &&
+               !(p.team||"").toLowerCase().includes(q) &&
+               !(p.hometown||"").toLowerCase().includes(q)) return false;
+      if (posFilter.length  && !posFilter.includes(p.pos))   return false;
+      if (yearFilter.length && !yearFilter.includes(p.year)) return false;
+      if (heightMin != null || heightMax != null) {
+        const inches = playerHeightInches(p.height);
+        if (inches == null) return false;
+        if (heightMin != null && inches < heightMin) return false;
+        if (heightMax != null && inches > heightMax) return false;
+      }
+      if (confFilter.length) {
+        const pConf = getTeamConference(p.team) || p.conf;
+        if (!confFilter.includes(pConf)) return false;
+      }
+      if (stateTerms && !matchesState(p.hometown || "", stateTerms)) return false;
+      if (!includeUnevaluated && !(p.marketHigh > 0)) return false;
+      if (toTeamFilter.trim()) {
+        const dest = (portalInfo[p.id]?.to_team || "").toLowerCase();
+        if (!dest.includes(toTeamFilter.trim().toLowerCase())) return false;
+      }
+      if (portalOnly) {
+        const portalSet = includeCommitted ? allPortalIds : availableIds;
+        if (!portalSet.has(p.id)) return false;
+      }
+      for (const f of ADVC_FIELDS) {
+        const val = f.src === "player" ? p[f.key] : p.stats?.[f.key];
+        const { min, max } = advcFilters[f.key];
+        if (min !== "" && (val == null || Number(val) < Number(min))) return false;
+        if (max !== "" && (val == null || Number(val) > Number(max))) return false;
+      }
+      return true;
+    });
+  }, [players, search, posFilter, yearFilter, heightMin, heightMax, confFilter, stateFilter, portalOnly, includeCommitted, includeUnevaluated, advcFilters, toTeamFilter, availableIds, allPortalIds, portalInfo]);
+
+  // ── Sort (separate so filter changes don't re-sort and vice versa) ──────────
+  const sorted = useMemo(() => {
+    if (!sortKey) return filtered;
+    const col = COLS.find(c => c.label === sortKey);
+    if (!col) return filtered;
+    return [...filtered].sort((a, b) => {
+      const av = col.get(a);
+      const bv = col.get(b);
+      let cmp;
+      if (sortKey === "Ht") {
+        cmp = heightToInches(av) - heightToInches(bv);
+      } else {
+        const an = parseFloat(String(av).replace(/[%,$,—]/g, ""));
+        const bn = parseFloat(String(bv).replace(/[%,$,—]/g, ""));
+        cmp = !isNaN(an) && !isNaN(bn)
+          ? an - bn
+          : String(av).localeCompare(String(bv));
+      }
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+  }, [filtered, sortKey, sortDir]);
+
+  // ── Roster state helpers (delegated to shared useRosterBoard hook) ──────────
+  function inRoster(id)    { return board.inRoster(id); }
+  function inShortlist(id) { return board.inShort(id); }
+
+  function addToRoster(id) {
+    // board.addToRoster uses byId which only knows board state from the hook's load.
+    // Since BoardPage loads its own players list, we seed the board state first if needed.
+    board.addToRoster(id);
+  }
+
+  function addToShortlist(id) {
+    board.addToShortlist(id);
+  }
+
+  function setStatus(id, key) {
+    board.setStatus(id, key);
+  }
+
+  // ── Sort handler ─────────────────────────────────────────────────────────────
+  function handleSort(label) {
+    setSortDir(prev => sortKey === label && prev === "asc" ? "desc" : "asc");
+    setSortKey(label);
+  }
+
+  // ── Render ─────────────────────────────────────────────────────────────────
+  return (
+    <>
+      <SiteHeader />
+      <div className="app-shell">
+        <div className="app-top">
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+            <h1 style={{ margin: 0 }}>Full Board</h1>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              {isAdmin && (
+                <TeamAutocomplete
+                  value={selectedTeam}
+                  onChange={setSelectedTeam}
+                  teams={allTeams}
+                  placeholder="Select team…"
+                />
+              )}
+              <button className="btn btn-ghost" style={{ position: "relative" }}
+                onClick={() => setShowAdvanced(v => !v)}>
+                Advanced Filters
+                {advcActive && <span style={{ position: "absolute", top: 4, right: 4, width: 7, height: 7, borderRadius: "50%", background: "var(--accent, #6c8ebf)" }} />}
+              </button>
+              <button className="btn btn-ghost" onClick={() => setViewMode(v => v === "cards" ? "table" : "cards")}>
+                {viewMode === "cards" ? "Table View" : "Card View"}
+              </button>
+            </div>
+          </div>
+
+          {/* Filters */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 }}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+              <input className="input" type="search" placeholder="Search players…"
+                style={{ flex: 1, minWidth: 160 }}
+                value={searchInput} onChange={e => setSearchInput(e.target.value)} />
+              <input className="input" type="search" placeholder="Transferring to…"
+                style={{ flex: 1, minWidth: 160 }}
+                value={toTeamFilter} onChange={e => setToTeamFilter(e.target.value)} />
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+              <MultiSelectFilter label="positions" options={["Guard", "Wing", "Big"]} value={posFilter}  onChange={setPosFilter}  width={130} />
+              <MultiSelectFilter label="years"     options={YEAR_OPTIONS}             value={yearFilter} onChange={setYearFilter} width={120} />
+              <MultiSelectFilter label="confs"     options={conferences}              value={confFilter} onChange={setConfFilter} width={140} />
+              <RangeFilter
+                label="Ht"
+                min={heightMin} max={heightMax}
+                onChange={(lo, hi) => { setHeightMin(lo); setHeightMax(hi); }}
+                parse={parseHeight} format={formatHeight}
+                placeholder={[`min`, `max`]} width={60}
+              />
+              <select className="input" style={{ width: 160 }} value={stateFilter} onChange={e => setStateFilter(e.target.value)}>
+                <option value="all">All locations</option>
+                {STATE_OPTIONS.map(o => <option key={o.label} value={o.label}>{o.label}</option>)}
+              </select>
+              <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, opacity: .7, cursor: "pointer", userSelect: "none" }}>
+                <input type="checkbox" checked={portalOnly} onChange={e => setPortalOnly(e.target.checked)} />
+                Available in portal
+              </label>
+              <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, opacity: portalOnly ? .7 : .3, cursor: portalOnly ? "pointer" : "default", userSelect: "none", paddingLeft: 10, borderLeft: "2px solid rgba(255,255,255,.1)" }}>
+                <input type="checkbox" checked={includeCommitted} disabled={!portalOnly} onChange={e => setIncludeCommitted(e.target.checked)} />
+                + already committed
+              </label>
+              <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, opacity: .7, cursor: "pointer", userSelect: "none" }}>
+                <input type="checkbox" checked={includeUnevaluated} onChange={e => setIncludeUnevaluated(e.target.checked)} />
+                Show unevaluated
+              </label>
+            </div>
+
+            <FilterChips
+              items={[
+                ...posFilter.map(p => ({ label: `Pos: ${p}`,  onClear: () => setPosFilter(posFilter.filter(x => x !== p)) })),
+                ...yearFilter.map(y => ({ label: `Yr: ${y}`,  onClear: () => setYearFilter(yearFilter.filter(x => x !== y)) })),
+                ...confFilter.map(c => ({ label: `Conf: ${c}`, onClear: () => setConfFilter(confFilter.filter(x => x !== c)) })),
+                ...(heightMin != null ? [{ label: `Ht ≥ ${formatHeight(heightMin)}`, onClear: () => setHeightMin(null) }] : []),
+                ...(heightMax != null ? [{ label: `Ht ≤ ${formatHeight(heightMax)}`, onClear: () => setHeightMax(null) }] : []),
+                ...(stateFilter !== "all" ? [{ label: `Loc: ${stateFilter}`, onClear: () => setStateFilter("all") }] : []),
+              ]}
+              onClearAll={() => {
+                setPosFilter([]); setYearFilter([]); setConfFilter([]);
+                setHeightMin(null); setHeightMax(null); setStateFilter("all");
+              }}
+            />
+          </div>
+
+          {/* Advanced filter panel */}
+          {showAdvanced && (
+            <div style={{
+              background: "var(--panel)", border: "1px solid var(--border)",
+              borderRadius: 10, padding: "16px 20px", marginBottom: 14,
+            }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                <span style={{ fontWeight: 600, fontSize: 14 }}>Advanced Filters</span>
+                <button className="btn btn-ghost" style={{ fontSize: 12, padding: "2px 10px" }}
+                  onClick={() => setAdvcFilters(emptyAdvc())}>
+                  Clear all
+                </button>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px 32px" }}>
+                {ADVC_FIELDS.map(f => (
+                  <div key={f.key}>
+                    <div style={{ fontSize: 12, opacity: .6, marginBottom: 4 }}>{f.label}</div>
+                    <input className="input" type="number" placeholder="Min"
+                      style={{ width: "100%", fontSize: 13 }}
+                      value={advcFilters[f.key].min}
+                      onChange={e => setAdvc(f.key, "min", e.target.value)} />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div style={{ fontSize: 12, opacity: .45, marginBottom: 10 }}>
+            {loading ? "Loading…" : `${sorted.length} of ${players.length} players`}
+            {viewMode === "table" && !loading && " · click header to sort"}
+          </div>
+
+        </div>
+
+        {/* Card view */}
+        {viewMode === "cards" && !loading && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+            {sorted.length === 0
+              ? <div className="empty">No players match your filters.</div>
+              : sorted.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE).map(p => {
+                  return (
+                    <div key={p.id} className="row row-click"
+                      style={{ background: "var(--panel)", borderRadius: 8, marginBottom: 2 }}
+                      onClick={e => { if (!e.target.closest("button,select")) setModal(p); }}>
+                      <div className="row-main">
+                        <div className="row-title">{p.name}</div>
+                        <div className="row-sub">
+                          {[p.team, p.pos, p.year, p.height, p.hometown].filter(Boolean).join(" · ")}
+                        </div>
+                        {portalInfo[p.id] && (() => {
+                          const { from_team, to_team } = portalInfo[p.id];
+                          const fromLogo = teamLogos[from_team];
+                          const toLogo   = to_team ? teamLogos[to_team] : null;
+                          const circleStyle = { width: 32, height: 32, borderRadius: "50%", background: "rgba(255,255,255,.07)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, overflow: "hidden" };
+                          const imgStyle = { width: "70%", height: "70%", objectFit: "contain" };
+                          return (
+                            <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 5 }}>
+                              {fromLogo
+                                ? <div style={circleStyle}><img src={fromLogo} alt={from_team} style={imgStyle} onError={e => { e.target.style.display = "none"; }} /></div>
+                                : <div style={{ ...circleStyle, fontSize: 10, opacity: .35 }}>?</div>
+                              }
+                              <span style={{ fontSize: 11, opacity: .35 }}>{from_team || "?"}</span>
+                              <span style={{ fontSize: 11, opacity: .3, margin: "0 2px" }}>→</span>
+                              {toLogo
+                                ? <div style={circleStyle}><img src={toLogo} alt={to_team} style={imgStyle} onError={e => { e.target.style.display = "none"; }} /></div>
+                                : <div style={{ ...circleStyle, fontSize: 10, opacity: .35 }}>?</div>
+                              }
+                              {to_team
+                                ? <span style={{ fontSize: 11, fontWeight: 600, color: "#5b9cf6" }}>{to_team}</span>
+                                : <span style={{ fontSize: 11, opacity: .3 }}>Undecided</span>
+                              }
+                            </div>
+                          );
+                        })()}
+                        <div className="row-sub">Market: {nilRange(p.marketLow, p.marketHigh)}</div>
+                        {(() => {
+                          const s = p.stats || {};
+                          const st = v => v != null && String(v) !== "NaN" ? Number(v).toFixed(1) : null;
+                          const line = [
+                            st(s.usg)  && `USG ${st(s.usg)}`,
+                            st(s.ppg)  && `PPG ${st(s.ppg)}`,
+                            st(s.rpg)  && `RPG ${st(s.rpg)}`,
+                            st(s.apg)  && `APG ${st(s.apg)}`,
+                          ].filter(Boolean).join("  ·  ");
+                          return line ? <div className="row-sub" style={{ opacity: .75 }}>{line}</div> : null;
+                        })()}
+                        {p.nilValuation > 0 && (() => {
+                          const label = projectedTier(p.nilValuation);
+                          const color = tierColor(label);
+                          return (
+                            <div style={{ marginTop: 6, display: "inline-block", padding: "2px 8px", borderRadius: 20, fontSize: 11, fontWeight: 600, background: `${color}22`, color, border: `1px solid ${color}55` }}>
+                              {label}
+                            </div>
+                          );
+                        })()}
+                      </div>
+                      <div className="row-actions">
+                        <button className="btn btn-ghost"
+                          disabled={inShortlist(p.id) || inRoster(p.id)}
+                          onClick={e => { e.stopPropagation(); addToShortlist(p.id); }}>
+                          Shortlist
+                        </button>
+                        <button className="btn btn-primary"
+                          disabled={inRoster(p.id)}
+                          onClick={e => { e.stopPropagation(); addToRoster(p.id); }}>
+                          Roster
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+            }
+          </div>
+        )}
+
+        {/* Table view */}
+        {viewMode === "table" && !loading && (
+          <div style={{ overflowX: "auto" }}>
+            {sorted.length === 0
+              ? <div className="empty">No players match your filters.</div>
+              : (
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                  <thead>
+                    <tr>
+                      <th style={thStyle}>Action</th>
+                      {COLS.map(col => (
+                        <th key={col.label} style={{ ...thStyle, cursor: "pointer", userSelect: "none" }}
+                          onClick={() => handleSort(col.label)}>
+                          {col.label}{" "}
+                          <span style={{ opacity: sortKey === col.label ? 1 : 0.25 }}>
+                            {sortKey === col.label && sortDir === "desc" ? "▼" : "▲"}
+                          </span>
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sorted.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE).map(p => {
+                      const row = { ...p, _toTeam: portalInfo[p.id]?.to_team || "—" };
+                      return (
+                        <tr key={p.id} className="row-click"
+                          onClick={e => { if (!e.target.closest("button,select")) setModal(p); }}
+                          style={{ borderBottom: "1px solid var(--border)" }}>
+                          <td style={tdStyle}>
+                            <button className="btn btn-primary" style={{ fontSize: 11, padding: "3px 8px" }}
+                              disabled={inRoster(p.id)}
+                              onClick={e => { e.stopPropagation(); addToRoster(p.id); }}>
+                              Roster
+                            </button>{" "}
+                            <button className="btn btn-ghost" style={{ fontSize: 11, padding: "3px 8px" }}
+                              disabled={inShortlist(p.id) || inRoster(p.id)}
+                              onClick={e => { e.stopPropagation(); addToShortlist(p.id); }}>
+                              Shortlist
+                            </button>
+                          </td>
+                          {COLS.map(col => (
+                            <td key={col.label} style={tdStyle}>{col.get(row)}</td>
+                          ))}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )
+            }
+          </div>
+        )}
+
+        {/* ── Pagination ── */}
+        {!loading && sorted.length > PAGE_SIZE && (
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12, marginTop: 20 }}>
+            <button className="btn btn-ghost" disabled={page === 0} onClick={() => setPage(p => p - 1)}>
+              ← Prev
+            </button>
+            <span style={{ fontSize: 13, opacity: .55 }}>
+              Page {page + 1} of {Math.ceil(sorted.length / PAGE_SIZE)}
+            </span>
+            <button className="btn btn-ghost" disabled={(page + 1) * PAGE_SIZE >= sorted.length} onClick={() => setPage(p => p + 1)}>
+              Next →
+            </button>
+          </div>
+        )}
+
+        {/* ── Disclaimer ── */}
+        <div style={{ marginTop: 24, textAlign: "center", fontSize: 11, opacity: .4 }}>
+          This is a Demo, all valuations are dynamic and subject to change. 
+        </div>
+      </div>
+
+      {modal && (
+        <PlayerModal
+          player={modal}
+          status={board.state.statusById?.[modal.id]}
+          onStatus={setStatus}
+          onClose={() => setModal(null)}
+        />
+      )}
+    </>
+  );
+}
+
+const thStyle = {
+  padding: "10px 12px",
+  textAlign: "left",
+  background: "rgba(0,0,0,.6)",
+  backdropFilter: "blur(6px)",
+  position: "sticky",
+  top: 0,
+  whiteSpace: "nowrap",
+  borderBottom: "1px solid var(--border)",
+  fontWeight: 500,
+  fontSize: 12,
+};
+
+const tdStyle = {
+  padding: "8px 12px",
+  whiteSpace: "nowrap",
+  verticalAlign: "middle",
+};

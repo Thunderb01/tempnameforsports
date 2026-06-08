@@ -4,7 +4,7 @@ import { money, bucketPosition } from "@/lib/display";
 
 
 // Module-level caches so data survives page navigation without re-fetching.
-const SESSION_BOARD_KEY = "bp_board_cache";
+const SESSION_BOARD_KEY = "bp_w_board_cache";
 const SESSION_BOARD_TTL  = 4 * 60 * 60 * 1000; // 4 hours
 const SESSION_BOARD_VER  = 6; // bump to invalidate all cached sessions
 
@@ -32,11 +32,11 @@ const _incomingCache = {}; // keyed by teamName
 export function getBoardCache() { return _boardCache; }
 export function setBoardCache(players) { _boardCache = players; }
 
-const STORAGE_KEY_PREFIX = "bp_roster_builder";
+const STORAGE_KEY_PREFIX = "bp_w_roster_builder";
 const STORAGE_VERSION    = 15; // bump this whenever the state shape changes
 
 // Legacy keys to purge on load
-const LEGACY_KEYS = ["bp_roster_builder_v1", "bp_roster_builder"];
+const LEGACY_KEYS = []; // no legacy women's keys to purge
 
 // Each (user, team) pair gets its own slot so switching teams loads the right
 // roster and edits to one team don't bleed into another.
@@ -151,7 +151,7 @@ function mapIntlPlayer(p) {
  * All roster-builder state in one hook.
  * Components just call the returned actions — no state management needed inline.
  */
-export function useRosterBoard(team, userId) {
+export function useWomensRosterBoard(team, userId) {
   const [state, _setState] = useState(() => {
     const saved = loadLocal(team, userId);
     return saved ?? defaultState(team);
@@ -199,7 +199,7 @@ export function useRosterBoard(team, userId) {
     let page = 0;
     while (true) {
       const { data, error } = await supabase
-        .from("vw_players")
+        .from("vw_w_players")
         .select("*")
         .order("name")
         .range(page * PAGE, (page + 1) * PAGE - 1);
@@ -250,7 +250,7 @@ export function useRosterBoard(team, userId) {
       let sPage = 0;
       while (true) {
         const { data: sData } = await supabase
-          .from("players")
+          .from("w_players")
           .select("id, player_status")
           .not("player_status", "is", null)
           .range(sPage * 1000, (sPage + 1) * 1000 - 1);
@@ -270,7 +270,7 @@ export function useRosterBoard(team, userId) {
       let cPage = 0;
       while (true) {
         const { data: cData } = await supabase
-          .from("portal_transfers")
+          .from("w_portal_transfers")
           .select("player_id, to_team")
           .gte("season_year", 2026)
           .eq("status", "committed")
@@ -311,7 +311,7 @@ export function useRosterBoard(team, userId) {
       setReturningPlayers(returning);
     } else {
       const { data: teamData, error: teamError } = await supabase
-        .from("team_players")
+        .from("w_team_players")
         .select("player_id")
         .eq("team", teamName);
 
@@ -324,7 +324,7 @@ export function useRosterBoard(team, userId) {
       }
 
       const { data, error } = await supabase
-        .from("vw_players")
+        .from("vw_w_players")
         .select("*")
         .in("id", ids);
 
@@ -361,20 +361,20 @@ export function useRosterBoard(team, userId) {
 
     const [{ data: portalData }, { data: incomingPortalData }, { data: playerStatusData }] = await Promise.all([
       supabase
-        .from("portal_transfers")
+        .from("w_portal_transfers")
         .select("player_id, status")
         .gte("season_year", 2026)
         .neq("status", "withdrawn")
         .in("player_id", returningIds),
       supabase
-        .from("portal_transfers")
+        .from("w_portal_transfers")
         .select("player_id")
         .gte("season_year", 2026)
         .eq("status", "committed")
         .ilike("to_team", teamName)
         .not("player_id", "is", null),
       supabase
-        .from("players")
+        .from("w_players")
         .select("id, player_status")
         .in("id", returningIds)
         .not("player_status", "is", null),
@@ -391,7 +391,7 @@ export function useRosterBoard(team, userId) {
       setIncomingTransfers(incomingMapped);
     } else if (incomingIds.length > 0) {
       const { data: incomingData } = await supabase
-        .from("vw_players")
+        .from("vw_w_players")
         .select("*")
         .in("id", incomingIds);
       incomingMapped = (incomingData || []).map(row => ({
@@ -439,7 +439,7 @@ export function useRosterBoard(team, userId) {
     // this team gets auto-added to the roster as a source="intl" entry.
     try {
       const { data: intlCommitted } = await supabase
-        .from("international_players")
+        .from("w_international_players")
         .select("*")
         .ilike("committed_team", teamName)
         .in("player_status", ["committed", "signed"]);
@@ -522,7 +522,7 @@ export function useRosterBoard(team, userId) {
   const loadCustomPlayers = useCallback(async (teamName, uid) => {
     if (!teamName || !uid) return;
     const { data, error } = await supabase
-      .from("custom_roster_players")
+      .from("w_custom_roster_players")
       .select("*")
       .eq("team", teamName)
       .eq("user_id", uid)
@@ -534,7 +534,7 @@ export function useRosterBoard(team, userId) {
   async function addCustomPlayer({ name, nil_offer = 0, pos = "", year_label = "FR" }, teamName, uid) {
     if (!name.trim() || !teamName || !uid) return;
     const { data, error } = await supabase
-      .from("custom_roster_players")
+      .from("w_custom_roster_players")
       .insert({ name: name.trim(), nil_offer: Number(nil_offer) || 0, pos, year_label, team: teamName, user_id: uid })
       .select()
       .single();
@@ -543,7 +543,7 @@ export function useRosterBoard(team, userId) {
   }
 
   async function removeCustomPlayer(id) {
-    const { error } = await supabase.from("custom_roster_players").delete().eq("id", id);
+    const { error } = await supabase.from("w_custom_roster_players").delete().eq("id", id);
     if (error) { console.error("remove custom player:", error); return; }
     setCustomPlayers(prev => prev.filter(p => p.id !== id));
   }
@@ -556,7 +556,7 @@ export function useRosterBoard(team, userId) {
 
   async function persistCustomPlayerNil(id, nil_offer) {
     const val = Math.max(0, Number(nil_offer) || 0);
-    const { error } = await supabase.from("custom_roster_players").update({ nil_offer: val }).eq("id", id);
+    const { error } = await supabase.from("w_custom_roster_players").update({ nil_offer: val }).eq("id", id);
     if (error) console.error("persist custom player nil:", error);
   }
 
