@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import teams from "@/data/allTeams.json";
+import { ALL_TEAMS as teams } from "@/lib/teamLookup";
 
 const ADMIN_TEAM_KEY = "bp_admin_selected_team";
 

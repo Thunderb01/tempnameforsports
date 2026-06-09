@@ -1,111 +1,139 @@
 // ── teamLookup.js ─────────────────────────────────────────────────────────────
-// One-stop helper for resolving a team's conference. Used to live as a raw
-// `teamConferences[team]` lookup against a static JSON, which constantly
-// missed because the JSON uses "Murray St." and vw_players uses "Murray State"
-// (or "Murray State (2 Yrs)" when stale player metadata leaks through).
+// SINGLE source of truth for every team: data/team_conferences.csv
 //
-// The fix has two layers:
-//   1. A `normalizeTeamName` pass that strips noise (trailing parens, periods,
-//      whitespace, case) and collapses common abbreviations into a canonical
-//      form ("Saint X" → "st x", "X State" → "x st").
-//   2. A small `EXPLICIT_ALIASES` map for names normalization can't handle
-//      cleanly (Loyola variants, Miami FL/OH disambiguation, etc.).
+//   team,conference,aliases
+//   Connecticut,BE,UConn
+//   McNeese,Slnd,McNeese State|McNeese St.
+//   Miami,ACC,Miami FL|Miami (FL)|Miami Florida
+//   Miami (OH),MAC,Miami OH|Miami Ohio
 //
-// Call `getTeamConference(name)` everywhere instead of indexing the JSON
-// directly. The JSON itself stays untouched.
+// Each row defines ONE school by its canonical name (the "team" column,
+// matching what's stored in vw_players.current_team), its conference, and a
+// pipe-separated list of alias spellings that should all resolve to the same
+// school. To add a team, fix a conference, or add a new alias, edit that
+// CSV row — nothing else in the codebase needs to change.
+//
+// On module load this file:
+//   1. Parses the CSV.
+//   2. Builds an index mapping every variant (canonical AND each alias),
+//      after running it through the spelling-normalizer, to the canonical
+//      team name + conference.
+//
+// Three public functions read off that index:
+//   - getTeamConference(team)    → conference code or null
+//   - getCanonicalTeamName(team) → canonical team name (falls back to input)
+//   - ALL_TEAMS                  → sorted array of canonical team names
+//
+// The CSV-driven design replaces the hand-maintained EXPLICIT_ALIASES map
+// that used to live in this file. New aliases now go in the CSV alongside
+// the team they belong to, so it's impossible to add an alias that points
+// at a non-existent team.
 
-import teamConferences from "@/data/teamConferences.json";
+import csvText from "@data/team_conferences.csv?raw";
 
 // ── Normalization ────────────────────────────────────────────────────────────
+// Strip stale "(N Yrs)" / "(N Years)" markers leaked from player metadata,
+// e.g. "Murray State (2 Yrs)". Intentionally LEAVES disambiguating tags like
+// "(OH)" / "(IL)" / "(MD)" alone — those are part of the canonical name.
 function stripParenSuffix(s) {
-  // "Murray State (2 Yrs)" → "Murray State"
-  return s.replace(/\s*\([^)]*\)\s*$/, "");
+  return s.replace(/\s*\(\s*\d+\s*(?:yrs?|years?)\s*\)\s*$/i, "");
 }
 
 export function normalizeTeamName(name) {
   if (!name) return "";
   let n = stripParenSuffix(String(name)).trim().toLowerCase();
-  // "X State" → "X St" so it matches the JSON's "Murray St." form
+  // "X State" → "x st" so Torvik-style and DB-style names normalize together
   n = n.replace(/\bstate\b/g, "st");
-  // "Saint Mary's" → "St Mary's"
-  n = n.replace(/^saint\b/, "st");
-  n = n.replace(/\bsaint\b/g, "st");
-  // Drop periods and apostrophes; collapse extra whitespace
-  n = n.replace(/[.']/g, "");
-  n = n.replace(/\s+/g, " ").trim();
+  // "Saint Mary's" → "st mary's"
+  n = n.replace(/^saint\b/, "st").replace(/\bsaint\b/g, "st");
+  // Drop periods and apostrophes; collapse whitespace
+  n = n.replace(/[.']/g, "").replace(/\s+/g, " ").trim();
   return n;
 }
 
-// ── Explicit aliases ─────────────────────────────────────────────────────────
-// Map of (normalized variant) → (canonical normalized key that exists in JSON).
-// These cover cases the regex normalizer can't resolve on its own — typically
-// when the same school is referred to by two genuinely different strings.
-const EXPLICIT_ALIASES = {
-  // Loyola variants — three schools share the name
-  "loyola chicago": "loyola (il)",
-  "loyola il":      "loyola (il)",
-  "loyola md":      "loyola (md)",
-  "loyola maryland": "loyola (md)",
-  "loyola marymount": "loyola marymount",
-  // Miami variants
-  "miami fl":       "miami (fl)",
-  "miami florida":  "miami (fl)",
-  "miami oh":       "miami (oh)",
-  "miami ohio":     "miami (oh)",
-  // Mount St. Mary's
-  "mt st marys":    "mount st marys",
-  "mount saint marys": "mount st marys",
-  // BYU / Brigham Young
-  "brigham young":  "byu",
-  // Pittsburgh
-  "pittsburgh":     "pitt",
-  // North/South Carolina
-  "north carolina state": "nc st",
-  "n c state":      "nc st",
-  // UNC
-  "unc":            "north carolina",
-  // UConn
-  "uconn":          "connecticut",
-  // SMU
-  "southern methodist": "smu",
-  // TCU
-  "texas christian": "tcu",
-  // UCF
-  "central florida": "ucf",
-  // USC
-  "southern california": "usc",
-  // UAB
-  "alabama-birmingham": "uab",
-  // UTEP / UTSA
-  "texas el paso":  "utep",
-  "texas-el paso":  "utep",
-  "texas san antonio": "utsa",
-  "texas-san antonio": "utsa",
-  // FIU / FAU
-  "florida international": "fiu",
-  "florida atlantic":      "fau",
-  // LIU
-  "long island":    "liu",
-  "long island u":  "liu",
-};
-
-// ── Pre-build the normalized index once ──────────────────────────────────────
-const _index = {};
-for (const [team, conf] of Object.entries(teamConferences)) {
-  _index[normalizeTeamName(team)] = conf;
+// ── Parse CSV ────────────────────────────────────────────────────────────────
+function parseCSV(text) {
+  const rows = [];
+  const lines = text.split(/\r?\n/);
+  for (let i = 1; i < lines.length; i++) {  // skip header
+    const raw = lines[i];
+    if (!raw || !raw.trim()) continue;
+    // 3 columns: team, conference, aliases. Aliases is the only field that
+    // could (in principle) contain a comma, but ours uses `|` to separate,
+    // so a plain split is fine. Defensive: take the first two commas as
+    // field boundaries and treat everything after as the aliases blob.
+    const i1 = raw.indexOf(",");
+    const i2 = raw.indexOf(",", i1 + 1);
+    if (i1 < 0 || i2 < 0) continue;
+    const team    = raw.slice(0, i1).trim();
+    const conf    = raw.slice(i1 + 1, i2).trim();
+    const aliases = raw.slice(i2 + 1).trim();
+    if (!team) continue;
+    const aliasList = aliases ? aliases.split("|").map(s => s.trim()).filter(Boolean) : [];
+    rows.push({ team, conf, aliases: aliasList });
+  }
+  return rows;
 }
 
-// ── Public lookup ────────────────────────────────────────────────────────────
-export function getTeamConference(team) {
+// ── Build the lookup index ───────────────────────────────────────────────────
+// Every variant (canonical + each alias), once normalized, maps to a single
+// { canonical, conf } record. The same variant pointing at two canonicals is
+// a data bug; we log it and last-write-wins so something still resolves.
+const _byNorm = {};
+const _canonicalConfs = {};
+const _canonicalSet = new Set();
+
+const _rows = parseCSV(csvText);
+for (const { team, conf, aliases } of _rows) {
+  _canonicalSet.add(team);
+  if (conf) _canonicalConfs[team] = conf;
+  const variants = [team, ...aliases];
+  for (const v of variants) {
+    const norm = normalizeTeamName(v);
+    if (!norm) continue;
+    if (norm in _byNorm && _byNorm[norm].canonical !== team) {
+      if (typeof console !== "undefined") {
+        console.warn(`[teamLookup] alias collision on "${v}" (normalized "${norm}"): ${_byNorm[norm].canonical} ↔ ${team}. Last definition wins.`);
+      }
+    }
+    _byNorm[norm] = { canonical: team, conf };
+  }
+}
+
+// ── Public lookups ───────────────────────────────────────────────────────────
+
+function _resolve(team) {
   if (!team) return null;
-  // Exact-key fast path
-  const exact = teamConferences[team];
-  if (exact) return exact;
-  // Normalized + alias-resolved lookup
-  const norm  = normalizeTeamName(team);
-  const alias = EXPLICIT_ALIASES[norm] ?? norm;
-  return _index[alias] ?? null;
+  // Exact-canonical fast path
+  if (_canonicalSet.has(team)) {
+    return { canonical: team, conf: _canonicalConfs[team] ?? null };
+  }
+  // Normalized lookup (covers canonical + every alias)
+  const norm = normalizeTeamName(team);
+  if (norm in _byNorm) return _byNorm[norm];
+  // Last-ditch: try the " st" suffix for bare-form strings like "Boise" when
+  // the canonical is "Boise State". Safe because if the bare form already
+  // exists as its own school (e.g. "Idaho"), the lookups above caught it.
+  const withSt = `${norm} st`;
+  if (withSt in _byNorm) return _byNorm[withSt];
+  return null;
 }
 
-// For debugging in the console
-export const _teamLookupInternals = { _index, EXPLICIT_ALIASES, normalizeTeamName };
+export function getTeamConference(team) {
+  return _resolve(team)?.conf ?? null;
+}
+
+export function getCanonicalTeamName(team) {
+  if (!team) return team;
+  return _resolve(team)?.canonical ?? team;
+}
+
+// Sorted list of every canonical CSV team — drives the team-selector
+// dropdown in useAdminTeam. Re-derived on every page load from the CSV,
+// so any edit flows through here automatically.
+export const ALL_TEAMS = [..._canonicalSet].sort((a, b) =>
+  a.localeCompare(b, "en", { sensitivity: "base" })
+);
+
+// For debugging in the browser console
+export const _teamLookupInternals = { _byNorm, _canonicalConfs, normalizeTeamName };

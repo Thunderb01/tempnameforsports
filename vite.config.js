@@ -4,7 +4,10 @@ import react from "@vitejs/plugin-react";
 export default defineConfig({
   plugins: [react()],
   resolve: {
-    alias: { "@": "/src" },
+    alias: {
+      "@":     "/src",
+      "@data": "/data",  // project-root /data — shared with Python ETL
+    },
   },
   build: {
     rollupOptions: {

@@ -14,7 +14,8 @@ that fails the build if a callsite skips the helper.
 
 | Domain | Helper | Backing data |
 |---|---|---|
-| Team → conference | `getTeamConference(team)` from `@/lib/teamLookup` | `src/data/teamConferences.json` |
+| Team → conference        | `getTeamConference(team)` from `@/lib/teamLookup`     | `data/team_conferences.csv` (single source of truth, imported via Vite `?raw`) |
+| Team name canonicalization | `getCanonicalTeamName(team)` from `@/lib/teamLookup` | Same CSV + `EXPLICIT_ALIASES` map in `teamLookup.js`                       |
 
 Why this matters: `vw_players.current_team` carries strings like
 `"Murray State"` while the JSON keys it as `"Murray St."`, and stale player

@@ -14,7 +14,7 @@ import { exportRosterPDF }  from "@/lib/exportRoster";
 import { track }            from "@/lib/track";
 import { money, letterGrade, gradeColor, bucketPosition } from "@/lib/display";
 import { MultiSelectFilter, RangeFilter, FilterChips, parseHeight, formatHeight, playerHeightInches } from "@/components/Filters";
-import { getTeamConference } from "@/lib/teamLookup";
+import { getTeamConference, getCanonicalTeamName } from "@/lib/teamLookup";
 
 // Absolute thresholds calibrated against portal rankings score distribution
 function rosterGrade(score) {
@@ -340,11 +340,16 @@ function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], userTeam = ""
   // team is scored at its own best 5; the user's live build uses the sidebar
   // counts so they can experiment with non-optimal lineups intentionally.
   function scorePool(pool, scorer, lineup = "auto") {
+    // Bucket players by CANONICAL team name so aliases (UConn / Connecticut,
+    // UNC / North Carolina, Miami / Miami FL, Ole Miss / Mississippi, ...)
+    // collapse into a single school. Without this, the same program shows up
+    // multiple times in the comparison list and gets ranked separately.
     const byTeam = {};
     pool.forEach(p => {
       if (!p.team || p.source === "intl") return;
-      if (!byTeam[p.team]) byTeam[p.team] = [];
-      byTeam[p.team].push(p);
+      const canon = getCanonicalTeamName(p.team);
+      if (!byTeam[canon]) byTeam[canon] = [];
+      byTeam[canon].push(p);
     });
     return Object.entries(byTeam).map(([team, players]) => {
       const conf = getTeamConference(team) ?? players[0]?.conf ?? null;
@@ -388,7 +393,11 @@ function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], userTeam = ""
     return addRanks(scorePool(pool, btpPlayerScoreDisplay));
   }, [allPlayers]);
 
-  const userConf = useMemo(() => getTeamConference(userTeam) ?? teamScores.find(t => t.team === userTeam)?.conf ?? null, [teamScores, userTeam]);
+  // Canonical form of the user's team — used everywhere we compare against
+  // the scored pool, since scorePool now buckets by canonical name.
+  // Display strings (e.g. "Your Miami build") still use raw `userTeam`.
+  const canonicalUserTeam = useMemo(() => getCanonicalTeamName(userTeam), [userTeam]);
+  const userConf = useMemo(() => getTeamConference(userTeam) ?? teamScores.find(t => t.team === canonicalUserTeam)?.conf ?? null, [teamScores, userTeam, canonicalUserTeam]);
 
   // ── Conference team scores ────────────────────────────────────────────────
   // Same scorer as national, just filtered to the conference pool. Committed
@@ -491,8 +500,8 @@ function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], userTeam = ""
       .sort((a, b) => a.rank - b.rank);
   }
 
-  const liveTeamScores     = injectAndRank(teamScores,     liveNational, userTeam, userConf, scoringPool.length);
-  const liveConfTeamScores = injectAndRank(confTeamScores, liveConf,     userTeam, userConf, scoringPool.length);
+  const liveTeamScores     = injectAndRank(teamScores,     liveNational, canonicalUserTeam, userConf, scoringPool.length);
+  const liveConfTeamScores = injectAndRank(confTeamScores, liveConf,     canonicalUserTeam, userConf, scoringPool.length);
 
   // Backwards-compat shim — the comparison-list code below still reads `chartScore`.
   const chartScore = liveNational.score;
@@ -527,7 +536,7 @@ function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], userTeam = ""
 
   // ── Active scope drives every grade on this panel ───────────────────────────
   const activeList   = cmpScope === "conference" ? liveConfTeamScores : liveTeamScores;
-  const userEntry    = activeList.find(t => t.team === userTeam);
+  const userEntry    = activeList.find(t => t.team === canonicalUserTeam);
   const activeTotal  = activeList.length;
   const userTotalPct = userEntry ? percentileFromRank(userEntry.rank, activeTotal) : 50;
   const chartGrade   = gradeFromPercentile(userTotalPct);
@@ -791,7 +800,7 @@ function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], userTeam = ""
         // different depending on which team is currently selected.
         const baseList = cmpScope === "conference" ? confTeamScores : teamScores;
         const displayList = cmpScope === "conference" ? baseList : (() => {
-          const userIdx = baseList.findIndex(t => t.team === userTeam);
+          const userIdx = baseList.findIndex(t => t.team === canonicalUserTeam);
           if (userIdx === -1 || userIdx <= 24) return baseList.slice(0, 25);
           return [...baseList.slice(0, 5), null, ...baseList.slice(userIdx - 2, userIdx + 3)];
         })();
@@ -802,8 +811,8 @@ function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], userTeam = ""
         );
 
         // Where the user's LIVE build would slot in (uses the live-injected list).
-        const userLiveRankAll  = liveTeamScores.findIndex(t => t.team === userTeam) + 1;
-        const userLiveRankConf = liveConfTeamScores.findIndex(t => t.team === userTeam) + 1;
+        const userLiveRankAll  = liveTeamScores.findIndex(t => t.team === canonicalUserTeam) + 1;
+        const userLiveRankConf = liveConfTeamScores.findIndex(t => t.team === canonicalUserTeam) + 1;
 
         return (
           <div style={{ background: "rgba(255,255,255,.03)", border: "1px solid var(--border)", borderRadius: 10, overflow: "hidden" }}>
@@ -874,7 +883,7 @@ function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], userTeam = ""
                 if (!t) return (
                   <div key={`sep-${idx}`} style={{ textAlign: "center", fontSize: 11, opacity: .25, padding: "2px 0" }}>· · ·</div>
                 );
-                const isUser = t.team === userTeam;
+                const isUser = t.team === canonicalUserTeam;
                 const barPct = (t.score / maxScore) * 100;
                 const tPct   = percentileFromRank(t.rank, activeTotal);
                 const tg     = gradeFromPercentile(tPct);
@@ -947,7 +956,9 @@ function TeamSkillProfileModal({ team, userTeam, scoringPool, allPlayers, active
   // Pool the modal scores against: live for user's own build, static for everyone else.
   const teamPlayers = useMemo(() => {
     if (isLive) return (scoringPool || []).filter(p => p?.source !== "intl");
-    return (allPlayers || []).filter(p => p?.team === team && p?.source !== "intl");
+    // `team` here is the canonical name from scorePool. allPlayers carries raw
+    // strings ("UConn" vs "Connecticut"), so canonicalize the filter key too.
+    return (allPlayers || []).filter(p => getCanonicalTeamName(p?.team) === team && p?.source !== "intl");
   }, [isLive, team, scoringPool, allPlayers]);
 
   // Group by position, sort by BTP score, pick optimal lineup, then compute

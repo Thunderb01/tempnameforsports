@@ -20,9 +20,12 @@ const SRC  = join(ROOT, "src");
 const RULES = [
   {
     name: "teamConferences",
-    pattern: /from\s+['"]@\/data\/teamConferences|teamConferences\s*\[/,
+    // Catch any direct import of the CSV / old JSON, or raw indexing of the
+    // parsed map. Source of truth is data/team_conferences.csv; consumers
+    // must go through getTeamConference / getCanonicalTeamName.
+    pattern: /from\s+['"]@data\/team_conferences|from\s+['"]@\/data\/teamConferences|teamConferences\s*\[/,
     allow:  new Set(["src/lib/teamLookup.js"]),
-    message: 'Use `getTeamConference(team)` from "@/lib/teamLookup" — the raw JSON misses name variants like "Murray State" vs "Murray St."',
+    message: 'Use `getTeamConference(team)` or `getCanonicalTeamName(team)` from "@/lib/teamLookup" — going through the CSV directly misses name variants like "Murray State" vs "Murray St." and aliases like "UConn" / "Connecticut".',
   },
   // Add more rules here as you build more lookup helpers.
 ];
