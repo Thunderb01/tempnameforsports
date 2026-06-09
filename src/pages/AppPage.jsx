@@ -313,7 +313,11 @@ function btpPlayerScoreDisplay(p) {
   return sei * 0.50 + market * 0.15 + ath * 0.13 + ris * 0.08 + dds * 0.08 + cdi * 0.06;
 }
 
-function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], userTeam = "", customOrder, setCustomOrder, starterCounts, setStarterCounts }) {
+function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], userTeam = "", customOrder, setCustomOrder, starterCounts, setStarterCounts, showRawValues = false }) {
+  // Coaches see only letter grades. Admin/superadmin see raw dollar values
+  // alongside the grades. Controlled by the `showRawValues` prop the parent
+  // sets from useAdminTeam().isAdmin.
+  const [profileModalTeam, setProfileModalTeam] = useState(null);
   const { scoringPool = [] } = calc;
   // Single toggle drives both the team-comparison list AND all grades on this page.
   const [cmpScope, setCmpScope] = useState("conference");
@@ -435,6 +439,9 @@ function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], userTeam = ""
   // Identical algorithm to static. Uses chart order so a manual drag promotes
   // a player into the starting lineup (slot weight 1.0), demotes another to
   // bench (0.20 if top-3, else 0.04). Intl excluded.
+  //
+  // `starterCounts` is seeded to the auto-optimal lineup on first load
+  // (see the useEffect below), then the user can adjust freely.
   function computeLive(scorer) {
     const posScores = {};
     let total = 0;
@@ -564,7 +571,8 @@ function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], userTeam = ""
                 {Math.round(userTotalPct)}<span style={{ fontSize: 12, opacity: .45, fontWeight: 400 }}> percentile · vs {cmpScope === "conference" ? (userConf || "conference") : "country"}</span>
               </div>
               <div style={{ fontSize: 12, opacity: .4 }}>
-                {userEntry ? `#${userEntry.rank} of ${activeTotal}` : `${activeTotal} teams in pool`} · {(chartScore / 1000000).toFixed(2)}M raw
+                {userEntry ? `#${userEntry.rank} of ${activeTotal}` : `${activeTotal} teams in pool`}
+                {showRawValues && ` · ${(chartScore / 1000000).toFixed(2)}M raw`}
               </div>
             </div>
           </div>
@@ -613,7 +621,7 @@ function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], userTeam = ""
                   <span style={{ fontWeight: 700, fontSize: 14 }}>{pos}s</span>
                   <span style={{ fontSize: 11, opacity: .35 }}>{players.length}</span>
                   <span style={{ marginLeft: "auto", background: pg.color, color: "#0e1521", fontWeight: 700, fontSize: 10, padding: "1px 7px", borderRadius: 8 }}>{pg.label}</span>
-                  <span style={{ fontSize: 12, opacity: .45 }} title={`${(chartPosScores[pos] / 1000000).toFixed(2)}M raw`}>{Math.round(posPct)}p</span>
+                  <span style={{ fontSize: 12, opacity: .45 }} title={showRawValues ? `${(chartPosScores[pos] / 1000000).toFixed(2)}M raw` : undefined}>{Math.round(posPct)}p</span>
                 </div>
 
                 {players.length === 0 ? (
@@ -668,9 +676,13 @@ function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], userTeam = ""
 
                       {/* Contribution + score bar */}
                       <div style={{ flexShrink: 0, textAlign: "right", minWidth: 36 }}>
-                        <div style={{ fontSize: 11, fontWeight: 600, opacity: .7 }}>{(contribution / 1000).toFixed(0)}k</div>
-                        <div style={{ fontSize: 9, opacity: .28 }}>×{weight.toFixed(2)}</div>
-                        <div style={{ width: 36, height: 3, background: "rgba(255,255,255,.07)", borderRadius: 2, marginTop: 3 }}>
+                        {showRawValues && (
+                          <>
+                            <div style={{ fontSize: 11, fontWeight: 600, opacity: .7 }}>{(contribution / 1000).toFixed(0)}k</div>
+                            <div style={{ fontSize: 9, opacity: .28 }}>×{weight.toFixed(2)}</div>
+                          </>
+                        )}
+                        <div style={{ width: 36, height: 3, background: "rgba(255,255,255,.07)", borderRadius: 2, marginTop: showRawValues ? 3 : 0 }}>
                           <div style={{ width: `${barPct}%`, height: "100%", background: isStarter ? "#fbbf24" : "#6b7280", borderRadius: 2 }} />
                         </div>
                       </div>
@@ -824,11 +836,15 @@ function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], userTeam = ""
               {/* "Your build" row — uses the user's LIVE score so they can see
                   where their custom roster would slot in vs the static league. */}
               {userTeam && (
-                <div style={{
+                <div
+                  onClick={() => setProfileModalTeam("__live__")}
+                  title="Click to see this team's skill profile"
+                  style={{
                   display: "flex", alignItems: "center", gap: 10,
                   padding: "8px 8px", borderRadius: 6,
                   background: "rgba(245,158,11,.10)",
                   border: "1px solid rgba(245,158,11,.30)",
+                  cursor: "pointer",
                 }}>
                   <span style={{ width: 22, fontSize: 11, opacity: .55, textAlign: "right", flexShrink: 0, color: "#f59e0b" }}>
                     ▶
@@ -839,9 +855,11 @@ function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], userTeam = ""
                   <div style={{ flex: 1, height: 5, background: "rgba(255,255,255,.07)", borderRadius: 3, minWidth: 40 }}>
                     <div style={{ width: `${(liveNational.score / maxScore) * 100}%`, height: "100%", background: "#f59e0b", borderRadius: 3 }} />
                   </div>
-                  <span style={{ fontSize: 11, opacity: .85, flexShrink: 0, fontVariantNumeric: "tabular-nums", color: "#f59e0b" }}>
-                    {(liveNational.score / 1000000).toFixed(2)}M
-                  </span>
+                  {showRawValues && (
+                    <span style={{ fontSize: 11, opacity: .85, flexShrink: 0, fontVariantNumeric: "tabular-nums", color: "#f59e0b" }}>
+                      {(liveNational.score / 1000000).toFixed(2)}M
+                    </span>
+                  )}
                   <span style={{ background: chartGrade.color, color: "#0e1521", fontWeight: 700, fontSize: 10, padding: "1px 6px", borderRadius: 6, flexShrink: 0 }}>
                     {chartGrade.label}
                   </span>
@@ -861,11 +879,15 @@ function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], userTeam = ""
                 const tPct   = percentileFromRank(t.rank, activeTotal);
                 const tg     = gradeFromPercentile(tPct);
                 return (
-                  <div key={t.team} style={{
+                  <div key={t.team}
+                    onClick={() => setProfileModalTeam(t.team)}
+                    title="Click to see this team's skill profile"
+                    style={{
                     display: "flex", alignItems: "center", gap: 10,
                     padding: "6px 8px", borderRadius: 6,
                     background: isUser ? "rgba(91,156,246,.08)" : "transparent",
                     border: isUser ? "1px solid rgba(91,156,246,.2)" : "1px solid transparent",
+                    cursor: "pointer",
                   }}>
                     <span style={{ width: 22, fontSize: 11, opacity: .4, textAlign: "right", flexShrink: 0 }}>
                       {t.rank}
@@ -876,9 +898,11 @@ function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], userTeam = ""
                     <div style={{ flex: 1, height: 5, background: "rgba(255,255,255,.07)", borderRadius: 3, minWidth: 40 }}>
                       <div style={{ width: `${barPct}%`, height: "100%", background: isUser ? "#5b9cf6" : tg.color, borderRadius: 3, opacity: isUser ? 1 : .65 }} />
                     </div>
-                    <span style={{ fontSize: 11, opacity: .55, flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>
-                      {(t.score / 1000000).toFixed(2)}M
-                    </span>
+                    {showRawValues && (
+                      <span style={{ fontSize: 11, opacity: .55, flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>
+                        {(t.score / 1000000).toFixed(2)}M
+                      </span>
+                    )}
                     <span style={{ background: tg.color, color: "#0e1521", fontWeight: 700, fontSize: 10, padding: "1px 6px", borderRadius: 6, flexShrink: 0 }}>
                       {tg.label}
                     </span>
@@ -889,7 +913,157 @@ function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], userTeam = ""
           </div>
         );
       })()}
+
+      {profileModalTeam && (
+        <TeamSkillProfileModal
+          team={profileModalTeam}
+          userTeam={userTeam}
+          scoringPool={scoringPool}
+          allPlayers={allPlayers}
+          activeList={activeList}
+          cmpScope={cmpScope}
+          onClose={() => setProfileModalTeam(null)}
+          percentileFromRank={percentileFromRank}
+          gradeFromPercentile={gradeFromPercentile}
+        />
+      )}
     </div>
+  );
+}
+
+// ── Team Skill Profile Modal ──────────────────────────────────────────────────
+// Click any row in the team comparison list to open this. Shows the team's
+// weighted-average BTP metrics (SEI / ATH / RIS / DDS / CDI) as bars with
+// letter grades, plus its players grouped by position. Lets a coach answer
+// "where is this team strong vs weak?" without showing any dollar amounts.
+//
+// `team` is either a team name (string) or the sentinel "__live__" — the
+// latter means show the user's live build (with portal additions) instead
+// of that team's static roster.
+function TeamSkillProfileModal({ team, userTeam, scoringPool, allPlayers, activeList, cmpScope, onClose, percentileFromRank, gradeFromPercentile }) {
+  const isLive    = team === "__live__";
+  const teamName  = isLive ? userTeam : team;
+
+  // Pool the modal scores against: live for user's own build, static for everyone else.
+  const teamPlayers = useMemo(() => {
+    if (isLive) return (scoringPool || []).filter(p => p?.source !== "intl");
+    return (allPlayers || []).filter(p => p?.team === team && p?.source !== "intl");
+  }, [isLive, team, scoringPool, allPlayers]);
+
+  // Group by position, sort by BTP score, pick optimal lineup, then compute
+  // each BTP metric's average weighted by each player's slot weight in that
+  // optimal lineup. Starters dominate; deep bench barely moves the needle.
+  const profile = useMemo(() => {
+    const POS = ["Guard", "Wing", "Big"];
+    const byPos = { Guard: [], Wing: [], Big: [] };
+    for (const p of teamPlayers) {
+      const bucket = bucketPosition(p.pos);
+      if (byPos[bucket]) byPos[bucket].push({ ...p, _score: btpPlayerScoreDisplay(p) });
+    }
+    for (const pos of POS) byPos[pos].sort((a, b) => b._score - a._score);
+    const scoresByPos = Object.fromEntries(POS.map(pos => [pos, byPos[pos].map(p => p._score)]));
+    const optimal = computeOptimalLineup(scoresByPos);
+    const totals = { sei: 0, ath: 0, ris: 0, dds: 0, cdi: 0 };
+    let totalWeight = 0;
+    for (const pos of POS) {
+      const n = optimal[pos] || 0;
+      byPos[pos].forEach((p, i) => {
+        const w = slotWeightFor(i, n);
+        totalWeight += w;
+        for (const m of Object.keys(totals)) totals[m] += (p.stats?.[m] || 0) * w;
+      });
+    }
+    const avg = Object.fromEntries(Object.keys(totals).map(m => [m, totalWeight > 0 ? totals[m] / totalWeight : 0]));
+    return { byPos, optimal, avg };
+  }, [teamPlayers]);
+
+  // Where this team ranks in the active comparison list (so the modal shows
+  // the same overall grade the row in the list does).
+  const entry      = activeList.find(t => t.team === teamName);
+  const total      = activeList.length;
+  const pct        = entry ? percentileFromRank(entry.rank, total) : 50;
+  const teamGrade  = gradeFromPercentile(pct);
+
+  return createPortal(
+    <div onClick={onClose} style={{
+      position: "fixed", inset: 0, background: "rgba(0,0,0,.7)",
+      zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
+    }}>
+      <div onClick={e => e.stopPropagation()} style={{
+        background: "#0e1521", border: "1px solid var(--border)", borderRadius: 12,
+        padding: 24, maxWidth: 560, width: "100%", maxHeight: "90vh", overflow: "auto",
+      }}>
+        {/* Header */}
+        <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 22 }}>
+          <span style={{ background: teamGrade.color, color: "#0e1521", fontWeight: 800, fontSize: 26, padding: "4px 16px", borderRadius: 10 }}>
+            {teamGrade.label}
+          </span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 18, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {isLive ? `Your ${teamName} build` : teamName}
+            </div>
+            <div style={{ fontSize: 12, opacity: .5 }}>
+              {entry ? `#${entry.rank} of ${total} · ${cmpScope === "conference" ? "Conference" : "Country"}` : "Skill Profile"}
+              {entry?.conf ? ` · ${entry.conf}` : ""}
+            </div>
+          </div>
+          <button onClick={onClose} title="Close" style={{
+            background: "none", border: "none", color: "rgba(255,255,255,.5)",
+            cursor: "pointer", fontSize: 22, lineHeight: 1, padding: 4,
+          }}>✕</button>
+        </div>
+
+        {/* Skill bars */}
+        <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".07em", opacity: .4, marginBottom: 10 }}>Skill Profile</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 22 }}>
+          {BTP_METRICS.map(({ key, label, desc }) => {
+            const val = profile.avg[key] || 0;
+            const g   = gradeFromPercentile(val);
+            return (
+              <div key={key}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+                  <span style={{ fontSize: 12, fontWeight: 600 }}>{desc}</span>
+                  <span style={{ background: g.color, color: "#0e1521", fontWeight: 700, fontSize: 10, padding: "1px 8px", borderRadius: 8 }}>{g.label}</span>
+                </div>
+                <div style={{ height: 8, background: "rgba(255,255,255,.07)", borderRadius: 4 }}>
+                  <div style={{ width: `${Math.min(100, Math.max(0, val))}%`, height: "100%", background: g.color, borderRadius: 4, opacity: .85 }} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Roster by position */}
+        <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".07em", opacity: .4, marginBottom: 10 }}>Roster · Optimal Lineup</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+          {["Guard", "Wing", "Big"].map(pos => {
+            const players  = profile.byPos[pos] || [];
+            const starters = profile.optimal[pos] || 0;
+            return (
+              <div key={pos} style={{ background: "rgba(255,255,255,.03)", border: "1px solid var(--border)", borderRadius: 8, padding: 10 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                  <span style={{ fontSize: 12, fontWeight: 700 }}>{pos}s</span>
+                  <span style={{ fontSize: 10, opacity: .45 }}>{players.length}</span>
+                </div>
+                {players.length === 0 && (
+                  <div style={{ fontSize: 11, opacity: .3 }}>—</div>
+                )}
+                {players.map((p, i) => (
+                  <div key={p.id || `${p.name}-${i}`} style={{
+                    fontSize: 11, padding: "3px 0",
+                    color: i < starters ? "#fbbf24" : "rgba(255,255,255,.65)",
+                    fontWeight: i < starters ? 600 : 400,
+                  }}>
+                    {i < starters ? "★ " : ""}{p.name}
+                  </div>
+                ))}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>,
+    document.body
   );
 }
 
@@ -929,6 +1103,27 @@ export function AppPage() {
   // Depth chart state — lifted here so it survives view switches
   const [depthChartOrder,  setDepthChartOrder]  = useState(null);
   const [depthStarterCounts, setDepthStarterCounts] = useState({ Guard: 2, Wing: 2, Big: 1 });
+
+  // Seed depthStarterCounts to the auto-optimal lineup the first time we have
+  // a roster for a given team. After that the user owns it — manual changes
+  // via the +/− buttons or the auto-optimize button take over. The ref tracks
+  // which team we've already seeded so reloads / view switches don't clobber
+  // the user's adjustments.
+  const seededTeamRef = useRef(null);
+  useEffect(() => {
+    if (!activeTeam || seededTeamRef.current === activeTeam) return;
+    const scoringPool = board.calc?.scoringPool || [];
+    if (scoringPool.length === 0) return;  // wait for roster to load
+    const sortedByPos = { Guard: [], Wing: [], Big: [] };
+    for (const p of scoringPool) {
+      if (p?.source === "intl") continue;
+      const bucket = bucketPosition(p.pos);
+      if (sortedByPos[bucket]) sortedByPos[bucket].push(btpPlayerScoreDisplay(p));
+    }
+    for (const pos of Object.keys(sortedByPos)) sortedByPos[pos].sort((a, b) => b - a);
+    setDepthStarterCounts(computeOptimalLineup(sortedByPos));
+    seededTeamRef.current = activeTeam;
+  }, [activeTeam, board.calc?.scoringPool]);
 
   const handleCustomNilChange = useCallback((id, val) => board.updateCustomPlayerNil(id, val), [board.updateCustomPlayerNil]);
   const handleCustomNilBlur   = useCallback((id, val) => board.persistCustomPlayerNil(id, val), [board.persistCustomPlayerNil]);
@@ -1635,7 +1830,7 @@ export function AppPage() {
         )}
 
         {/* ── Roster Strength breakdown ───────────────────────────────────── */}
-        {viewMode === "strength" && <RosterStrengthPanel calc={calc} onOpenModal={handleOpenModal} allPlayers={board.state.board} userTeam={activeTeam} customOrder={depthChartOrder} setCustomOrder={setDepthChartOrder} starterCounts={depthStarterCounts} setStarterCounts={setDepthStarterCounts} />}
+        {viewMode === "strength" && <RosterStrengthPanel calc={calc} onOpenModal={handleOpenModal} allPlayers={board.state.board} userTeam={activeTeam} customOrder={depthChartOrder} setCustomOrder={setDepthChartOrder} starterCounts={depthStarterCounts} setStarterCounts={setDepthStarterCounts} showRawValues={isAdmin} />}
 
       </div>
 
