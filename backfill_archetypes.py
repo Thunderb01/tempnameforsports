@@ -123,20 +123,33 @@ def _def_has_range(d):
                for k, _ in DOMESTIC_FIELD_DEFS)
 
 
-def match_archetype(row, defs):
-    """First definition (by priority, then name) whose every set range contains
-    the player's corresponding value. Returns the archetype name or None."""
+def _row_values(row):
     values = {}
     for key, src in DOMESTIC_FIELD_DEFS:
         raw = row.get(src)
         values[key] = norm_pct(raw) if key == "p3_pct" else raw
+    return values
+
+
+def match_archetypes(row, defs):
+    """Every definition (priority, then name) whose set ranges all contain the
+    player's values. Returns a list of names in priority order."""
+    values = _row_values(row)
     ordered = sorted(defs, key=lambda d: (d.get("priority") or 0, str(d.get("name"))))
+    out = []
     for d in ordered:
         if not _def_has_range(d):
             continue
         if all(_in_range(values[k], d.get(f"{k}_min"), d.get(f"{k}_max")) for k, _ in DOMESTIC_FIELD_DEFS):
-            return d.get("name")
-    return None
+            if d.get("name") not in out:
+                out.append(d.get("name"))
+    return out
+
+
+def match_archetype(row, defs):
+    """The highest-priority matching archetype name, or None."""
+    matches = match_archetypes(row, defs)
+    return matches[0] if matches else None
 
 
 def load_defs(sb, table):
@@ -356,13 +369,14 @@ def main():
         # A manual override always wins — no position/metrics needed.
         if overwrite:
             if (overwrite or None) != (p.get("archetype") or None):
-                updates.append((p["id"], p.get("name", ""), p.get("archetype"), overwrite))
+                updates.append((p["id"], p.get("name", ""), p.get("archetype"), overwrite, [overwrite]))
             else:
                 skipped += 1
             continue
 
         if defs:
-            arch = match_archetype(p, defs)
+            arch_list = match_archetypes(p, defs)
+            arch = arch_list[0] if arch_list else None
         else:
             # Legacy fallback: built-in position-based thresholds (metrics only).
             if not pos:
@@ -377,9 +391,10 @@ def main():
                 sei=p.get("sei"), ath=p.get("ath"), ris=p.get("ris"),
                 dds=p.get("dds"), cdi=p.get("cdi"),
             )
+            arch_list = [arch] if arch else []
 
         if arch:
-            updates.append((p["id"], p.get("name", ""), p.get("archetype"), arch))
+            updates.append((p["id"], p.get("name", ""), p.get("archetype"), arch, arch_list))
 
     # ── Report ─────────────────────────────────────────────────────────────────
     print(f"  {skipped} already have an archetype — skipping (use --overwrite to redo).")
@@ -398,20 +413,20 @@ def main():
         return
 
     # ── Preview ────────────────────────────────────────────────────────────────
-    # Show archetype distribution
+    # Show archetype distribution (by primary archetype)
     from collections import Counter
-    dist = Counter(arch for _, _, _, arch in updates)
-    print("Archetype distribution:")
+    dist = Counter(u[3] for u in updates)
+    print("Archetype distribution (primary):")
     for arch, count in sorted(dist.items(), key=lambda x: -x[1]):
         print(f"  {count:>4}  {arch}")
     print()
 
     # Show first 20 changes
-    print(f"{'Player':<32}  {'Old':<22}  →  New")
-    print("-" * 72)
-    for _, name, old, new in updates[:20]:
+    print(f"{'Player':<32}  {'Old':<22}  →  New (all matches)")
+    print("-" * 80)
+    for _, name, old, new, new_list in updates[:20]:
         old_str = old or "(none)"
-        print(f"  {name:<30}  {old_str:<22}  →  {new}")
+        print(f"  {name:<30}  {old_str:<22}  →  {', '.join(new_list) if new_list else '(none)'}")
     if len(updates) > 20:
         print(f"  … and {len(updates) - 20} more")
     print()
@@ -424,9 +439,9 @@ def main():
     BATCH, written, errors = 50, 0, 0
     for i in range(0, len(updates), BATCH):
         batch = updates[i : i + BATCH]
-        for pid, name, _, arch in batch:
+        for pid, name, _, arch, arch_list in batch:
             try:
-                sb.table(players_table).update({"archetype": arch}).eq("id", pid).execute()
+                sb.table(players_table).update({"archetype": arch, "archetypes": arch_list}).eq("id", pid).execute()
                 written += 1
             except Exception as exc:
                 print(f"  ERROR {name}: {exc}")

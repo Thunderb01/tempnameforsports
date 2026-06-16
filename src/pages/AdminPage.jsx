@@ -4,7 +4,7 @@ import { supabase }   from "@/lib/supabase";
 import { money, nilRange, letterGrade, gradeColor } from "@/lib/display";
 import { InternationalAdminContent } from "@/pages/InternationalAdminPage";
 import { DefCard } from "@/components/DefCard";
-import { DOMESTIC_FIELDS, domesticValues, resolveArchetype } from "@/lib/archetypeMatch";
+import { DOMESTIC_FIELDS, domesticValues, resolveArchetypeList } from "@/lib/archetypeMatch";
 
 // Load every row from a table/view, paging past PostgREST's 1000-row cap.
 async function fetchAllRows(table, columns) {
@@ -1010,20 +1010,23 @@ function ArchetypesTab() {
       // current archetype + override live on the base table (the men's
       // vw_players doesn't expose archetype, so never read it from the view).
       const rows     = await fetchAllRows(cfg.view, "id, ppg, rpg, apg, 3p_pct, sei, ath, ris, dds, cdi");
-      const baseRows = await fetchAllRows(cfg.players, "id, archetype, archetype_overwrite");
+      const baseRows = await fetchAllRows(cfg.players, "id, archetype, archetypes, archetype_overwrite");
       const baseById = Object.fromEntries(baseRows.map(r => [r.id, r]));
 
+      const sameList = (a, b) => JSON.stringify(a || []) === JSON.stringify(b || []);
       const changed = [];
       for (const r of rows) {
         const base = baseById[r.id] || {};
-        const resolved = resolveArchetype(base.archetype_overwrite, domesticValues(r), defs, DOMESTIC_FIELDS);
-        if ((resolved || null) !== (base.archetype || null)) changed.push({ id: r.id, archetype: resolved });
+        const { list, primary } = resolveArchetypeList(base.archetype_overwrite, domesticValues(r), defs, DOMESTIC_FIELDS);
+        if ((primary || null) !== (base.archetype || null) || !sameList(list, base.archetypes)) {
+          changed.push({ id: r.id, archetype: primary, archetypes: list });
+        }
       }
 
       const CHUNK = 25;
       for (let i = 0; i < changed.length; i += CHUNK) {
         await Promise.all(changed.slice(i, i + CHUNK).map(c =>
-          supabase.from(cfg.players).update({ archetype: c.archetype }).eq("id", c.id)));
+          supabase.from(cfg.players).update({ archetype: c.archetype, archetypes: c.archetypes }).eq("id", c.id)));
         setMsg(`Updating… ${Math.min(i + CHUNK, changed.length)}/${changed.length}`);
       }
       setMsg(`Done — ${changed.length} player${changed.length === 1 ? "" : "s"} updated (${rows.length} scanned).`);

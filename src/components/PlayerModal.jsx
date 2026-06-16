@@ -145,12 +145,17 @@ function SkillProfile({ stats }) {
   );
 }
 
-export function PlayerModal({ player, onClose, onReplace }) {
+export function PlayerModal({ player, onClose, onReplace, sport = "mens" }) {
   const navigate = useNavigate();
   const [stats, setStats] = useState(null);
   const [loadingStats, setLoadingStats] = useState(true);
   const [profileIdx, setProfileIdx] = useState(0);
   const [showAdv, setShowAdv] = useState(false);
+  const [archetypes, setArchetypes] = useState([]);
+  const [archColors, setArchColors] = useState({});
+
+  const playersTable = sport === "womens" ? "w_players"        : "players";
+  const defsTable    = sport === "womens" ? "w_archetype_defs" : "archetype_defs";
 
   useEffect(() => {
     function onKey(e) { if (e.key === "Escape") onClose(); }
@@ -171,6 +176,20 @@ export function PlayerModal({ player, onClose, onReplace }) {
         setLoadingStats(false);
       });
   }, [player?.id]);
+
+  // Resolved archetype list + their colors (falls back to the single archetype).
+  useEffect(() => {
+    if (!player?.id) { setArchetypes([]); return; }
+    supabase.from(playersTable).select("archetype, archetypes").eq("id", player.id).maybeSingle()
+      .then(({ data }) => {
+        const list = Array.isArray(data?.archetypes) && data.archetypes.length
+          ? data.archetypes
+          : (data?.archetype ? [data.archetype] : (player.archetype ? [player.archetype] : []));
+        setArchetypes(list);
+      });
+    supabase.from(defsTable).select("name, color")
+      .then(({ data }) => setArchColors(Object.fromEntries((data || []).map(d => [d.name, d.color || "#38bdf8"]))));
+  }, [player?.id, playersTable, defsTable]);
 
   if (!player) return null;
 
@@ -227,11 +246,16 @@ export function PlayerModal({ player, onClose, onReplace }) {
                 </div>
               );
             })()}
-            {player.archetype && (
-              <div style={{ marginTop: 6, marginLeft: 6, display: "inline-block", padding: "3px 10px", borderRadius: 20, fontSize: 12, fontWeight: 600, background: "#38bdf822", color: "#38bdf8", border: "1px solid #38bdf855" }}>
-                {player.archetype}
-              </div>
-            )}
+            {archetypes.map(name => {
+              const c = archColors[name] || "#38bdf8";
+              return (
+                <div key={name} style={{ marginTop: 6, marginLeft: 6, display: "inline-block", padding: "3px 10px",
+                  borderRadius: 20, fontSize: 12, fontWeight: 600,
+                  background: `${c}22`, color: c, border: `1px solid ${c}55` }}>
+                  {name}
+                </div>
+              );
+            })}
           </div>
 
           <div className="modal-section">

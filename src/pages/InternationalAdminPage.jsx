@@ -3,7 +3,7 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { supabase }   from "@/lib/supabase";
 import { PROJECTED_TIER_OPTIONS, tierColor } from "@/lib/display";
 import { DefCard } from "@/components/DefCard";
-import { INTL_FIELDS, intlValues, resolveArchetype } from "@/lib/archetypeMatch";
+import { INTL_FIELDS, intlValues, resolveArchetypeList } from "@/lib/archetypeMatch";
 
 // Load every row from a table, paging past PostgREST's 1000-row cap.
 // `build` optionally adds filters/ordering to the query before paging.
@@ -676,7 +676,7 @@ export function InternationalAdminContent() {
       for (const pool of pools) {
         let profiles = [];
         try {
-          profiles = await fetchAllIntl(pool.players, "id, archetype, archetype_overwrite, metrics");
+          profiles = await fetchAllIntl(pool.players, "id, archetype, archetypes, archetype_overwrite, metrics");
         } catch { continue; } // women's intl table may not exist on older DBs
         if (!profiles.length) continue;
 
@@ -687,17 +687,20 @@ export function InternationalAdminContent() {
           if (s.player_id && !(s.player_id in statsByPid)) statsByPid[s.player_id] = s.stats || {};
         }
 
+        const sameList = (a, b) => JSON.stringify(a || []) === JSON.stringify(b || []);
         const changed = [];
         for (const p of profiles) {
           const vals = intlValues(p.metrics || {}, statsByPid[p.id] || {});
-          const resolved = resolveArchetype(p.archetype_overwrite, vals, archDefs, INTL_FIELDS);
-          if ((resolved || null) !== (p.archetype || null)) changed.push({ id: p.id, archetype: resolved });
+          const { list, primary } = resolveArchetypeList(p.archetype_overwrite, vals, archDefs, INTL_FIELDS);
+          if ((primary || null) !== (p.archetype || null) || !sameList(list, p.archetypes)) {
+            changed.push({ id: p.id, archetype: primary, archetypes: list });
+          }
         }
 
         const CHUNK = 25;
         for (let i = 0; i < changed.length; i += CHUNK) {
           await Promise.all(changed.slice(i, i + CHUNK).map(c =>
-            supabase.from(pool.players).update({ archetype: c.archetype }).eq("id", c.id)));
+            supabase.from(pool.players).update({ archetype: c.archetype, archetypes: c.archetypes }).eq("id", c.id)));
         }
         totChanged += changed.length; totScanned += profiles.length;
       }

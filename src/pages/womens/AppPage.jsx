@@ -1747,6 +1747,7 @@ export function WomensAppPage() {
         ) : (
           <PlayerModal
             player={modal}
+            sport="womens"
             onClose={() => setModal(null)}
             onReplace={["returning", "undecided", "transfer"].includes(modal._typeKey)
               ? () => {

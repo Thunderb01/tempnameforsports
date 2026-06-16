@@ -73,9 +73,7 @@ export function defHasRange(def, fields) {
 // `values` is an object keyed by field.key (already normalized). Returns the
 // name of the first matching definition by priority, or null.
 export function matchArchetype(values, defs, fields) {
-  const ordered = [...(defs || [])].sort(
-    (a, b) => (a.priority ?? 0) - (b.priority ?? 0) || String(a.name).localeCompare(String(b.name))
-  );
+  const ordered = sortDefs(defs);
   for (const def of ordered) {
     if (!defHasRange(def, fields)) continue;
     const ok = fields.every(f => inRange(values[f.key], def[`${f.key}_min`], def[`${f.key}_max`]));
@@ -84,10 +82,37 @@ export function matchArchetype(values, defs, fields) {
   return null;
 }
 
-// overwrite wins; otherwise threshold match; otherwise null.
+// Every matching definition's name, in priority order (deduped).
+export function matchArchetypes(values, defs, fields) {
+  const out = [];
+  for (const def of sortDefs(defs)) {
+    if (!defHasRange(def, fields)) continue;
+    const ok = fields.every(f => inRange(values[f.key], def[`${f.key}_min`], def[`${f.key}_max`]));
+    if (ok && !out.includes(def.name)) out.push(def.name);
+  }
+  return out;
+}
+
+function sortDefs(defs) {
+  return [...(defs || [])].sort(
+    (a, b) => (a.priority ?? 0) - (b.priority ?? 0) || String(a.name).localeCompare(String(b.name))
+  );
+}
+
+// overwrite wins; otherwise first threshold match; otherwise null.
 export function resolveArchetype(overwrite, values, defs, fields) {
   if (overwrite && String(overwrite).trim()) return overwrite;
   return matchArchetype(values, defs, fields);
+}
+
+// Returns { list, primary }. A manual override forces a single-item list.
+// Otherwise list = all matching archetypes; primary = the highest-priority one.
+export function resolveArchetypeList(overwrite, values, defs, fields) {
+  if (overwrite && String(overwrite).trim()) {
+    return { list: [overwrite], primary: overwrite };
+  }
+  const list = matchArchetypes(values, defs, fields);
+  return { list, primary: list[0] ?? null };
 }
 
 // Pull the normalized match-values off a vw_players row.

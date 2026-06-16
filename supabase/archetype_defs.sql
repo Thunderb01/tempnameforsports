@@ -114,14 +114,21 @@ alter table public.international_archetype_defs  add column if not exists color 
 
 -- ── New columns ──────────────────────────────────────────────────────────────
 -- Domestic: archetype already exists; add the per-player exception override.
+-- `archetypes` (jsonb array) holds EVERY definition the player matches; the
+-- singular `archetype` keeps the primary (highest-priority) match for legacy
+-- consumers (board pill/filter, finder fallback).
 alter table public.players   add column if not exists archetype_overwrite text;
+alter table public.players   add column if not exists archetypes jsonb default '[]';
 alter table public.w_players add column if not exists archetype_overwrite text;
+alter table public.w_players add column if not exists archetypes jsonb default '[]';
 
--- International: no archetype concept existed yet — add both.
+-- International: no archetype concept existed yet — add all three.
 alter table public.international_players   add column if not exists archetype           text;
 alter table public.international_players   add column if not exists archetype_overwrite text;
+alter table public.international_players   add column if not exists archetypes           jsonb default '[]';
 alter table public.w_international_players add column if not exists archetype           text;
 alter table public.w_international_players add column if not exists archetype_overwrite text;
+alter table public.w_international_players add column if not exists archetypes           jsonb default '[]';
 
 -- ── Surface archetype_overwrite through the women's view ─────────────────────
 -- (the recompute reads the overwrite + 9 fields from the view in one query).

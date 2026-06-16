@@ -295,7 +295,7 @@ export function WomensPortalRankingsPage() {
   return (
     <>
       <SiteHeader />
-      {modal && <PlayerModal player={modal} onClose={() => setModal(null)} />}
+      {modal && <PlayerModal player={modal} sport="womens" onClose={() => setModal(null)} />}
       <div className="app-shell">
         <div className="app-top">
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12, marginBottom: 16 }}>

@@ -580,6 +580,7 @@ export function WomensBoardPage() {
       {modal && (
         <PlayerModal
           player={modal}
+          sport="womens"
           status={board.state.statusById?.[modal.id]}
           onStatus={setStatus}
           onClose={() => setModal(null)}

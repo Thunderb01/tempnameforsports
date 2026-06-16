@@ -63,7 +63,7 @@ export function BoardPage() {
   const [archetypeFilter,  setArchetypeFilter]  = useState("");
   const [archetypeOptions, setArchetypeOptions] = useState([]);
   const [archetypeColors,  setArchetypeColors]  = useState({});
-  const [archetypeById,    setArchetypeById]    = useState({});
+  const [archetypesById,   setArchetypesById]   = useState({});
   const YEAR_OPTIONS = ["Fr", "RS Fr", "So", "RS So", "Jr", "RS Jr", "Sr", "RS Sr", "Grad", "5th Year"];
   const conferences = [
     "A10", "ACC", "AE", "ASun", "Amer",
@@ -149,15 +149,19 @@ export function BoardPage() {
       let from = 0, map = {};
       for (;;) {
         const { data, error } = await supabase
-          .from("players").select("id, archetype")
+          .from("players").select("id, archetype, archetypes")
           .not("archetype", "is", null)
           .range(from, from + PAGE - 1);
         if (error || !data) break;
-        data.forEach(r => { map[r.id] = r.archetype; });
+        data.forEach(r => {
+          const list = Array.isArray(r.archetypes) && r.archetypes.length
+            ? r.archetypes : (r.archetype ? [r.archetype] : []);
+          if (list.length) map[r.id] = list;
+        });
         if (data.length < PAGE) break;
         from += PAGE;
       }
-      setArchetypeById(map);
+      setArchetypesById(map);
     })();
   }, []);
 
@@ -267,7 +271,7 @@ export function BoardPage() {
         const pConf = getTeamConference(p.team) || p.conf;
         if (!confFilter.includes(pConf)) return false;
       }
-      if (archetypeFilter && archetypeById[p.id] !== archetypeFilter) return false;
+      if (archetypeFilter && !(archetypesById[p.id] || []).includes(archetypeFilter)) return false;
       if (stateTerms && !matchesState(p.hometown || "", stateTerms)) return false;
       if (!includeUnevaluated && !(p.marketHigh > 0)) return false;
       if (toTeamFilter.trim()) {
@@ -286,7 +290,7 @@ export function BoardPage() {
       }
       return true;
     });
-  }, [players, search, posFilter, yearFilter, heightMin, heightMax, confFilter, archetypeFilter, archetypeById, stateFilter, portalOnly, includeCommitted, includeUnevaluated, advcFilters, toTeamFilter, availableIds, allPortalIds, portalInfo]);
+  }, [players, search, posFilter, yearFilter, heightMin, heightMax, confFilter, archetypeFilter, archetypesById, stateFilter, portalOnly, includeCommitted, includeUnevaluated, advcFilters, toTeamFilter, availableIds, allPortalIds, portalInfo]);
 
   // ── Sort (separate so filter changes don't re-sort and vice versa) ──────────
   const sorted = useMemo(() => {
@@ -509,16 +513,19 @@ export function BoardPage() {
                           ].filter(Boolean).join("  ·  ");
                           return line ? <div className="row-sub" style={{ opacity: .75 }}>{line}</div> : null;
                         })()}
-                        {archetypeById[p.id] && (() => {
-                          const c = archetypeColors[archetypeById[p.id]] || "#f5a623";
-                          return (
-                            <div style={{ marginTop: 6, display: "inline-block", padding: "2px 8px", borderRadius: 20,
-                              fontSize: 11, fontWeight: 600, background: `${c}22`, color: c,
-                              border: `1px solid ${c}55`, marginRight: 6 }}>
-                              {archetypeById[p.id]}
-                            </div>
-                          );
-                        })()}
+                        {(archetypesById[p.id] || []).length > 0 && (
+                          <div style={{ marginTop: 6, display: "flex", flexWrap: "wrap", gap: 6 }}>
+                            {archetypesById[p.id].map(name => {
+                              const c = archetypeColors[name] || "#f5a623";
+                              return (
+                                <span key={name} style={{ display: "inline-block", padding: "2px 8px", borderRadius: 20,
+                                  fontSize: 11, fontWeight: 600, background: `${c}22`, color: c, border: `1px solid ${c}55` }}>
+                                  {name}
+                                </span>
+                              );
+                            })}
+                          </div>
+                        )}
                         {p.nilValuation > 0 && (() => {
                           const label = projectedTier(p.nilValuation);
                           const color = tierColor(label);
