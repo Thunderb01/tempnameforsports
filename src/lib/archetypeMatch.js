@@ -105,11 +105,16 @@ export function resolveArchetype(overwrite, values, defs, fields) {
   return matchArchetype(values, defs, fields);
 }
 
-// Returns { list, primary }. A manual override forces a single-item list.
-// Otherwise list = all matching archetypes; primary = the highest-priority one.
-export function resolveArchetypeList(overwrite, values, defs, fields) {
-  if (overwrite && String(overwrite).trim()) {
-    return { list: [overwrite], primary: overwrite };
+// Returns { list, primary }. The override wins when present:
+//   - an array (incl. []) = the explicit final list ([] means "all shut off")
+//   - a non-empty string  = legacy single-archetype override → [string]
+//   - null / "" / undefined = no override → use all threshold matches
+export function resolveArchetypeList(override, values, defs, fields) {
+  if (Array.isArray(override)) {
+    return { list: override, primary: override[0] ?? null };
+  }
+  if (override && String(override).trim()) {
+    return { list: [override], primary: override };
   }
   const list = matchArchetypes(values, defs, fields);
   return { list, primary: list[0] ?? null };

@@ -122,6 +122,13 @@ alter table public.players   add column if not exists archetypes jsonb default '
 alter table public.w_players add column if not exists archetype_overwrite text;
 alter table public.w_players add column if not exists archetypes jsonb default '[]';
 
+-- Per-player override LIST (supersedes the legacy single `archetype_overwrite`):
+--   null  = auto (use threshold matches)
+--   []    = explicitly no archetypes ("all shut off" for this player)
+--   [...] = exactly these archetypes for this player
+alter table public.players   add column if not exists archetype_override jsonb;
+alter table public.w_players add column if not exists archetype_override jsonb;
+
 -- International: no archetype concept existed yet — add all three.
 alter table public.international_players   add column if not exists archetype           text;
 alter table public.international_players   add column if not exists archetype_overwrite text;

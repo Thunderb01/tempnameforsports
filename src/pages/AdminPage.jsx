@@ -4,7 +4,7 @@ import { supabase }   from "@/lib/supabase";
 import { money, nilRange, letterGrade, gradeColor } from "@/lib/display";
 import { InternationalAdminContent } from "@/pages/InternationalAdminPage";
 import { DefCard } from "@/components/DefCard";
-import { DOMESTIC_FIELDS, domesticValues, resolveArchetypeList } from "@/lib/archetypeMatch";
+import { DOMESTIC_FIELDS, domesticValues, resolveArchetypeList, matchArchetypes } from "@/lib/archetypeMatch";
 
 // Load every row from a table/view, paging past PostgREST's 1000-row cap.
 async function fetchAllRows(table, columns) {
@@ -681,13 +681,15 @@ function PlayersTab() {
         const ids = players.map(p => p.id);
         const { data: statusRows } = await supabase
           .from("players")
-          .select("id, player_status, archetype_overwrite")
+          .select("id, player_status, archetype_overwrite, archetypes, archetype_override")
           .in("id", ids);
         const byId = Object.fromEntries((statusRows || []).map(r => [r.id, r]));
         setResults(players.map(p => ({
           ...p,
           player_status:       byId[p.id]?.player_status       ?? null,
           archetype_overwrite: byId[p.id]?.archetype_overwrite ?? null,
+          archetypes:          byId[p.id]?.archetypes          ?? [],
+          archetype_override:  byId[p.id]?.archetype_override  ?? null,
         })));
       } else {
         setResults([]);
@@ -831,32 +833,73 @@ function PlayerEditForm({ player, mode = "edit", onSave, onCancel, saving }) {
     primary_position:    player.primary_position    || "",
     current_team:        player.current_team        || "",
     player_status:       player.player_status       || "",
-    archetype_overwrite: player.archetype_overwrite || "",
   });
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
-  // Overwrite options come from the men's archetype definitions table.
-  const [defNames, setDefNames] = useState([]);
+  // ── Archetypes ──────────────────────────────────────────────────────────
+  // Definitions drive both the auto-match (computed live from this player's
+  // metrics) and the available-to-add list + colors.
+  const [defs, setDefs]   = useState([]);
+  const [defsLoaded, setDefsLoaded] = useState(false);
   useEffect(() => {
-    supabase.from("archetype_defs").select("name").order("priority")
-      .then(({ data }) => setDefNames([...new Set((data || []).map(d => d.name))]));
+    supabase.from("archetype_defs").select("*").order("priority")
+      .then(({ data }) => { setDefs(data || []); setDefsLoaded(true); });
   }, []);
+
+  const colorByName = Object.fromEntries(defs.map(d => [d.name, d.color || "#f5a623"]));
+  const defNames    = [...new Set(defs.map(d => d.name))];
+  // What the player would match purely from thresholds, computed live.
+  const autoList    = matchArchetypes(domesticValues(player), defs, DOMESTIC_FIELDS);
+
+  // overrideList: null = auto (use autoList); array = explicit set ([] = none).
+  const [overrideList, setOverrideList] = useState(
+    Array.isArray(player.archetype_override) ? player.archetype_override : null
+  );
+  const effective = overrideList != null ? overrideList : autoList;
+  const sameSet = (a, b) => a.length === b.length && a.every(x => b.includes(x));
+
+  function removeArch(name) { setOverrideList(effective.filter(x => x !== name)); }
+  function addArch(name)    { if (name && !effective.includes(name)) setOverrideList([...effective, name]); }
+  function resetAuto()      { setOverrideList(null); }
 
   function submit() {
     const num = (v) => v !== "" ? Number(v) : null;
-    onSave({
-      name:                form.name.trim()          || null,
-      espn_id:             form.espn_id.trim()       || null,
-      height:              form.height.trim()        || null,
-      hometown:            form.hometown.trim()      || null,
-      year:                form.year                 || null,
-      eligibility_years:   num(form.eligibility_years),
-      primary_position:    form.primary_position     || null,
-      current_team:        form.current_team.trim()  || null,
-      player_status:       form.player_status        || null,
-      archetype_overwrite: form.archetype_overwrite  || null,
-    });
+    const patch = {
+      name:              form.name.trim()          || null,
+      espn_id:           form.espn_id.trim()       || null,
+      height:            form.height.trim()        || null,
+      hometown:          form.hometown.trim()      || null,
+      year:              form.year                 || null,
+      eligibility_years: num(form.eligibility_years),
+      primary_position:  form.primary_position     || null,
+      current_team:      form.current_team.trim()  || null,
+      player_status:     form.player_status        || null,
+    };
+    // Only write archetype fields once definitions have loaded, so we never
+    // clobber a player's archetypes with an empty auto-match.
+    if (defsLoaded) {
+      // Treat an explicit override that equals the auto-match as "auto" (null).
+      const finalOverride = overrideList != null && !sameSet(overrideList, autoList) ? overrideList : null;
+      const list = finalOverride != null ? finalOverride : autoList;
+      patch.archetype_override  = finalOverride;   // jsonb: null | string[]
+      patch.archetype_overwrite = null;            // retire the legacy single override
+      patch.archetypes          = list;
+      patch.archetype           = list[0] ?? null;
+    }
+    onSave(patch);
   }
+
+  const pill = (name, onRemove) => {
+    const c = colorByName[name] || "#f5a623";
+    return (
+      <span key={name} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "3px 6px 3px 10px",
+        borderRadius: 20, fontSize: 12, fontWeight: 600, background: `${c}22`, color: c, border: `1px solid ${c}55` }}>
+        {name}
+        <button onClick={() => onRemove(name)} title="Shut off for this player"
+          style={{ background: "none", border: "none", color: c, cursor: "pointer", fontSize: 13, lineHeight: 1, padding: 0 }}>×</button>
+      </span>
+    );
+  };
 
   const sectionHead = (title) => (
     <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".06em", opacity: .35,
@@ -933,17 +976,37 @@ function PlayerEditForm({ player, mode = "edit", onSave, onCancel, saving }) {
       </div>
 
 
-      {/* Archetype override */}
-      {sectionHead("Archetype Override")}
-      <div style={{ fontSize: 11, opacity: .3, marginBottom: 8, marginTop: -6 }}>
-        Exception only. Leave blank to let the threshold definitions assign the archetype on recompute.
+      {/* Archetypes */}
+      {sectionHead("Archetypes")}
+      <div style={{ fontSize: 11, opacity: .35, marginBottom: 10, marginTop: -6 }}>
+        Auto-assigned from the threshold definitions. Shut specific ones off with ×, or add a
+        specific archetype below. Any change pins this player (overriding auto-match) until you reset.
+        {overrideList != null && (
+          <button className="btn btn-ghost" style={{ fontSize: 11, padding: "1px 8px", marginLeft: 8 }}
+            onClick={resetAuto}>Reset to auto</button>
+        )}
       </div>
-      <div style={{ marginBottom: 16, maxWidth: 280 }}>
-        <label style={labelStyle}>Override Archetype</label>
-        <select className="input" style={{ width: "100%" }} value={form.archetype_overwrite} onChange={e => set("archetype_overwrite", e.target.value)}>
-          <option value="">— auto (from thresholds) —</option>
-          {(defNames.length ? defNames : ARCHETYPE_OPTIONS).map(a => <option key={a} value={a}>{a}</option>)}
-        </select>
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center", minHeight: 30 }}>
+          {effective.length === 0 && (
+            <span style={{ fontSize: 12, opacity: .35, fontStyle: "italic" }}>
+              {overrideList != null ? "No archetypes (all shut off)" : (defsLoaded ? "No threshold matches" : "Loading…")}
+            </span>
+          )}
+          {effective.map(name => pill(name, removeArch))}
+        </div>
+        {defNames.filter(n => !effective.includes(n)).length > 0 && (
+          <select className="input" style={{ width: 240, marginTop: 10, fontSize: 12 }}
+            value="" onChange={e => addArch(e.target.value)}>
+            <option value="">+ Add archetype…</option>
+            {defNames.filter(n => !effective.includes(n)).map(a => <option key={a} value={a}>{a}</option>)}
+          </select>
+        )}
+        <div style={{ fontSize: 11, opacity: .3, marginTop: 8 }}>
+          {overrideList != null
+            ? "Pinned — this exact set is saved for the player."
+            : "Auto — follows the definitions on every recompute."}
+        </div>
       </div>
 
       <div style={{ display: "flex", gap: 8 }}>
@@ -1010,14 +1073,16 @@ function ArchetypesTab() {
       // current archetype + override live on the base table (the men's
       // vw_players doesn't expose archetype, so never read it from the view).
       const rows     = await fetchAllRows(cfg.view, "id, ppg, rpg, apg, 3p_pct, sei, ath, ris, dds, cdi");
-      const baseRows = await fetchAllRows(cfg.players, "id, archetype, archetypes, archetype_overwrite");
+      const baseRows = await fetchAllRows(cfg.players, "id, archetype, archetypes, archetype_overwrite, archetype_override");
       const baseById = Object.fromEntries(baseRows.map(r => [r.id, r]));
 
       const sameList = (a, b) => JSON.stringify(a || []) === JSON.stringify(b || []);
       const changed = [];
       for (const r of rows) {
         const base = baseById[r.id] || {};
-        const { list, primary } = resolveArchetypeList(base.archetype_overwrite, domesticValues(r), defs, DOMESTIC_FIELDS);
+        // Prefer the explicit override LIST; fall back to the legacy text override.
+        const override = base.archetype_override != null ? base.archetype_override : base.archetype_overwrite;
+        const { list, primary } = resolveArchetypeList(override, domesticValues(r), defs, DOMESTIC_FIELDS);
         if ((primary || null) !== (base.archetype || null) || !sameList(list, base.archetypes)) {
           changed.push({ id: r.id, archetype: primary, archetypes: list });
         }
