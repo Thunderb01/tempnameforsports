@@ -76,12 +76,84 @@ def classify_archetype(pos, sei=0, ath=0, ris=0, dds=0, cdi=0):
     return None  # position unknown
 
 
+# ── Definition-table archetypes (mirrors src/lib/archetypeMatch.js) ────────────
+# Each field's `src` is the column on vw_players to read; the defs table uses
+# `<key>_min` / `<key>_max`. Keeps parity with DOMESTIC_FIELDS on the JS side.
+DOMESTIC_FIELD_DEFS = [
+    ("ppg",    "ppg"),
+    ("rpg",    "rpg"),
+    ("apg",    "apg"),
+    ("p3_pct", "3p_pct"),
+    ("sei",    "sei"),
+    ("ath",    "ath"),
+    ("ris",    "ris"),
+    ("dds",    "dds"),
+    ("cdi",    "cdi"),
+]
+
+
+def norm_pct(v):
+    if v is None or v == "":
+        return None
+    try:
+        n = float(v)
+    except (TypeError, ValueError):
+        return None
+    return n * 100 if 0 < n <= 1 else n
+
+
+def _in_range(value, lo, hi):
+    if lo is None and hi is None:
+        return True
+    if value is None or value == "":
+        return False
+    try:
+        v = float(value)
+    except (TypeError, ValueError):
+        return False
+    if lo is not None and v < float(lo):
+        return False
+    if hi is not None and v > float(hi):
+        return False
+    return True
+
+
+def _def_has_range(d):
+    return any(d.get(f"{k}_min") is not None or d.get(f"{k}_max") is not None
+               for k, _ in DOMESTIC_FIELD_DEFS)
+
+
+def match_archetype(row, defs):
+    """First definition (by priority, then name) whose every set range contains
+    the player's corresponding value. Returns the archetype name or None."""
+    values = {}
+    for key, src in DOMESTIC_FIELD_DEFS:
+        raw = row.get(src)
+        values[key] = norm_pct(raw) if key == "p3_pct" else raw
+    ordered = sorted(defs, key=lambda d: (d.get("priority") or 0, str(d.get("name"))))
+    for d in ordered:
+        if not _def_has_range(d):
+            continue
+        if all(_in_range(values[k], d.get(f"{k}_min"), d.get(f"{k}_max")) for k, _ in DOMESTIC_FIELD_DEFS):
+            return d.get("name")
+    return None
+
+
+def load_defs(sb, table):
+    try:
+        res = sb.table(table).select("*").order("priority").execute()
+        return res.data or []
+    except Exception:
+        return []
+
+
 # ── Helpers ────────────────────────────────────────────────────────────────────
 def parse_args():
     p = argparse.ArgumentParser()
     p.add_argument("--dry-run",   action="store_true", help="Print without writing")
     p.add_argument("--overwrite", action="store_true", help="Re-compute even if archetype already set")
     p.add_argument("--analyze",   action="store_true", help="Show archetype distribution + metric ranges, no writes")
+    p.add_argument("--womens",    action="store_true", help="Target the women's pool (w_players / vw_w_players / w_archetype_defs)")
     return p.parse_args()
 
 
@@ -174,12 +246,12 @@ def run_analyze(players):
     print()
 
 
-def fetch_all_players(sb, with_archetype=False):
-    # Metrics live on vw_players; archetype (if the column exists) lives on players.
+def fetch_all_players(sb, view="vw_players", players_table="players", with_archetype=False):
+    # Box stats + metrics live on the view; archetype + override live on the base table.
     rows, page_size, offset = [], 1000, 0
     while True:
-        res = sb.table("vw_players") \
-                .select("id, name, primary_position, sei, ath, ris, dds, cdi") \
+        res = sb.table(view) \
+                .select("id, name, primary_position, ppg, rpg, apg, 3p_pct, sei, ath, ris, dds, cdi") \
                 .range(offset, offset + page_size - 1) \
                 .execute()
         batch = res.data or []
@@ -192,19 +264,23 @@ def fetch_all_players(sb, with_archetype=False):
         try:
             arch_rows, offset = [], 0
             while True:
-                res = sb.table("players").select("id, archetype").range(offset, offset + page_size - 1).execute()
+                res = sb.table(players_table).select("id, archetype, archetype_overwrite") \
+                        .range(offset, offset + page_size - 1).execute()
                 batch = res.data or []
                 arch_rows.extend(batch)
                 if len(batch) < page_size:
                     break
                 offset += page_size
-            arch_map = {r["id"]: r.get("archetype") for r in arch_rows}
+            by_id = {r["id"]: r for r in arch_rows}
             for r in rows:
-                r["archetype"] = arch_map.get(r["id"])
+                base = by_id.get(r["id"], {})
+                r["archetype"]           = base.get("archetype")
+                r["archetype_overwrite"] = base.get("archetype_overwrite")
         except Exception:
-            # archetype column not yet added — treat all as unset
+            # columns not yet added — treat all as unset
             for r in rows:
                 r["archetype"] = None
+                r["archetype_overwrite"] = None
 
     return rows
 
@@ -250,8 +326,17 @@ def main():
         print("\nRe-run without --dry-run to write to the DB.")
         return
 
+    view          = "vw_w_players"     if args.womens else "vw_players"
+    players_table = "w_players"        if args.womens else "players"
+    defs_table    = "w_archetype_defs" if args.womens else "archetype_defs"
+
+    print(f"Pool: {'women' if args.womens else 'men'}  (table={players_table})")
+    defs = load_defs(sb, defs_table)
+    print(f"  {len(defs)} archetype definitions loaded from {defs_table}"
+          f"{' — falling back to built-in thresholds' if not defs else ''}.")
+
     print("Fetching players…")
-    players = fetch_all_players(sb, with_archetype=True)
+    players = fetch_all_players(sb, view=view, players_table=players_table, with_archetype=True)
     print(f"  {len(players)} players loaded.\n")
 
     updates    = []
@@ -261,27 +346,38 @@ def main():
 
     for p in players:
         pos = p.get("primary_position")
+        overwrite = p.get("archetype_overwrite")
 
         # Skip if archetype already set and not overwriting
         if p.get("archetype") and not args.overwrite:
             skipped += 1
             continue
 
-        if not pos:
-            no_pos.append(p.get("name", p["id"]))
+        # A manual override always wins — no position/metrics needed.
+        if overwrite:
+            if (overwrite or None) != (p.get("archetype") or None):
+                updates.append((p["id"], p.get("name", ""), p.get("archetype"), overwrite))
+            else:
+                skipped += 1
             continue
 
-        # Skip players with no metrics at all (unevaluated)
-        metrics = [p.get("sei"), p.get("ath"), p.get("ris"), p.get("dds"), p.get("cdi")]
-        if all(v is None for v in metrics):
-            no_metrics.append(p.get("name", p["id"]))
-            continue
+        if defs:
+            arch = match_archetype(p, defs)
+        else:
+            # Legacy fallback: built-in position-based thresholds (metrics only).
+            if not pos:
+                no_pos.append(p.get("name", p["id"]))
+                continue
+            metrics = [p.get("sei"), p.get("ath"), p.get("ris"), p.get("dds"), p.get("cdi")]
+            if all(v is None for v in metrics):
+                no_metrics.append(p.get("name", p["id"]))
+                continue
+            arch = classify_archetype(
+                pos,
+                sei=p.get("sei"), ath=p.get("ath"), ris=p.get("ris"),
+                dds=p.get("dds"), cdi=p.get("cdi"),
+            )
 
-        arch = classify_archetype(
-            pos,
-            sei=p.get("sei"), ath=p.get("ath"), ris=p.get("ris"),
-            dds=p.get("dds"), cdi=p.get("cdi"),
-        )
         if arch:
             updates.append((p["id"], p.get("name", ""), p.get("archetype"), arch))
 
@@ -330,7 +426,7 @@ def main():
         batch = updates[i : i + BATCH]
         for pid, name, _, arch in batch:
             try:
-                sb.table("players").update({"archetype": arch}).eq("id", pid).execute()
+                sb.table(players_table).update({"archetype": arch}).eq("id", pid).execute()
                 written += 1
             except Exception as exc:
                 print(f"  ERROR {name}: {exc}")

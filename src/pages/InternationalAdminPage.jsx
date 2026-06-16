@@ -2,6 +2,25 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { supabase }   from "@/lib/supabase";
 import { PROJECTED_TIER_OPTIONS, tierColor } from "@/lib/display";
+import { DefCard } from "@/components/DefCard";
+import { INTL_FIELDS, intlValues, resolveArchetype } from "@/lib/archetypeMatch";
+
+// Load every row from a table, paging past PostgREST's 1000-row cap.
+// `build` optionally adds filters/ordering to the query before paging.
+async function fetchAllIntl(table, columns, build) {
+  const PAGE = 1000;
+  let from = 0, all = [];
+  for (;;) {
+    let q = supabase.from(table).select(columns);
+    if (build) q = build(q);
+    const { data, error } = await q.range(from, from + PAGE - 1);
+    if (error) throw error;
+    all = all.concat(data || []);
+    if (!data || data.length < PAGE) break;
+    from += PAGE;
+  }
+  return all;
+}
 
 // ── Constants ────────────────────────────────────────────────────────────────
 // Tier labels are now loaded from the international_tier_labels table at runtime.
@@ -28,7 +47,7 @@ const PROFILE_CSV_HEADERS = [
   "country_of_origin", "age", "recruiting_class",
   "agent_name", "agent_contact", "film_url", "competition_tier",
   "player_status", "committed_team", "us_interest_level", "projected_tier",
-  "scouting_notes",
+  "archetype_overwrite", "scouting_notes",
   ...METRIC_KEYS,
 ];
 const STATS_CSV_FIXED = ["player_name", "league", "season", "season_type", "stat_type", "team"];
@@ -107,26 +126,27 @@ function Section({ title, children, action }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // Profile form
 // ─────────────────────────────────────────────────────────────────────────────
-function ProfileForm({ initial, onSave, onCancel, saving, tierLabels }) {
+function ProfileForm({ initial, onSave, onCancel, saving, tierLabels, archetypeNames = [] }) {
   const [form, setForm] = useState(() => ({
-    name:              initial?.name              ?? "",
-    league:            initial?.league            ?? "",
-    profile_url:       initial?.profile_url       ?? "",
-    height:            initial?.height            ?? "",
-    primary_position:  initial?.primary_position  ?? "",
-    country_of_origin: initial?.country_of_origin ?? "",
-    age:               initial?.age               ?? "",
-    recruiting_class:  initial?.recruiting_class  ?? "",
-    agent_name:        initial?.agent_name        ?? "",
-    agent_contact:     initial?.agent_contact     ?? "",
-    film_url:          initial?.film_url          ?? "",
-    competition_tier:  initial?.competition_tier  ?? 2,
-    player_status:     initial?.player_status     ?? "uncommitted",
-    committed_team:    initial?.committed_team    ?? "",
-    us_interest_level: initial?.us_interest_level ?? "",
-    projected_tier:    initial?.projected_tier    ?? "",
-    scouting_notes:    initial?.scouting_notes    ?? "",
-    metrics:           { ...(initial?.metrics || {}) },
+    name:                initial?.name                ?? "",
+    league:              initial?.league              ?? "",
+    profile_url:         initial?.profile_url         ?? "",
+    height:              initial?.height              ?? "",
+    primary_position:    initial?.primary_position    ?? "",
+    country_of_origin:   initial?.country_of_origin   ?? "",
+    age:                 initial?.age                 ?? "",
+    recruiting_class:    initial?.recruiting_class    ?? "",
+    agent_name:          initial?.agent_name          ?? "",
+    agent_contact:       initial?.agent_contact       ?? "",
+    film_url:            initial?.film_url            ?? "",
+    competition_tier:    initial?.competition_tier    ?? 2,
+    player_status:       initial?.player_status       ?? "uncommitted",
+    committed_team:      initial?.committed_team      ?? "",
+    us_interest_level:   initial?.us_interest_level   ?? "",
+    projected_tier:      initial?.projected_tier      ?? "",
+    archetype_overwrite: initial?.archetype_overwrite ?? "",
+    scouting_notes:      initial?.scouting_notes      ?? "",
+    metrics:             { ...(initial?.metrics || {}) },
   }));
 
   // Toggle for the "Recruiting Status" sub-field: "interest" (US college interest level)
@@ -162,6 +182,7 @@ function ProfileForm({ initial, onSave, onCancel, saving, tierLabels }) {
       committed_team:    recruitMode === "committed" ? (form.committed_team.trim() || null) : null,
       us_interest_level: recruitMode === "interest"  ? (form.us_interest_level || null)    : null,
       projected_tier:    form.projected_tier || null,
+      archetype_overwrite: form.archetype_overwrite || null,
       scouting_notes:    form.scouting_notes.trim()    || null,
       metrics:           form.metrics,
     });
@@ -256,7 +277,7 @@ function ProfileForm({ initial, onSave, onCancel, saving, tierLabels }) {
               onChange={e => set("committed_team", e.target.value)} />
           )}
         </div>
-        <div style={{ gridColumn: "1 / -1" }}>
+        <div>
           <label style={labelStyle}>Projected Tier (D1 level)</label>
           <select className="input" style={{ width: "100%" }}
             value={form.projected_tier}
@@ -265,6 +286,15 @@ function ProfileForm({ initial, onSave, onCancel, saving, tierLabels }) {
             {PROJECTED_TIER_OPTIONS.map(t => (
               <option key={t} value={t}>{t}</option>
             ))}
+          </select>
+        </div>
+        <div>
+          <label style={labelStyle}>Archetype Override (exception only)</label>
+          <select className="input" style={{ width: "100%" }}
+            value={form.archetype_overwrite}
+            onChange={e => set("archetype_overwrite", e.target.value)}>
+            <option value="">— auto (from thresholds) —</option>
+            {archetypeNames.map(a => <option key={a} value={a}>{a}</option>)}
           </select>
         </div>
         <div>
@@ -601,6 +631,84 @@ export function InternationalAdminContent() {
   const [statEditId,      setStatEditId]      = useState(null); // 'new' | uuid
   const [statEditInitial, setStatEditInitial] = useState(null);
 
+  const [archDefs,    setArchDefs]    = useState([]);
+  const [recomputing, setRecomputing] = useState(false);
+  const [archMsg,     setArchMsg]     = useState("");
+
+  const loadArchDefs = useCallback(async () => {
+    const { data, error } = await supabase.from("international_archetype_defs").select("*").order("priority");
+    if (error) { console.error("archetype defs fetch:", error); return; }
+    setArchDefs(data || []);
+  }, []);
+
+  async function addArchDef() {
+    const { data, error } = await supabase.from("international_archetype_defs")
+      .insert({ name: "New Archetype", priority: archDefs.length }).select();
+    if (error) { alert("Add failed: " + error.message); return; }
+    setArchDefs(prev => [...prev, ...(data || [])]);
+  }
+
+  async function saveArchDef(id, patch) {
+    const { error } = await supabase.from("international_archetype_defs").update(patch).eq("id", id);
+    if (error) { alert("Save failed: " + error.message); return; }
+    setArchDefs(prev => prev.map(d => d.id === id ? { ...d, ...patch } : d));
+  }
+
+  async function deleteArchDef(id) {
+    if (!confirm("Delete this archetype definition?")) return;
+    const { error } = await supabase.from("international_archetype_defs").delete().eq("id", id);
+    if (error) { alert("Delete failed: " + error.message); return; }
+    setArchDefs(prev => prev.filter(d => d.id !== id));
+  }
+
+  // Resolve + write `archetype` for every international player across both the
+  // men's and women's intl pools. Reads metrics off the profile and the box
+  // stats off the canonical stat row (latest Averages / Regular_Season).
+  async function recomputeArchetypes() {
+    if (!archDefs.length) { setArchMsg("Define at least one archetype before recomputing."); return; }
+    setRecomputing(true); setArchMsg("Scanning players…");
+    try {
+      const pools = [
+        { players: "international_players",   stats: "international_players_stats"   },
+        { players: "w_international_players", stats: "w_international_players_stats" },
+      ];
+      let totChanged = 0, totScanned = 0;
+      for (const pool of pools) {
+        let profiles = [];
+        try {
+          profiles = await fetchAllIntl(pool.players, "id, archetype, archetype_overwrite, metrics");
+        } catch { continue; } // women's intl table may not exist on older DBs
+        if (!profiles.length) continue;
+
+        const statRows = await fetchAllIntl(pool.stats, "player_id, season, stats",
+          q => q.eq("stat_type", "Averages").eq("season_type", "Regular_Season").order("season", { ascending: false }));
+        const statsByPid = {};
+        for (const s of statRows) {
+          if (s.player_id && !(s.player_id in statsByPid)) statsByPid[s.player_id] = s.stats || {};
+        }
+
+        const changed = [];
+        for (const p of profiles) {
+          const vals = intlValues(p.metrics || {}, statsByPid[p.id] || {});
+          const resolved = resolveArchetype(p.archetype_overwrite, vals, archDefs, INTL_FIELDS);
+          if ((resolved || null) !== (p.archetype || null)) changed.push({ id: p.id, archetype: resolved });
+        }
+
+        const CHUNK = 25;
+        for (let i = 0; i < changed.length; i += CHUNK) {
+          await Promise.all(changed.slice(i, i + CHUNK).map(c =>
+            supabase.from(pool.players).update({ archetype: c.archetype }).eq("id", c.id)));
+        }
+        totChanged += changed.length; totScanned += profiles.length;
+      }
+      setArchMsg(`Done — ${totChanged} player${totChanged === 1 ? "" : "s"} updated (${totScanned} scanned).`);
+      await loadProfiles();
+    } catch (e) {
+      setArchMsg("Recompute failed: " + e.message);
+    }
+    setRecomputing(false);
+  }
+
   // ── Load profiles ─────────────────────────────────────────────────────────
   const loadProfiles = useCallback(async () => {
     const { data, error } = await supabase
@@ -635,7 +743,7 @@ export function InternationalAdminContent() {
     setTierLabels(prev => ({ ...prev, [tier]: label }));
   }
 
-  useEffect(() => { loadProfiles(); loadTierLabels(); }, [loadProfiles, loadTierLabels]);
+  useEffect(() => { loadProfiles(); loadTierLabels(); loadArchDefs(); }, [loadProfiles, loadTierLabels, loadArchDefs]);
 
   const loadStatsFor = useCallback(async (profile) => {
     if (!profile) { setStatsRows([]); return; }
@@ -736,9 +844,10 @@ export function InternationalAdminContent() {
         competition_tier:  parseInt(r.competition_tier, 10) || 2,
         player_status:     r.player_status?.trim()     || null,
         committed_team:    r.committed_team?.trim()    || null,
-        us_interest_level: r.us_interest_level?.trim() || null,
-        projected_tier:    r.projected_tier?.trim()    || null,
-        scouting_notes:    r.scouting_notes?.trim()    || null,
+        us_interest_level:   r.us_interest_level?.trim()   || null,
+        projected_tier:      r.projected_tier?.trim()      || null,
+        archetype_overwrite: r.archetype_overwrite?.trim() || null,
+        scouting_notes:      r.scouting_notes?.trim()      || null,
         metrics,
       };
     }).filter(p => p.name && p.league);
@@ -812,10 +921,11 @@ export function InternationalAdminContent() {
     <div>
       <div style={{ display: "flex", gap: 6, marginBottom: 24 }}>
             {[
-              { id: "profiles", label: "Profiles" },
-              { id: "stats",    label: "Stats" },
-              { id: "tiers",    label: "Tier Labels" },
-              { id: "csv",      label: "CSV Import" },
+              { id: "profiles",   label: "Profiles" },
+              { id: "stats",      label: "Stats" },
+              { id: "archetypes", label: "Archetypes" },
+              { id: "tiers",      label: "Tier Labels" },
+              { id: "csv",        label: "CSV Import" },
             ].map(t => (
               <button key={t.id} onClick={() => setTab(t.id)} style={{
                 fontSize: 12, fontWeight: 600, padding: "6px 16px", borderRadius: 20, cursor: "pointer", border: "1px solid",
@@ -842,6 +952,7 @@ export function InternationalAdminContent() {
                   initial={editInitial}
                   saving={saving}
                   tierLabels={tierLabels}
+                  archetypeNames={archDefs.map(d => d.name)}
                   onSave={saveProfile}
                   onCancel={() => { setEditId(null); setEditInitial(null); }}
                 />
@@ -978,6 +1089,39 @@ export function InternationalAdminContent() {
               )}
             </Section>
           )}
+
+      {/* ── ARCHETYPES TAB ──────────────────────────────────────────── */}
+      {tab === "archetypes" && (
+        <Section title={`Archetype definitions (${archDefs.length})`}>
+          <div style={{ fontSize: 12, opacity: .5, marginBottom: 16, maxWidth: 680 }}>
+            A player matches an archetype when every set range contains their value. Box stats
+            (PTS / REB / AST / 3P%) read from the latest <em>Averages · Regular Season</em> stat
+            row; the five metrics read from the player's BTP metrics. Leave a field as
+            <em> any–any</em> to ignore it. Lowest <strong>priority</strong> wins when several
+            match. <strong>Recompute</strong> applies to all international players (men's &
+            women's); per-player overrides always take precedence.
+          </div>
+
+          <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 18, flexWrap: "wrap" }}>
+            <button className="btn btn-primary" style={{ fontSize: 12 }} onClick={addArchDef}>+ Add archetype</button>
+            <button className="btn btn-ghost" style={{ fontSize: 12 }} disabled={recomputing} onClick={recomputeArchetypes}>
+              {recomputing ? "Recomputing…" : "↻ Recompute all players"}
+            </button>
+            {archMsg && <span style={{ fontSize: 12, opacity: .6 }}>{archMsg}</span>}
+          </div>
+
+          {archDefs.length === 0 ? (
+            <div style={{ opacity: .35, fontSize: 13 }}>No archetypes defined yet. Click "+ Add archetype".</div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              {archDefs.map(def => (
+                <DefCard key={def.id} def={def} fields={INTL_FIELDS}
+                  onSave={patch => saveArchDef(def.id, patch)} onDelete={() => deleteArchDef(def.id)} />
+              ))}
+            </div>
+          )}
+        </Section>
+      )}
 
       {/* ── TIER LABELS TAB ─────────────────────────────────────────── */}
       {tab === "tiers" && (

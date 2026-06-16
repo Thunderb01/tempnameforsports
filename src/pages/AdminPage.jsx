@@ -3,6 +3,22 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { supabase }   from "@/lib/supabase";
 import { money, nilRange, letterGrade, gradeColor } from "@/lib/display";
 import { InternationalAdminContent } from "@/pages/InternationalAdminPage";
+import { DefCard } from "@/components/DefCard";
+import { DOMESTIC_FIELDS, domesticValues, resolveArchetype } from "@/lib/archetypeMatch";
+
+// Load every row from a table/view, paging past PostgREST's 1000-row cap.
+async function fetchAllRows(table, columns) {
+  const PAGE = 1000;
+  let from = 0, all = [];
+  for (;;) {
+    const { data, error } = await supabase.from(table).select(columns).range(from, from + PAGE - 1);
+    if (error) throw error;
+    all = all.concat(data || []);
+    if (!data || data.length < PAGE) break;
+    from += PAGE;
+  }
+  return all;
+}
 
 // Self-contained team search — queries vw_players.current_team (avoids teams table RLS)
 function TeamSearch({ value, onChange, placeholder = "Search team…" }) {
@@ -444,6 +460,7 @@ export function AdminPage() {
             {[
               { key: "transfers",     label: "Portal Transfers" },
               { key: "players",       label: "Players" },
+              { key: "archetypes",    label: "Archetypes" },
               { key: "international", label: "International" },
               { key: "coaches",       label: "Coaches" },
             ].map(t => (
@@ -460,6 +477,7 @@ export function AdminPage() {
         <div style={{ marginTop: 24 }}>
           {activeTab === "transfers"     && <TransfersTab />}
           {activeTab === "players"       && <PlayersTab />}
+          {activeTab === "archetypes"    && <ArchetypesTab />}
           {activeTab === "international" && <InternationalAdminContent />}
           {activeTab === "coaches"       && <CoachesTab />}
         </div>
@@ -663,10 +681,14 @@ function PlayersTab() {
         const ids = players.map(p => p.id);
         const { data: statusRows } = await supabase
           .from("players")
-          .select("id, player_status")
+          .select("id, player_status, archetype_overwrite")
           .in("id", ids);
-        const statusById = Object.fromEntries((statusRows || []).map(r => [r.id, r.player_status]));
-        setResults(players.map(p => ({ ...p, player_status: statusById[p.id] ?? null })));
+        const byId = Object.fromEntries((statusRows || []).map(r => [r.id, r]));
+        setResults(players.map(p => ({
+          ...p,
+          player_status:       byId[p.id]?.player_status       ?? null,
+          archetype_overwrite: byId[p.id]?.archetype_overwrite ?? null,
+        })));
       } else {
         setResults([]);
       }
@@ -800,32 +822,39 @@ function PlayersTab() {
 function PlayerEditForm({ player, mode = "edit", onSave, onCancel, saving }) {
   const isAdd = mode === "add";
   const [form, setForm] = useState({
-    name:              player.name              || "",
-    espn_id:           player.espn_id           || "",
-    height:            player.height            || "",
-    hometown:          player.hometown          || "",
-    year:              player.year              || "",
-    eligibility_years: player.eligibility_years ?? "",
-    primary_position:  player.primary_position  || "",
-    current_team:      player.current_team      || "",
-    player_status:     player.player_status     || "",
-    archetype:         player.archetype         || "",
+    name:                player.name                || "",
+    espn_id:             player.espn_id             || "",
+    height:              player.height              || "",
+    hometown:            player.hometown            || "",
+    year:                player.year                || "",
+    eligibility_years:   player.eligibility_years   ?? "",
+    primary_position:    player.primary_position    || "",
+    current_team:        player.current_team        || "",
+    player_status:       player.player_status       || "",
+    archetype_overwrite: player.archetype_overwrite || "",
   });
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  // Overwrite options come from the men's archetype definitions table.
+  const [defNames, setDefNames] = useState([]);
+  useEffect(() => {
+    supabase.from("archetype_defs").select("name").order("priority")
+      .then(({ data }) => setDefNames([...new Set((data || []).map(d => d.name))]));
+  }, []);
 
   function submit() {
     const num = (v) => v !== "" ? Number(v) : null;
     onSave({
-      name:              form.name.trim()          || null,
-      espn_id:           form.espn_id.trim()       || null,
-      height:            form.height.trim()        || null,
-      hometown:          form.hometown.trim()      || null,
-      year:              form.year                 || null,
-      eligibility_years: num(form.eligibility_years),
-      primary_position:  form.primary_position     || null,
-      current_team:      form.current_team.trim()  || null,
-      player_status:     form.player_status        || null,
-      archetype:         form.archetype || null,
+      name:                form.name.trim()          || null,
+      espn_id:             form.espn_id.trim()       || null,
+      height:              form.height.trim()        || null,
+      hometown:            form.hometown.trim()      || null,
+      year:                form.year                 || null,
+      eligibility_years:   num(form.eligibility_years),
+      primary_position:    form.primary_position     || null,
+      current_team:        form.current_team.trim()  || null,
+      player_status:       form.player_status        || null,
+      archetype_overwrite: form.archetype_overwrite  || null,
     });
   }
 
@@ -904,14 +933,16 @@ function PlayerEditForm({ player, mode = "edit", onSave, onCancel, saving }) {
       </div>
 
 
-      {/* Archetype */}
-      {sectionHead("Archetype")}
-      <div style={{ fontSize: 11, opacity: .3, marginBottom: 8, marginTop: -6 }}>Leave blank to auto-compute from BTP metrics.</div>
+      {/* Archetype override */}
+      {sectionHead("Archetype Override")}
+      <div style={{ fontSize: 11, opacity: .3, marginBottom: 8, marginTop: -6 }}>
+        Exception only. Leave blank to let the threshold definitions assign the archetype on recompute.
+      </div>
       <div style={{ marginBottom: 16, maxWidth: 280 }}>
-        <label style={labelStyle}>Archetype</label>
-        <select className="input" style={{ width: "100%" }} value={form.archetype} onChange={e => set("archetype", e.target.value)}>
-          <option value="">— auto (from metrics) —</option>
-          {ARCHETYPE_OPTIONS.map(a => <option key={a} value={a}>{a}</option>)}
+        <label style={labelStyle}>Override Archetype</label>
+        <select className="input" style={{ width: "100%" }} value={form.archetype_overwrite} onChange={e => set("archetype_overwrite", e.target.value)}>
+          <option value="">— auto (from thresholds) —</option>
+          {(defNames.length ? defNames : ARCHETYPE_OPTIONS).map(a => <option key={a} value={a}>{a}</option>)}
         </select>
       </div>
 
@@ -921,6 +952,128 @@ function PlayerEditForm({ player, mode = "edit", onSave, onCancel, saving }) {
         </button>
         <button className="btn btn-ghost" style={{ fontSize: 12 }} onClick={onCancel}>Cancel</button>
       </div>
+    </div>
+  );
+}
+
+// ── Archetypes tab ─────────────────────────────────────────────────────────
+// Superadmin-defined archetype definitions (named threshold ranges) for the
+// domestic pools. A player's resolved archetype = override ?? threshold-match.
+// "Recompute" reads the latest-season fields from the view, the per-player
+// override from the base table, resolves, and writes `archetype`.
+function ArchetypesTab() {
+  const [sport, setSport] = useState("mens");
+  const cfg = sport === "mens"
+    ? { defs: "archetype_defs",   view: "vw_players",   players: "players"   }
+    : { defs: "w_archetype_defs", view: "vw_w_players", players: "w_players" };
+
+  const [defs,        setDefs]        = useState([]);
+  const [loading,     setLoading]     = useState(true);
+  const [recomputing, setRecomputing] = useState(false);
+  const [msg,         setMsg]         = useState("");
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const { data, error } = await supabase.from(cfg.defs).select("*").order("priority");
+    if (error) { alert("Load failed: " + error.message); setLoading(false); return; }
+    setDefs(data || []);
+    setLoading(false);
+  }, [cfg.defs]);
+
+  useEffect(() => { load(); }, [load]);
+
+  async function addDef() {
+    const { data, error } = await supabase.from(cfg.defs)
+      .insert({ name: "New Archetype", priority: defs.length }).select();
+    if (error) { alert("Add failed: " + error.message); return; }
+    setDefs(prev => [...prev, ...(data || [])]);
+  }
+
+  async function saveDef(id, patch) {
+    const { error } = await supabase.from(cfg.defs).update(patch).eq("id", id);
+    if (error) { alert("Save failed: " + error.message); return; }
+    setDefs(prev => prev.map(d => d.id === id ? { ...d, ...patch } : d));
+  }
+
+  async function deleteDef(id) {
+    if (!confirm("Delete this archetype definition?")) return;
+    const { error } = await supabase.from(cfg.defs).delete().eq("id", id);
+    if (error) { alert("Delete failed: " + error.message); return; }
+    setDefs(prev => prev.filter(d => d.id !== id));
+  }
+
+  async function recompute() {
+    if (!defs.length) { setMsg("Define at least one archetype before recomputing."); return; }
+    setRecomputing(true); setMsg("Scanning players…");
+    try {
+      const rows   = await fetchAllRows(cfg.view, "id, archetype, ppg, rpg, apg, 3p_pct, sei, ath, ris, dds, cdi");
+      const ovRows = await fetchAllRows(cfg.players, "id, archetype_overwrite");
+      const ovById = Object.fromEntries(ovRows.map(r => [r.id, r.archetype_overwrite]));
+
+      const changed = [];
+      for (const r of rows) {
+        const resolved = resolveArchetype(ovById[r.id], domesticValues(r), defs, DOMESTIC_FIELDS);
+        if ((resolved || null) !== (r.archetype || null)) changed.push({ id: r.id, archetype: resolved });
+      }
+
+      const CHUNK = 25;
+      for (let i = 0; i < changed.length; i += CHUNK) {
+        await Promise.all(changed.slice(i, i + CHUNK).map(c =>
+          supabase.from(cfg.players).update({ archetype: c.archetype }).eq("id", c.id)));
+        setMsg(`Updating… ${Math.min(i + CHUNK, changed.length)}/${changed.length}`);
+      }
+      setMsg(`Done — ${changed.length} player${changed.length === 1 ? "" : "s"} updated (${rows.length} scanned).`);
+    } catch (e) {
+      setMsg("Recompute failed: " + e.message);
+    }
+    setRecomputing(false);
+  }
+
+  return (
+    <div>
+      {/* Men's / Women's toggle */}
+      <div style={{ display: "flex", gap: 6, marginBottom: 20 }}>
+        {[["mens", "Men's"], ["womens", "Women's"]].map(([val, lbl]) => (
+          <button key={val} onClick={() => { setSport(val); setMsg(""); }} style={{
+            fontSize: 12, fontWeight: 600, padding: "5px 16px", borderRadius: 20, cursor: "pointer", border: "1px solid",
+            background:  sport === val ? "rgba(245,166,35,.15)" : "transparent",
+            color:       sport === val ? "#f5a623"              : "rgba(255,255,255,.4)",
+            borderColor: sport === val ? "rgba(245,166,35,.4)"  : "rgba(255,255,255,.12)",
+          }}>{lbl}</button>
+        ))}
+      </div>
+
+      <Section
+        title={`Archetype definitions — ${sport === "mens" ? "Men's" : "Women's"} (${defs.length})`}
+      >
+        <div style={{ fontSize: 12, opacity: .45, marginBottom: 16, maxWidth: 680 }}>
+          A player matches an archetype when every set range contains their latest-season value.
+          Leave a field as <em>any–any</em> to ignore it. When several archetypes match, the lowest
+          <strong> priority</strong> number wins. Click <strong>Recompute</strong> to apply changes to
+          all players (per-player overrides always take precedence).
+        </div>
+
+        <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 18, flexWrap: "wrap" }}>
+          <button className="btn btn-primary" style={{ fontSize: 12 }} onClick={addDef}>+ Add archetype</button>
+          <button className="btn btn-ghost" style={{ fontSize: 12 }} disabled={recomputing} onClick={recompute}>
+            {recomputing ? "Recomputing…" : "↻ Recompute all players"}
+          </button>
+          {msg && <span style={{ fontSize: 12, opacity: .6 }}>{msg}</span>}
+        </div>
+
+        {loading ? (
+          <div style={{ opacity: .4, fontSize: 13 }}>Loading…</div>
+        ) : defs.length === 0 ? (
+          <div style={{ opacity: .35, fontSize: 13 }}>No archetypes defined yet. Click "+ Add archetype".</div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            {defs.map(def => (
+              <DefCard key={def.id} def={def} fields={DOMESTIC_FIELDS}
+                onSave={patch => saveDef(def.id, patch)} onDelete={() => deleteDef(def.id)} />
+            ))}
+          </div>
+        )}
+      </Section>
     </div>
   );
 }
