@@ -1006,14 +1006,18 @@ function ArchetypesTab() {
     if (!defs.length) { setMsg("Define at least one archetype before recomputing."); return; }
     setRecomputing(true); setMsg("Scanning players…");
     try {
-      const rows   = await fetchAllRows(cfg.view, "id, archetype, ppg, rpg, apg, 3p_pct, sei, ath, ris, dds, cdi");
-      const ovRows = await fetchAllRows(cfg.players, "id, archetype_overwrite");
-      const ovById = Object.fromEntries(ovRows.map(r => [r.id, r.archetype_overwrite]));
+      // Match fields come from the view (latest-season stats + metrics); the
+      // current archetype + override live on the base table (the men's
+      // vw_players doesn't expose archetype, so never read it from the view).
+      const rows     = await fetchAllRows(cfg.view, "id, ppg, rpg, apg, 3p_pct, sei, ath, ris, dds, cdi");
+      const baseRows = await fetchAllRows(cfg.players, "id, archetype, archetype_overwrite");
+      const baseById = Object.fromEntries(baseRows.map(r => [r.id, r]));
 
       const changed = [];
       for (const r of rows) {
-        const resolved = resolveArchetype(ovById[r.id], domesticValues(r), defs, DOMESTIC_FIELDS);
-        if ((resolved || null) !== (r.archetype || null)) changed.push({ id: r.id, archetype: resolved });
+        const base = baseById[r.id] || {};
+        const resolved = resolveArchetype(base.archetype_overwrite, domesticValues(r), defs, DOMESTIC_FIELDS);
+        if ((resolved || null) !== (base.archetype || null)) changed.push({ id: r.id, archetype: resolved });
       }
 
       const CHUNK = 25;
