@@ -107,6 +107,11 @@ begin
   end loop;
 end $$;
 
+-- ── Per-archetype display color (shown as the pill on the board / cards) ─────
+alter table public.archetype_defs               add column if not exists color text default '#f5a623';
+alter table public.w_archetype_defs             add column if not exists color text default '#f5a623';
+alter table public.international_archetype_defs  add column if not exists color text default '#f5a623';
+
 -- ── New columns ──────────────────────────────────────────────────────────────
 -- Domestic: archetype already exists; add the per-player exception override.
 alter table public.players   add column if not exists archetype_overwrite text;

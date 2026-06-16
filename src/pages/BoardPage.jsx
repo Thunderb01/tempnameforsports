@@ -60,6 +60,10 @@ export function BoardPage() {
   const [toTeamFilter,      setToTeamFilter]      = useState("");
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [confFilter,  setConfFilter]  = useState([]);
+  const [archetypeFilter,  setArchetypeFilter]  = useState("");
+  const [archetypeOptions, setArchetypeOptions] = useState([]);
+  const [archetypeColors,  setArchetypeColors]  = useState({});
+  const [archetypeById,    setArchetypeById]    = useState({});
   const YEAR_OPTIONS = ["Fr", "RS Fr", "So", "RS So", "Jr", "RS Jr", "Sr", "RS Sr", "Grad", "5th Year"];
   const conferences = [
     "A10", "ACC", "AE", "ASun", "Amer",
@@ -131,6 +135,30 @@ export function BoardPage() {
         setAllPortalIds(all);
         setPortalInfo(info);
       });
+
+    // Archetype filter: dropdown options are the definitions we've created;
+    // each player's resolved archetype comes from the players table.
+    supabase.from("archetype_defs").select("name, color").order("priority")
+      .then(({ data }) => {
+        setArchetypeOptions([...new Set((data || []).map(d => d.name))]);
+        setArchetypeColors(Object.fromEntries((data || []).map(d => [d.name, d.color || "#f5a623"])));
+      });
+
+    (async () => {
+      const PAGE = 1000;
+      let from = 0, map = {};
+      for (;;) {
+        const { data, error } = await supabase
+          .from("players").select("id, archetype")
+          .not("archetype", "is", null)
+          .range(from, from + PAGE - 1);
+        if (error || !data) break;
+        data.forEach(r => { map[r.id] = r.archetype; });
+        if (data.length < PAGE) break;
+        from += PAGE;
+      }
+      setArchetypeById(map);
+    })();
   }, []);
 
   // ── Tags ────────────────────────────────────────────────────────────────────
@@ -214,7 +242,7 @@ export function BoardPage() {
 
 
   // Reset to page 0 whenever filters or sort change
-  useEffect(() => setPage(0), [search, posFilter, yearFilter, heightMin, heightMax, stateFilter, confFilter, sortKey, sortDir, portalOnly, includeCommitted, includeUnevaluated, advcFilters, toTeamFilter]);
+  useEffect(() => setPage(0), [search, posFilter, yearFilter, heightMin, heightMax, stateFilter, confFilter, archetypeFilter, sortKey, sortDir, portalOnly, includeCommitted, includeUnevaluated, advcFilters, toTeamFilter]);
 
   // ── Filter ──────────────────────────────────────────────────────────────────
   const filtered = useMemo(() => {
@@ -239,6 +267,7 @@ export function BoardPage() {
         const pConf = getTeamConference(p.team) || p.conf;
         if (!confFilter.includes(pConf)) return false;
       }
+      if (archetypeFilter && archetypeById[p.id] !== archetypeFilter) return false;
       if (stateTerms && !matchesState(p.hometown || "", stateTerms)) return false;
       if (!includeUnevaluated && !(p.marketHigh > 0)) return false;
       if (toTeamFilter.trim()) {
@@ -257,7 +286,7 @@ export function BoardPage() {
       }
       return true;
     });
-  }, [players, search, posFilter, yearFilter, heightMin, heightMax, confFilter, stateFilter, portalOnly, includeCommitted, includeUnevaluated, advcFilters, toTeamFilter, availableIds, allPortalIds, portalInfo]);
+  }, [players, search, posFilter, yearFilter, heightMin, heightMax, confFilter, archetypeFilter, archetypeById, stateFilter, portalOnly, includeCommitted, includeUnevaluated, advcFilters, toTeamFilter, availableIds, allPortalIds, portalInfo]);
 
   // ── Sort (separate so filter changes don't re-sort and vice versa) ──────────
   const sorted = useMemo(() => {
@@ -358,6 +387,10 @@ export function BoardPage() {
                 <option value="all">All locations</option>
                 {STATE_OPTIONS.map(o => <option key={o.label} value={o.label}>{o.label}</option>)}
               </select>
+              <select className="input" style={{ width: 180 }} value={archetypeFilter} onChange={e => setArchetypeFilter(e.target.value)}>
+                <option value="">All archetypes</option>
+                {archetypeOptions.map(a => <option key={a} value={a}>{a}</option>)}
+              </select>
               <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, opacity: .7, cursor: "pointer", userSelect: "none" }}>
                 <input type="checkbox" checked={portalOnly} onChange={e => setPortalOnly(e.target.checked)} />
                 Available in portal
@@ -380,10 +413,12 @@ export function BoardPage() {
                 ...(heightMin != null ? [{ label: `Ht ≥ ${formatHeight(heightMin)}`, onClear: () => setHeightMin(null) }] : []),
                 ...(heightMax != null ? [{ label: `Ht ≤ ${formatHeight(heightMax)}`, onClear: () => setHeightMax(null) }] : []),
                 ...(stateFilter !== "all" ? [{ label: `Loc: ${stateFilter}`, onClear: () => setStateFilter("all") }] : []),
+                ...(archetypeFilter ? [{ label: `Archetype: ${archetypeFilter}`, onClear: () => setArchetypeFilter("") }] : []),
               ]}
               onClearAll={() => {
                 setPosFilter([]); setYearFilter([]); setConfFilter([]);
                 setHeightMin(null); setHeightMax(null); setStateFilter("all");
+                setArchetypeFilter("");
               }}
             />
           </div>
@@ -473,6 +508,16 @@ export function BoardPage() {
                             st(s.apg)  && `APG ${st(s.apg)}`,
                           ].filter(Boolean).join("  ·  ");
                           return line ? <div className="row-sub" style={{ opacity: .75 }}>{line}</div> : null;
+                        })()}
+                        {archetypeById[p.id] && (() => {
+                          const c = archetypeColors[archetypeById[p.id]] || "#f5a623";
+                          return (
+                            <div style={{ marginTop: 6, display: "inline-block", padding: "2px 8px", borderRadius: 20,
+                              fontSize: 11, fontWeight: 600, background: `${c}22`, color: c,
+                              border: `1px solid ${c}55`, marginRight: 6 }}>
+                              {archetypeById[p.id]}
+                            </div>
+                          );
                         })()}
                         {p.nilValuation > 0 && (() => {
                           const label = projectedTier(p.nilValuation);

@@ -22,7 +22,11 @@ export function DefCard({ def, fields, onSave, onDelete }) {
   };
 
   function save() {
-    const patch = { name: (form.name || "").trim() || "Unnamed", priority: Number(form.priority) || 0 };
+    const patch = {
+      name: (form.name || "").trim() || "Unnamed",
+      priority: Number(form.priority) || 0,
+      color: form.color || "#f5a623",
+    };
     fields.forEach(f => {
       patch[`${f.key}_min`] = form[`${f.key}_min`] ?? null;
       patch[`${f.key}_max`] = form[`${f.key}_max`] ?? null;
@@ -43,6 +47,19 @@ export function DefCard({ def, fields, onSave, onDelete }) {
           <label style={labelStyle}>Priority</label>
           <input className="input" type="number" style={{ width: "100%" }} value={form.priority ?? 0}
             onChange={e => set("priority", e.target.value)} />
+        </div>
+        <div>
+          <label style={labelStyle}>Color</label>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <input type="color" value={form.color || "#f5a623"} onChange={e => set("color", e.target.value)}
+              style={{ width: 40, height: 32, padding: 0, border: "1px solid var(--border)", borderRadius: 6,
+                background: "transparent", cursor: "pointer" }} />
+            <span style={{ display: "inline-block", padding: "2px 10px", borderRadius: 20, fontSize: 11, fontWeight: 600,
+              background: `${form.color || "#f5a623"}22`, color: form.color || "#f5a623",
+              border: `1px solid ${form.color || "#f5a623"}55` }}>
+              {(form.name || "Preview").trim() || "Preview"}
+            </span>
+          </div>
         </div>
         <div style={{ display: "flex", gap: 6, marginLeft: "auto" }}>
           <button className="btn btn-primary" style={{ fontSize: 12 }} disabled={!dirty} onClick={save}>
