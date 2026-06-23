@@ -1230,10 +1230,15 @@ function FreshmanTiersTab() {
       </Section>
 
       <Section title="Incoming freshmen by team">
-        <div style={{ fontSize: 12, opacity: .5, marginBottom: 14, maxWidth: 680 }}>
+        <div style={{ fontSize: 12, opacity: .5, marginBottom: 8, maxWidth: 680 }}>
           Attach official incoming freshmen to a team. These are global — they appear (read-only)
           on every coach's build of that team and raise that team's score in the roster-strength
           comparison. Pick a team, then add freshmen with a position and an impact tier.
+        </div>
+        <div style={{ fontSize: 11, opacity: .55, marginBottom: 14, maxWidth: 680, fontStyle: "italic",
+          color: "#fbbf24" }}>
+          ⚠ Freshman BTP metrics and NIL valuations are pre-enrollment <strong>estimates/projections</strong>,
+          not verified production data.
         </div>
         <TeamFreshmenManager sport={sport} tiers={tiers} />
       </Section>

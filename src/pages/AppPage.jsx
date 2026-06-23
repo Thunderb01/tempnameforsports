@@ -136,6 +136,9 @@ const CustomPlayersSection = memo(function CustomPlayersSection({ customPlayers,
   return (
     <>
       <div className="section-divider">Freshmen / Redshirts</div>
+      <div style={{ padding: "0 14px 8px", fontSize: 11, opacity: .5, fontStyle: "italic" }}>
+        Freshman impact, BTP metrics, and NIL valuations are projections / estimates, not verified data.
+      </div>
       {customPlayers.map(p => (
         <div key={p.id} className="row" style={{ opacity: .8 }}>
           <div className="row-main">
@@ -578,9 +581,16 @@ function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], teamFreshmenA
   const maxPosScore    = Math.max(...Object.values(chartPosScores), 1);
   const maxPlayerScore = Math.max(...scoringPool.map(btpPlayerScoreDisplay), 1);
   const posCount       = POS_ORDER.filter(pos => (chart[pos] || []).length > 0).length;
+  const hasFreshmen    = scoringPool.some(p => p._freshmanEffect != null || p._isTeamFreshman);
 
   return (
     <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 16 }}>
+      {hasFreshmen && (
+        <div style={{ fontSize: 11, opacity: .55, fontStyle: "italic", color: "#fbbf24" }}>
+          ⚠ This grade includes incoming freshmen, whose impact, BTP metrics, and NIL valuations are
+          projections / estimates — not verified production data.
+        </div>
+      )}
 
       {/* Overall header */}
       <div style={{ background: "rgba(255,255,255,.04)", border: "1px solid var(--border)", borderRadius: 10, padding: "16px 20px", display: "flex", alignItems: "center", gap: 20, flexWrap: "wrap" }}>
