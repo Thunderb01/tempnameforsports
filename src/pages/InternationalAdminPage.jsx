@@ -25,8 +25,9 @@ async function fetchAllIntl(table, columns, build) {
 // ── Constants ────────────────────────────────────────────────────────────────
 // Tier labels are now loaded from the international_tier_labels table at runtime.
 // These are fallbacks used before the fetch resolves.
-const TIER_LABELS_FALLBACK = { 1: "EuroLeague / Elite", 2: "Top Domestic", 3: "Mid Domestic", 4: "Developmental" };
-const TIER_COLORS  = { 1: "#f59e0b", 2: "#5b9cf6", 3: "#4ade80", 4: "#9ca3af" };
+const TIERS = [1, 2, 3, 4, 5];
+const TIER_LABELS_FALLBACK = { 1: "EuroLeague / Elite", 2: "Top Domestic", 3: "Mid Domestic", 4: "Developmental", 5: "Academy / Youth" };
+const TIER_COLORS  = { 1: "#f59e0b", 2: "#5b9cf6", 3: "#4ade80", 4: "#9ca3af", 5: "#a78bfa" };
 const STAT_TYPES   = ["Averages", "Totals", "Per_36", "Advanced_Stats"];
 const SEASON_TYPES = ["Regular_Season", "Playoffs", "Cup", "International"];
 const POSITIONS    = ["PG", "SG", "SF", "PF", "C", "G", "F"];
@@ -229,7 +230,7 @@ function ProfileForm({ initial, onSave, onCancel, saving, tierLabels, archetypeN
         <div>
           <label style={labelStyle}>Competition Tier</label>
           <select className="input" style={{ width: "100%" }} value={form.competition_tier} onChange={e => set("competition_tier", e.target.value)}>
-            {[1, 2, 3, 4].map(t => (
+            {TIERS.map(t => (
               <option key={t} value={t}>
                 Tier {t} · {(tierLabels && tierLabels[t]) || TIER_LABELS_FALLBACK[t]}
               </option>
@@ -355,11 +356,11 @@ function TierLabelsEditor({ labels, onSave, saving }) {
     <div style={{ background: "rgba(255,255,255,.02)", border: "1px solid rgba(255,255,255,.08)",
                   borderRadius: 12, padding: 20 }}>
       <div style={{ fontSize: 11, opacity: .5, marginBottom: 12 }}>
-        Labels for the 4 international competition tiers. These show up in the public
+        Labels for the 5 international competition tiers. These show up in the public
         International page filter, on player profiles, and in the admin dropdown.
       </div>
       <div style={{ display: "grid", gap: 10 }}>
-        {[1, 2, 3, 4].map(tier => (
+        {TIERS.map(tier => (
           <div key={tier} style={{ display: "grid", gridTemplateColumns: "60px 1fr 120px", gap: 10, alignItems: "center" }}>
             <span style={{
               fontSize: 12, fontWeight: 700, textAlign: "center",
@@ -554,7 +555,7 @@ function CSVImporter({ kind, onImport }) {
 
       <div style={{ fontSize: 11, opacity: .5, marginBottom: 12 }}>
         {kind === "profile"
-          ? "Required: name, league. Optional: height, primary_position, country_of_origin, age, recruiting_class, agent_name, agent_contact, film_url, profile_url, competition_tier (1-4), scouting_notes, and 5 metric columns (offensive_footprint, defensive_score, winning_impact, sos_performance, translation_grade)."
+          ? "Required: name, league. Optional: height, primary_position, country_of_origin, age, recruiting_class, agent_name, agent_contact, film_url, profile_url, competition_tier (1-5), scouting_notes, and 5 metric columns (offensive_footprint, defensive_score, winning_impact, sos_performance, translation_grade)."
           : "Required: player_name, league, season, stat_type, team. All other columns become stat keys in the JSONB (e.g. pts, reb, fg%, ortg). Optional: season_type (defaults to Regular_Season)."}
       </div>
 

@@ -130,15 +130,27 @@ const NilInput = memo(function NilInput({ value, onCommit }) {
 });
 
 // ── Custom players (freshmen / redshirts) ────────────────────────────────────
-const CustomPlayersSection = memo(function CustomPlayersSection({ customPlayers, onAdd, onRemove, onNilChange, onNilBlur, activeTeam, userId }) {
-  const nameRef = useRef(); const posRef = useRef(); const yearRef = useRef(); const nilRef = useRef();
+const CustomPlayersSection = memo(function CustomPlayersSection({ customPlayers, freshmanTiers = [], onAdd, onRemove, onNilChange, onNilBlur, activeTeam, userId }) {
+  const nameRef = useRef(); const posRef = useRef(); const yearRef = useRef(); const nilRef = useRef(); const tierRef = useRef();
+  const tierColorByName = Object.fromEntries(freshmanTiers.map(t => [t.name, t.color || "#fbbf24"]));
   return (
     <>
       <div className="section-divider">Freshmen / Redshirts</div>
       {customPlayers.map(p => (
         <div key={p.id} className="row" style={{ opacity: .8 }}>
           <div className="row-main">
-            <div className="row-title" style={{ fontSize: 13 }}>{p.name}</div>
+            <div className="row-title" style={{ fontSize: 13 }}>
+              {p.name}
+              {p.freshman_tier && (() => {
+                const c = tierColorByName[p.freshman_tier] || "#fbbf24";
+                return (
+                  <span style={{ marginLeft: 8, display: "inline-block", padding: "1px 8px", borderRadius: 20,
+                    fontSize: 10, fontWeight: 600, background: `${c}22`, color: c, border: `1px solid ${c}55` }}>
+                    {p.freshman_tier}
+                  </span>
+                );
+              })()}
+            </div>
             <div className="row-sub" style={{ fontSize: 11 }}>{p.pos || "—"} · {p.year_label}</div>
             <div className="offer">
               <label>NIL</label>
@@ -156,18 +168,26 @@ const CustomPlayersSection = memo(function CustomPlayersSection({ customPlayers,
       ))}
       <div style={{ padding: "10px 14px", display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center", borderTop: "1px solid var(--border)" }}>
         <input className="input" placeholder="Name" style={{ flex: "1 1 130px", fontSize: 12, padding: "5px 8px" }} ref={nameRef} defaultValue="" />
-        <input className="input" placeholder="Pos" style={{ width: 54, fontSize: 12, padding: "5px 8px" }} ref={posRef} defaultValue="" />
-        <select className="input" style={{ fontSize: 12, padding: "5px 8px", width: 72 }} ref={yearRef} defaultValue="FR">
+        <select className="input" style={{ fontSize: 12, padding: "5px 8px", width: 84 }} ref={posRef} defaultValue="Guard" title="Position">
+          <option value="Guard">Guard</option><option value="Wing">Wing</option><option value="Big">Big</option>
+        </select>
+        <select className="input" style={{ fontSize: 12, padding: "5px 8px", width: 72 }} ref={yearRef} defaultValue="FR" title="Class">
           <option value="FR">FR</option><option value="RS FR">RS FR</option>
           <option value="SO">SO</option><option value="RS SO">RS SO</option>
           <option value="JR">JR</option>
+        </select>
+        <select className="input" style={{ fontSize: 12, padding: "5px 8px", width: 130 }} ref={tierRef} defaultValue="" title="Impact tier (roster strength)">
+          <option value="">No impact</option>
+          {freshmanTiers.map(t => <option key={t.name} value={t.name}>{t.name}</option>)}
         </select>
         <input className="input" placeholder="NIL" type="number" min="0" step="1000" style={{ width: 90, fontSize: 12, padding: "5px 8px" }} ref={nilRef} defaultValue="" />
         <button className="btn btn-ghost" style={{ fontSize: 12 }} onClick={async () => {
           const name = nameRef.current?.value?.trim();
           if (!name) return;
-          await onAdd({ name, nil_offer: nilRef.current?.value || 0, pos: posRef.current?.value || "", year_label: yearRef.current?.value || "FR" }, activeTeam, userId);
-          nameRef.current.value = ""; nilRef.current.value = ""; posRef.current.value = ""; yearRef.current.value = "FR";
+          await onAdd({ name, nil_offer: nilRef.current?.value || 0, pos: posRef.current?.value || "Guard",
+            year_label: yearRef.current?.value || "FR", freshman_tier: tierRef.current?.value || null }, activeTeam, userId);
+          nameRef.current.value = ""; nilRef.current.value = ""; posRef.current.value = "Guard";
+          yearRef.current.value = "FR"; tierRef.current.value = "";
         }}>+ Add</button>
       </div>
     </>
@@ -194,6 +214,7 @@ const TYPE_COLOR = {
   "Incoming":      "#34d399",
   "International": "#a78bfa",
   "FR/RS":       "rgba(255,255,255,.25)",
+  "Official FR":  "#34d399",
 };
 
 // ── Roster Strength breakdown panel ──────────────────────────────────────────
@@ -301,6 +322,8 @@ function isPriorYearEval(p) {
   return cy > 0 && cy < CURRENT_STATS_YEAR && (s.ppg ?? 0) >= MIN_PPG_MEANINGFUL;
 }
 function btpPlayerScoreDisplay(p) {
+  // Incoming freshmen score by their admin-defined impact-tier effect.
+  if (p._freshmanEffect != null) return p._freshmanEffect;
   const s = p.stats || {};
   const sei    = (s.sei || 0) * 15000;
   const ath    = (s.ath || 0) * 5000;
@@ -313,7 +336,7 @@ function btpPlayerScoreDisplay(p) {
   return sei * 0.50 + market * 0.15 + ath * 0.13 + ris * 0.08 + dds * 0.08 + cdi * 0.06;
 }
 
-function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], userTeam = "", customOrder, setCustomOrder, starterCounts, setStarterCounts, showRawValues = false }) {
+function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], teamFreshmenAll = [], userTeam = "", customOrder, setCustomOrder, starterCounts, setStarterCounts, showRawValues = false }) {
   // Coaches see only letter grades. Admin/superadmin see raw dollar values
   // alongside the grades. Controlled by the `showRawValues` prop the parent
   // sets from useAdminTeam().isAdmin.
@@ -390,8 +413,10 @@ function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], userTeam = ""
       if (p._committed_to) return true;
       return !CMP_LEAVING_STATUSES.has(p.player_status);
     });
-    return addRanks(scorePool(pool, btpPlayerScoreDisplay));
-  }, [allPlayers]);
+    // Official team freshmen raise each team's baseline (they bypass the
+    // leaving-status filter — they're incoming, not on vw_players).
+    return addRanks(scorePool([...pool, ...teamFreshmenAll], btpPlayerScoreDisplay));
+  }, [allPlayers, teamFreshmenAll]);
 
   // Canonical form of the user's team — used everywhere we compare against
   // the scored pool, since scorePool now buckets by canonical name.
@@ -412,9 +437,10 @@ function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], userTeam = ""
       if (p._committed_to) return true;
       return !CMP_LEAVING_STATUSES.has(p.player_status);
     });
-    if (confPool.length < 2) return [];
-    return addRanks(scorePool(confPool, btpPlayerScoreDisplay));
-  }, [allPlayers, userConf]);
+    const freshConf = teamFreshmenAll.filter(f => (getTeamConference(f.team) ?? null) === userConf);
+    if (confPool.length + freshConf.length < 2) return [];
+    return addRanks(scorePool([...confPool, ...freshConf], btpPlayerScoreDisplay));
+  }, [allPlayers, userConf, teamFreshmenAll]);
   // Depth chart state — owned by AppPage, passed in as props so it survives view switches
 
   // Plain variables (no memoization) — scoringPool is ≤20 players, compute is trivial,
@@ -1278,8 +1304,15 @@ export function AppPage() {
       nilOffer: p.nil_offer || 0, _type: "FR/RS", _typeKey: "custom", stats: {},
     }));
 
-    return [...transfers, ...returning, ...undecided, ...leaving, ...custom];
-  }, [board.returningPlayers, board.incomingTransfers, board.state.board, board.state.roster, board.state.retentionById, board.state.nilById, board.customPlayers]);
+    // Official, superadmin-added freshmen for this team (read-only).
+    const officialFresh = (board.teamFreshmen || []).map(p => ({
+      id: p.id, name: p.name, pos: p.pos || "—", year: "FR",
+      nilOffer: 0, _type: "Official FR", _typeKey: "official_fr", _readOnly: true,
+      freshman_tier: p.freshman_tier, stats: {},
+    }));
+
+    return [...transfers, ...returning, ...undecided, ...leaving, ...custom, ...officialFresh];
+  }, [board.returningPlayers, board.incomingTransfers, board.state.board, board.state.roster, board.state.retentionById, board.state.nilById, board.customPlayers, board.teamFreshmen]);
 
   const sortedView = useMemo(() => {
     if (!sortKey) return rosterPlayers;
@@ -1767,6 +1800,7 @@ export function AppPage() {
                       {/* 7. Freshmen / Redshirts */}
                       <CustomPlayersSection
                         customPlayers={board.customPlayers}
+                        freshmanTiers={board.freshmanTiers}
                         onAdd={board.addCustomPlayer}
                         onRemove={handleCustomRemove}
                         onNilChange={handleCustomNilChange}
@@ -1841,7 +1875,7 @@ export function AppPage() {
         )}
 
         {/* ── Roster Strength breakdown ───────────────────────────────────── */}
-        {viewMode === "strength" && <RosterStrengthPanel calc={calc} onOpenModal={handleOpenModal} allPlayers={board.state.board} userTeam={activeTeam} customOrder={depthChartOrder} setCustomOrder={setDepthChartOrder} starterCounts={depthStarterCounts} setStarterCounts={setDepthStarterCounts} showRawValues={isAdmin} />}
+        {viewMode === "strength" && <RosterStrengthPanel calc={calc} onOpenModal={handleOpenModal} allPlayers={board.state.board} teamFreshmenAll={board.allTeamFreshmen} userTeam={activeTeam} customOrder={depthChartOrder} setCustomOrder={setDepthChartOrder} starterCounts={depthStarterCounts} setStarterCounts={setDepthStarterCounts} showRawValues={isAdmin} />}
 
       </div>
 

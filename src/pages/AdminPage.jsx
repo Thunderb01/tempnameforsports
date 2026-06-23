@@ -461,6 +461,7 @@ export function AdminPage() {
               { key: "transfers",     label: "Portal Transfers" },
               { key: "players",       label: "Players" },
               { key: "archetypes",    label: "Archetypes" },
+              { key: "freshmen",      label: "Freshmen Management" },
               { key: "international", label: "International" },
               { key: "coaches",       label: "Coaches" },
             ].map(t => (
@@ -478,6 +479,7 @@ export function AdminPage() {
           {activeTab === "transfers"     && <TransfersTab />}
           {activeTab === "players"       && <PlayersTab />}
           {activeTab === "archetypes"    && <ArchetypesTab />}
+          {activeTab === "freshmen"      && <FreshmanTiersTab />}
           {activeTab === "international" && <InternationalAdminContent />}
           {activeTab === "coaches"       && <CoachesTab />}
         </div>
@@ -1146,6 +1148,303 @@ function ArchetypesTab() {
           </div>
         )}
       </Section>
+    </div>
+  );
+}
+
+// ── Freshman Tiers tab ─────────────────────────────────────────────────────
+// Admin-defined impact tiers for incoming freshmen. `effect` is the BTP score a
+// freshman of that tier contributes to roster strength (slot-weighted like any
+// player). Men's → freshman_tiers, Women's → w_freshman_tiers.
+function FreshmanTiersTab() {
+  const [sport, setSport] = useState("mens");
+  const table = sport === "mens" ? "freshman_tiers" : "w_freshman_tiers";
+
+  const [tiers,   setTiers]   = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const { data, error } = await supabase.from(table).select("*").order("sort");
+    if (error) { alert("Load failed: " + error.message); setLoading(false); return; }
+    setTiers(data || []);
+    setLoading(false);
+  }, [table]);
+
+  useEffect(() => { load(); }, [load]);
+
+  async function addTier() {
+    const { data, error } = await supabase.from(table)
+      .insert({ name: "New Tier", effect: 0, color: "#fbbf24", sort: tiers.length }).select();
+    if (error) { alert("Add failed: " + error.message); return; }
+    setTiers(prev => [...prev, ...(data || [])]);
+  }
+
+  async function saveTier(id, patch) {
+    const { error } = await supabase.from(table).update(patch).eq("id", id);
+    if (error) { alert("Save failed: " + error.message); return; }
+    setTiers(prev => prev.map(t => t.id === id ? { ...t, ...patch } : t));
+  }
+
+  async function deleteTier(id) {
+    if (!confirm("Delete this freshman tier?")) return;
+    const { error } = await supabase.from(table).delete().eq("id", id);
+    if (error) { alert("Delete failed: " + error.message); return; }
+    setTiers(prev => prev.filter(t => t.id !== id));
+  }
+
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 6, marginBottom: 20 }}>
+        {[["mens", "Men's"], ["womens", "Women's"]].map(([val, lbl]) => (
+          <button key={val} onClick={() => setSport(val)} style={{
+            fontSize: 12, fontWeight: 600, padding: "5px 16px", borderRadius: 20, cursor: "pointer", border: "1px solid",
+            background:  sport === val ? "rgba(245,166,35,.15)" : "transparent",
+            color:       sport === val ? "#f5a623"              : "rgba(255,255,255,.4)",
+            borderColor: sport === val ? "rgba(245,166,35,.4)"  : "rgba(255,255,255,.12)",
+          }}>{lbl}</button>
+        ))}
+      </div>
+
+      <Section title={`Freshman impact tiers — ${sport === "mens" ? "Men's" : "Women's"} (${tiers.length})`}>
+        <div style={{ fontSize: 12, opacity: .5, marginBottom: 16, maxWidth: 680 }}>
+          When a coach adds an incoming freshman to a roster and tags one of these tiers, the
+          freshman is scored at that tier's <strong>effect</strong> — a BTP score (≈ a starter's
+          value, where ~1,000,000 = "1M BTP") — and runs through the same starter/bench/depth
+          weighting as everyone else. Higher effect = bigger bump to the roster grade. Applies
+          live; no recompute needed.
+        </div>
+
+        <button className="btn btn-primary" style={{ fontSize: 12, marginBottom: 18 }} onClick={addTier}>+ Add tier</button>
+
+        {loading ? (
+          <div style={{ opacity: .4, fontSize: 13 }}>Loading…</div>
+        ) : tiers.length === 0 ? (
+          <div style={{ opacity: .35, fontSize: 13 }}>No tiers yet. Click "+ Add tier".</div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {tiers.map(t => <FreshmanTierRow key={t.id} tier={t}
+              onSave={patch => saveTier(t.id, patch)} onDelete={() => deleteTier(t.id)} />)}
+          </div>
+        )}
+      </Section>
+
+      <Section title="Incoming freshmen by team">
+        <div style={{ fontSize: 12, opacity: .5, marginBottom: 14, maxWidth: 680 }}>
+          Attach official incoming freshmen to a team. These are global — they appear (read-only)
+          on every coach's build of that team and raise that team's score in the roster-strength
+          comparison. Pick a team, then add freshmen with a position and an impact tier.
+        </div>
+        <TeamFreshmenManager sport={sport} tiers={tiers} />
+      </Section>
+    </div>
+  );
+}
+
+// Per-team official freshmen manager (superadmin). Men's → team_freshmen,
+// Women's → w_team_freshmen. `tiers` is the loaded freshman_tiers for the sport.
+function TeamFreshmenManager({ sport, tiers }) {
+  const table = sport === "mens" ? "team_freshmen" : "w_team_freshmen";
+  const [team,    setTeam]    = useState("");
+  const [rows,    setRows]    = useState([]);
+  const [loading, setLoading] = useState(false);
+  const nameRef = useRef(); const posRef = useRef(); const tierRef = useRef();
+
+  const load = useCallback(async (t) => {
+    if (!t) { setRows([]); return; }
+    setLoading(true);
+    const { data, error } = await supabase.from(table)
+      .select("id, name, pos, tier, sei, ath, ris, dds, cdi, nil_valuation").eq("team", t).order("created_at");
+    if (error) { alert("Load failed: " + error.message); setLoading(false); return; }
+    setRows(data || []);
+    setLoading(false);
+  }, [table]);
+
+  useEffect(() => { load(team); }, [team, load]);
+
+  async function add() {
+    const name = nameRef.current?.value?.trim();
+    if (!name || !team) return;
+    const { data, error } = await supabase.from(table)
+      .insert({ team, name, pos: posRef.current?.value || "Guard", tier: tierRef.current?.value || null })
+      .select();
+    if (error) { alert("Add failed: " + error.message); return; }
+    setRows(prev => [...prev, ...(data || [])]);
+    nameRef.current.value = ""; posRef.current.value = "Guard"; tierRef.current.value = "";
+  }
+
+  async function save(id, patch) {
+    const { error } = await supabase.from(table).update(patch).eq("id", id);
+    if (error) { alert("Save failed: " + error.message); return; }
+    setRows(prev => prev.map(r => r.id === id ? { ...r, ...patch } : r));
+  }
+
+  async function del(id) {
+    const { error } = await supabase.from(table).delete().eq("id", id);
+    if (error) { alert("Delete failed: " + error.message); return; }
+    setRows(prev => prev.filter(r => r.id !== id));
+  }
+
+  return (
+    <div>
+      <div style={{ maxWidth: 360, marginBottom: 16 }}>
+        <label style={labelStyle}>Team</label>
+        <TeamSearch value={team} onChange={setTeam} placeholder="Search team…" />
+      </div>
+
+      {!team ? (
+        <div style={{ opacity: .35, fontSize: 13 }}>Pick a team to manage its incoming freshmen.</div>
+      ) : (
+        <>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center", marginBottom: 14 }}>
+            <input className="input" placeholder="Freshman name" style={{ flex: "1 1 180px", fontSize: 13 }} ref={nameRef} defaultValue="" />
+            <select className="input" style={{ width: 96, fontSize: 13 }} ref={posRef} defaultValue="Guard">
+              <option value="Guard">Guard</option><option value="Wing">Wing</option><option value="Big">Big</option>
+            </select>
+            <select className="input" style={{ width: 150, fontSize: 13 }} ref={tierRef} defaultValue="">
+              <option value="">No impact</option>
+              {tiers.map(t => <option key={t.name} value={t.name}>{t.name}</option>)}
+            </select>
+            <button className="btn btn-primary" style={{ fontSize: 12 }} onClick={add}>+ Add</button>
+          </div>
+
+          {loading ? (
+            <div style={{ opacity: .4, fontSize: 13 }}>Loading…</div>
+          ) : rows.length === 0 ? (
+            <div style={{ opacity: .35, fontSize: 13 }}>No official freshmen for {team} yet.</div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {rows.map(r => (
+                <TeamFreshmanRow key={r.id} row={r} tiers={tiers}
+                  onSave={patch => save(r.id, patch)} onDelete={() => del(r.id)} />
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+const FRESH_METRICS = ["sei", "ath", "ris", "dds", "cdi"];
+
+// Editable official-freshman row: name, pos, tier (fallback score), and optional
+// BTP metrics (0–100). When any metric is set, metrics drive the score instead.
+function TeamFreshmanRow({ row, tiers, onSave, onDelete }) {
+  const [form, setForm] = useState(row);
+  const [dirty, setDirty] = useState(false);
+  useEffect(() => { setForm(row); setDirty(false); }, [row.id]);
+  const set = (k, v) => { setForm(f => ({ ...f, [k]: v })); setDirty(true); };
+
+  const hasMetrics = FRESH_METRICS.some(k => form[k] != null && form[k] !== "");
+  const tierColor  = Object.fromEntries(tiers.map(t => [t.name, t.color || "#fbbf24"]))[form.tier] || "#fbbf24";
+
+  function save() {
+    const num = v => (v === "" || v == null ? null : Number(v));
+    onSave({
+      name: (form.name || "").trim() || "Unnamed",
+      pos:  form.pos || "Guard",
+      tier: form.tier || null,
+      nil_valuation: num(form.nil_valuation),
+      ...Object.fromEntries(FRESH_METRICS.map(k => [k, num(form[k])])),
+    });
+    setDirty(false);
+  }
+
+  return (
+    <div style={{ background: "rgba(255,255,255,.03)", border: "1px solid var(--border)", borderRadius: 8, padding: "8px 12px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+        <input className="input" style={{ flex: "1 1 150px", fontSize: 13 }} value={form.name || ""}
+          onChange={e => set("name", e.target.value)} />
+        <select className="input" style={{ width: 90, fontSize: 12 }} value={form.pos || "Guard"} onChange={e => set("pos", e.target.value)}>
+          <option value="Guard">Guard</option><option value="Wing">Wing</option><option value="Big">Big</option>
+        </select>
+        <select className="input" style={{ width: 140, fontSize: 12, opacity: hasMetrics ? .4 : 1 }}
+          value={form.tier || ""} onChange={e => set("tier", e.target.value)}
+          title={hasMetrics ? "Ignored while metrics are set" : "Fallback impact tier"}>
+          <option value="">No tier</option>
+          {tiers.map(t => <option key={t.name} value={t.name}>{t.name}</option>)}
+        </select>
+        <div style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
+          <button className="btn btn-primary" style={{ fontSize: 12 }} disabled={!dirty} onClick={save}>
+            {dirty ? "Save" : "Saved"}
+          </button>
+          <button className="btn btn-ghost" style={{ fontSize: 11, padding: "2px 8px", color: "#f77", borderColor: "rgba(220,70,70,.3)" }}
+            onClick={onDelete}>Delete</button>
+        </div>
+      </div>
+      <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 8 }}>
+        <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".06em", opacity: .4, fontWeight: 600 }}>
+          BTP metrics {hasMetrics ? "(driving score)" : "(optional)"}
+        </span>
+        {FRESH_METRICS.map(k => (
+          <div key={k} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            <span style={{ fontSize: 10, opacity: .5, textTransform: "uppercase" }}>{k}</span>
+            <input className="input" type="number" min="0" max="100" style={{ width: 56, fontSize: 12, padding: "3px 6px" }}
+              value={form[k] ?? ""} onChange={e => set(k, e.target.value)} placeholder="—" />
+          </div>
+        ))}
+        <div style={{ display: "flex", alignItems: "center", gap: 4, marginLeft: 8, paddingLeft: 10, borderLeft: "1px solid var(--border)" }}>
+          <span style={{ fontSize: 10, opacity: .5, textTransform: "uppercase" }}>NIL $</span>
+          <input className="input" type="number" min="0" step="10000" style={{ width: 96, fontSize: 12, padding: "3px 6px" }}
+            value={form.nil_valuation ?? ""} onChange={e => set("nil_valuation", e.target.value)} placeholder="—" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FreshmanTierRow({ tier, onSave, onDelete }) {
+  const [form, setForm] = useState(tier);
+  const [dirty, setDirty] = useState(false);
+  useEffect(() => { setForm(tier); setDirty(false); }, [tier.id]);
+  const set = (k, v) => { setForm(f => ({ ...f, [k]: v })); setDirty(true); };
+
+  function save() {
+    onSave({
+      name: (form.name || "").trim() || "Unnamed",
+      effect: Number(form.effect) || 0,
+      color: form.color || "#fbbf24",
+      sort: Number(form.sort) || 0,
+    });
+    setDirty(false);
+  }
+
+  const c = form.color || "#fbbf24";
+  return (
+    <div style={{ display: "flex", gap: 12, alignItems: "flex-end", flexWrap: "wrap",
+      background: "rgba(255,255,255,.03)", border: "1px solid var(--border)", borderRadius: 10, padding: "12px 14px" }}>
+      <div style={{ flex: "1 1 180px" }}>
+        <label style={labelStyle}>Name</label>
+        <input className="input" style={{ width: "100%" }} value={form.name || ""}
+          onChange={e => set("name", e.target.value)} placeholder="e.g. High Impact" />
+      </div>
+      <div style={{ width: 140 }}>
+        <label style={labelStyle}>Effect (BTP score)</label>
+        <input className="input" type="number" step="10000" style={{ width: "100%" }} value={form.effect ?? 0}
+          onChange={e => set("effect", e.target.value)} />
+      </div>
+      <div style={{ width: 70 }}>
+        <label style={labelStyle}>Sort</label>
+        <input className="input" type="number" style={{ width: "100%" }} value={form.sort ?? 0}
+          onChange={e => set("sort", e.target.value)} />
+      </div>
+      <div>
+        <label style={labelStyle}>Color</label>
+        <input type="color" value={c} onChange={e => set("color", e.target.value)}
+          style={{ width: 48, height: 32, padding: 0, border: "1px solid var(--border)", borderRadius: 6, background: "transparent", cursor: "pointer" }} />
+      </div>
+      <span style={{ display: "inline-block", padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 600,
+        background: `${c}22`, color: c, border: `1px solid ${c}55` }}>
+        {(form.name || "Preview").trim() || "Preview"} · {(Number(form.effect) || 0) / 1000000}M
+      </span>
+      <div style={{ display: "flex", gap: 6, marginLeft: "auto" }}>
+        <button className="btn btn-primary" style={{ fontSize: 12 }} disabled={!dirty} onClick={save}>
+          {dirty ? "Save" : "Saved"}
+        </button>
+        <button className="btn btn-ghost" style={{ fontSize: 12, color: "#f77", borderColor: "rgba(220,70,70,.3)" }}
+          onClick={onDelete}>Delete</button>
+      </div>
     </div>
   );
 }

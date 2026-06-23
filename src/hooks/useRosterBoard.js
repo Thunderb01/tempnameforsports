@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
 import { money, bucketPosition } from "@/lib/display";
+import { getCanonicalTeamName } from "@/lib/teamLookup";
 
 
 // Module-level caches so data survives page navigation without re-fetching.
@@ -515,6 +516,48 @@ export function useRosterBoard(team, userId) {
     });
   }, []);
 
+  // ── Freshman impact tiers (admin-defined; effect = BTP score per freshman) ──
+  const [freshmanTiers, setFreshmanTiers] = useState([]);
+  useEffect(() => {
+    supabase.from("freshman_tiers").select("name, effect, color, sort").order("sort")
+      .then(({ data, error }) => { if (!error) setFreshmanTiers(data || []); });
+  }, []);
+
+  // ── Official team freshmen (superadmin-added; global, per team) ─────────────
+  const [allTeamFreshmenRaw, setAllTeamFreshmenRaw] = useState([]);
+  useEffect(() => {
+    supabase.from("team_freshmen").select("id, team, name, pos, tier, recruiting_class, sei, ath, ris, dds, cdi, nil_valuation")
+      .then(({ data, error }) => { if (!error) setAllTeamFreshmenRaw(data || []); });
+  }, []);
+
+  // Resolve each to a scoreable pseudo-player. If a superadmin gave BTP metrics,
+  // they score like a real player (stats + NIL drive btpPlayerScore); otherwise
+  // the tier's flat effect is used. NIL valuation is carried for display either way.
+  const allTeamFreshmen = useMemo(() => {
+    const effectByName = Object.fromEntries(freshmanTiers.map(t => [t.name, Number(t.effect) || 0]));
+    return allTeamFreshmenRaw
+      .map(f => {
+        const hasMetrics = ["sei", "ath", "ris", "dds", "cdi"].some(k => f[k] != null);
+        const nil = f.nil_valuation || 0;
+        const base = { id: f.id, name: f.name, pos: f.pos, team: f.team, source: "domestic",
+                       _isTeamFreshman: true, freshman_tier: f.tier,
+                       nilValuation: nil, marketLow: nil, marketHigh: nil };
+        if (hasMetrics) {
+          return { ...base, stats: { sei: f.sei, ath: f.ath, ris: f.ris, dds: f.dds, cdi: f.cdi } };
+        }
+        if (f.tier && effectByName[f.tier] != null) return { ...base, _freshmanEffect: effectByName[f.tier] };
+        return null;  // no metrics and no resolvable tier → not scoreable
+      })
+      .filter(Boolean);
+  }, [allTeamFreshmenRaw, freshmanTiers]);
+
+  // Subset for the team currently being built (auto-included on the roster).
+  const teamFreshmen = useMemo(() => {
+    if (!team) return [];
+    const canon = getCanonicalTeamName(team);
+    return allTeamFreshmen.filter(f => getCanonicalTeamName(f.team) === canon);
+  }, [allTeamFreshmen, team]);
+
   // ── Custom players (freshmen / redshirts) ──────────────────────────────────
 
   const [customPlayers, setCustomPlayers] = useState([]);
@@ -531,11 +574,11 @@ export function useRosterBoard(team, userId) {
     setCustomPlayers(data || []);
   }, []);
 
-  async function addCustomPlayer({ name, nil_offer = 0, pos = "", year_label = "FR" }, teamName, uid) {
+  async function addCustomPlayer({ name, nil_offer = 0, pos = "", year_label = "FR", freshman_tier = null }, teamName, uid) {
     if (!name.trim() || !teamName || !uid) return;
     const { data, error } = await supabase
       .from("custom_roster_players")
-      .insert({ name: name.trim(), nil_offer: Number(nil_offer) || 0, pos, year_label, team: teamName, user_id: uid })
+      .insert({ name: name.trim(), nil_offer: Number(nil_offer) || 0, pos, year_label, freshman_tier: freshman_tier || null, team: teamName, user_id: uid })
       .select()
       .single();
     if (error) { console.error("add custom player:", error); return; }
@@ -778,6 +821,8 @@ export function useRosterBoard(team, userId) {
       return cy > 0 && cy < CURRENT_STATS_YEAR && (s.ppg ?? 0) >= MIN_PPG_MEANINGFUL;
     }
     function btpPlayerScore(p) {
+      // Incoming freshmen score by their admin-defined impact-tier effect.
+      if (p._freshmanEffect != null) return p._freshmanEffect;
       const s = p.stats || {};
       const sei    = (s.sei || 0) * 15000;
       const ath    = (s.ath || 0) * 5000;
@@ -787,6 +832,13 @@ export function useRosterBoard(team, userId) {
       const market = (p.marketHigh || 0) * (isPriorYearEval(p) ? 0.8 : 1.0);
       return sei * 0.50 + market * 0.15 + ath * 0.13 + ris * 0.08 + dds * 0.08 + cdi * 0.06;
     }
+    // Incoming freshmen tagged with an impact tier become scoreable pseudo-players.
+    const freshmanEffectByName = Object.fromEntries(freshmanTiers.map(t => [t.name, Number(t.effect) || 0]));
+    const freshmanPool = customPlayers
+      .filter(p => p.freshman_tier && freshmanEffectByName[p.freshman_tier] != null)
+      .map(p => ({ id: p.id, name: p.name, pos: p.pos, source: "domestic",
+                   _freshmanEffect: freshmanEffectByName[p.freshman_tier] }));
+
     // Build the scoring pool, then dedupe by id so no player is ever counted
     // twice through slot weights — accidental overlap between activeReturners
     // and state.roster (or any other source) would otherwise inflate the
@@ -796,6 +848,8 @@ export function useRosterBoard(team, userId) {
       ...activeRosterReturners.map(p => ({ ...p, _priorYearEval: isPriorYearEval(p) })),
       ...roster.map(r => { const p = lookupRosterPlayer(r); return p ? { ...p, _priorYearEval: isPriorYearEval(p) } : null; }).filter(Boolean),
       ...incomingTransfers.filter(p => !_rosterIds.has(p.id)).map(p => ({ ...p, _priorYearEval: isPriorYearEval(p) })),
+      ...freshmanPool,
+      ...teamFreshmen,   // official, superadmin-added freshmen for this team
     ].filter(p => {
       if (!p?.id || _seen.has(p.id)) return false;
       _seen.add(p.id);
@@ -832,13 +886,16 @@ export function useRosterBoard(team, userId) {
     });
 
     return { totalRoster, nilCommitted, nilRemaining, scholarshipsRemaining, maxPerPlayer, projectedLow, projectedHigh, rosterScore, scoringPool, warnings };
-  }, [state, returningPlayers, incomingTransfers, customPlayers, _boardById, _intlById, _rosterIds]);
+  }, [state, returningPlayers, incomingTransfers, customPlayers, freshmanTiers, teamFreshmen, _boardById, _intlById, _rosterIds]);
 
   return {
     state,
     returningPlayers,
     incomingTransfers,
     customPlayers,
+    freshmanTiers,
+    teamFreshmen,
+    allTeamFreshmen,
     calc,
     loadPortalBoard,
     loadReturningRoster,

@@ -155,7 +155,7 @@ create table if not exists public.international_players (
   agent_name         text,
   agent_contact      text,
   film_url           text,
-  competition_tier   integer default 2 check (competition_tier between 1 and 4),
+  competition_tier   integer default 2 check (competition_tier between 1 and 5),
   scouting_notes     text,
   player_status      text default 'uncommitted',   -- uncommitted | committed | signed | withdrawn
   committed_team     text,                          -- D1 school they've committed to (auto-roster trigger)
@@ -169,7 +169,7 @@ create table if not exists public.international_players (
 -- ── International competition tier labels ───────────────────────────────────
 -- Editable by superadmin via /admin → International → Tier Labels.
 create table if not exists public.international_tier_labels (
-  tier  integer primary key check (tier between 1 and 4),
+  tier  integer primary key check (tier between 1 and 5),
   label text not null
 );
 alter table public.international_tier_labels enable row level security;

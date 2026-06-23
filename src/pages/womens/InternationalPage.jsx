@@ -9,7 +9,7 @@ import { tierColor, PROJECTED_TIER_OPTIONS } from "@/lib/display";
 import {
   IntlPlayerModal, AgentClientsPopup,
   AVERAGES_COLS, STAT_TYPE_COLS, STAT_TYPES, STAT_TYPE_LABELS,
-  TIER_LABELS_FALLBACK, TIER_COLORS, TIER_BG,
+  TIERS, TIER_LABELS_FALLBACK, TIER_COLORS, TIER_BG,
   fmtStatByKey, getStat,
 } from "@/components/IntlPlayerModal";
 
@@ -458,7 +458,7 @@ export function WomensInternationalPage() {
 
             <MultiSelectFilter label="leagues"   options={leagues}   value={leagueFilter} onChange={setLeagueFilter} width={170} />
             <MultiSelectFilter label="tiers"
-              options={[1,2,3,4].map(t => ({ value: String(t), label: `Tier ${t} · ${tierLabels[t] || TIER_LABELS_FALLBACK[t]}` }))}
+              options={TIERS.map(t => ({ value: String(t), label: `Tier ${t} · ${tierLabels[t] || TIER_LABELS_FALLBACK[t]}` }))}
               value={tierFilter} onChange={setTierFilter} width={170} />
             {positions.length > 0 && (
               <MultiSelectFilter label="positions" options={positions} value={posFilter} onChange={setPosFilter} width={120} />

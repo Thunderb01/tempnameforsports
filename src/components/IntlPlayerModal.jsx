@@ -27,9 +27,10 @@ export const STAT_TYPES       = ["Averages", "Totals", "Per_36", "Advanced_Stats
 export const STAT_TYPE_LABELS = { Averages: "Averages", Totals: "Totals", Per_36: "Per 36", Advanced_Stats: "Advanced" };
 export const PCT_KEYS         = new Set(["fg%","3p%","ft%","ts%","efg%","usg%","ast%","to%","orb%","drb%"]);
 
-export const TIER_LABELS_FALLBACK = { 1: "EuroLeague / Elite", 2: "Top Domestic", 3: "Mid Domestic", 4: "Developmental" };
-export const TIER_COLORS = { 1: "#f59e0b", 2: "#5b9cf6", 3: "#4ade80", 4: "#9ca3af" };
-export const TIER_BG     = { 1: "rgba(245,158,11,.15)", 2: "rgba(91,156,246,.15)", 3: "rgba(74,222,128,.15)", 4: "rgba(156,163,175,.12)" };
+export const TIERS = [1, 2, 3, 4, 5];
+export const TIER_LABELS_FALLBACK = { 1: "EuroLeague / Elite", 2: "Top Domestic", 3: "Mid Domestic", 4: "Developmental", 5: "Academy / Youth" };
+export const TIER_COLORS = { 1: "#f59e0b", 2: "#5b9cf6", 3: "#4ade80", 4: "#9ca3af", 5: "#a78bfa" };
+export const TIER_BG     = { 1: "rgba(245,158,11,.15)", 2: "rgba(91,156,246,.15)", 3: "rgba(74,222,128,.15)", 4: "rgba(156,163,175,.12)", 5: "rgba(167,139,250,.15)" };
 
 export const INTL_METRICS = [
   { key: "offensive_footprint", label: "Offensive Footprint", desc: "Scoring volume × efficiency × creation" },
