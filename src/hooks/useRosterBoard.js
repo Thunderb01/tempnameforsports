@@ -1,13 +1,13 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
 import { money, bucketPosition } from "@/lib/display";
-import { getCanonicalTeamName } from "@/lib/teamLookup";
+import { getCanonicalTeamName, getTeamConference } from "@/lib/teamLookup";
 
 
 // Module-level caches so data survives page navigation without re-fetching.
 const SESSION_BOARD_KEY = "bp_board_cache";
 const SESSION_BOARD_TTL  = 4 * 60 * 60 * 1000; // 4 hours
-const SESSION_BOARD_VER  = 6; // bump to invalidate all cached sessions
+const SESSION_BOARD_VER  = 7; // bump to invalidate all cached sessions
 
 function loadSessionCache() {
   try {
@@ -286,8 +286,12 @@ export function useRosterBoard(team, userId) {
         const dest = commitsMap[p.id];
         if (dest) {
           p._original_team = p.team;
+          p._original_conf = p.conf;
           p.team           = dest;
           p._committed_to  = dest;
+          // Conference must follow the new team — otherwise the card shows the
+          // destination school next to the old school's conference.
+          p.conf           = getTeamConference(dest) ?? null;
         }
       });
     } catch (_) { /* RLS or table missing — fall back to current_team only */ }
