@@ -5,6 +5,7 @@ import { money, nilRange, letterGrade, gradeColor } from "@/lib/display";
 import { InternationalAdminContent } from "@/pages/InternationalAdminPage";
 import { DefCard } from "@/components/DefCard";
 import { DOMESTIC_FIELDS, domesticValues, resolveArchetypeList, matchArchetypes } from "@/lib/archetypeMatch";
+import { renderArticleBody } from "@/lib/renderArticle";
 
 // Load every row from a table/view, paging past PostgREST's 1000-row cap.
 async function fetchAllRows(table, columns) {
@@ -462,6 +463,7 @@ export function AdminPage() {
               { key: "players",       label: "Players" },
               { key: "archetypes",    label: "Archetypes" },
               { key: "freshmen",      label: "Freshmen Management" },
+              { key: "news",          label: "News" },
               { key: "international", label: "International" },
               { key: "coaches",       label: "Coaches" },
             ].map(t => (
@@ -480,6 +482,7 @@ export function AdminPage() {
           {activeTab === "players"       && <PlayersTab />}
           {activeTab === "archetypes"    && <ArchetypesTab />}
           {activeTab === "freshmen"      && <FreshmanTiersTab />}
+          {activeTab === "news"          && <NewsTab />}
           {activeTab === "international" && <InternationalAdminContent />}
           {activeTab === "coaches"       && <CoachesTab />}
         </div>
@@ -1450,6 +1453,271 @@ function FreshmanTierRow({ tier, onSave, onDelete }) {
         <button className="btn btn-ghost" style={{ fontSize: 12, color: "#f77", borderColor: "rgba(220,70,70,.3)" }}
           onClick={onDelete}>Delete</button>
       </div>
+    </div>
+  );
+}
+
+// ── News tab ───────────────────────────────────────────────────────────────
+// Superadmin authoring for the /news board. Body supports **bold**,
+// [text](url), and [[p:<id>|Name]] player mentions (inserted via search).
+const EMPTY_NEWS = { title: "", body: "", event_date: "", status: "draft", pinned: false, author_name: "" };
+
+function NewsTab() {
+  const [posts,   setPosts]   = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState(null);  // post object | 'new' | null
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const { data, error } = await supabase.from("news_posts")
+      .select("*")
+      .order("pinned", { ascending: false })
+      .order("created_at", { ascending: false });
+    if (error) { alert("Load failed: " + error.message); setLoading(false); return; }
+    setPosts(data || []);
+    setLoading(false);
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  async function savePost(form) {
+    const payload = {
+      title:       form.title.trim() || "Untitled",
+      body:        form.body,
+      event_date:  form.event_date || null,
+      status:      form.status,
+      pinned:      !!form.pinned,
+      author_name: form.author_name?.trim() || null,
+      // stamp published_at the first time it goes live
+      published_at: form.status === "published" ? (form.published_at || new Date().toISOString()) : form.published_at || null,
+    };
+    let res;
+    if (editing === "new") res = await supabase.from("news_posts").insert(payload).select();
+    else                   res = await supabase.from("news_posts").update(payload).eq("id", editing.id).select();
+    if (res.error) { alert("Save failed: " + res.error.message); return; }
+    setEditing(null);
+    await load();
+  }
+
+  async function quickUpdate(id, patch) {
+    const { error } = await supabase.from("news_posts").update(patch).eq("id", id);
+    if (error) { alert("Update failed: " + error.message); return; }
+    setPosts(prev => prev.map(p => p.id === id ? { ...p, ...patch } : p));
+  }
+
+  async function deletePost(id) {
+    if (!confirm("Delete this post?")) return;
+    const { error } = await supabase.from("news_posts").delete().eq("id", id);
+    if (error) { alert("Delete failed: " + error.message); return; }
+    setPosts(prev => prev.filter(p => p.id !== id));
+  }
+
+  if (editing) {
+    const initial = editing === "new" ? EMPTY_NEWS : editing;
+    return <NewsEditor initial={initial} onSave={savePost} onCancel={() => setEditing(null)} />;
+  }
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
+        <div style={{ fontSize: 12, opacity: .5, maxWidth: 560 }}>
+          Posts appear on the <strong>/news</strong> board for all coaches once published. Use
+          <strong> Insert player</strong> to drop a link that opens the player's card.
+        </div>
+        <button className="btn btn-primary" style={{ fontSize: 12 }} onClick={() => setEditing("new")}>+ New post</button>
+      </div>
+
+      {loading ? (
+        <div style={{ opacity: .4, fontSize: 13 }}>Loading…</div>
+      ) : posts.length === 0 ? (
+        <div style={{ opacity: .35, fontSize: 13 }}>No posts yet.</div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {posts.map(p => {
+            const isPub = p.status === "published";
+            return (
+              <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap",
+                background: "rgba(255,255,255,.03)", border: "1px solid var(--border)", borderRadius: 8, padding: "10px 14px" }}>
+                <div style={{ flex: 1, minWidth: 200 }}>
+                  <div style={{ fontWeight: 600, fontSize: 13 }}>
+                    {p.pinned && <span title="Pinned" style={{ marginRight: 6 }}>📌</span>}
+                    {p.title}
+                  </div>
+                  <div style={{ fontSize: 11, opacity: .4, marginTop: 2 }}>
+                    {p.event_date ? `Event ${p.event_date} · ` : ""}{isPub ? "Published" : "Draft"}
+                  </div>
+                </div>
+                <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 20,
+                  color: isPub ? "#4ade80" : "#94a3b8", background: isPub ? "rgba(74,222,128,.15)" : "rgba(148,163,184,.12)",
+                  border: `1px solid ${isPub ? "rgba(74,222,128,.4)" : "rgba(148,163,184,.3)"}` }}>{p.status}</span>
+                <button className="btn btn-ghost" style={{ fontSize: 11, padding: "2px 8px" }}
+                  onClick={() => quickUpdate(p.id, { pinned: !p.pinned })}>{p.pinned ? "Unpin" : "Pin"}</button>
+                <button className="btn btn-ghost" style={{ fontSize: 11, padding: "2px 8px" }}
+                  onClick={() => quickUpdate(p.id, isPub
+                    ? { status: "draft" }
+                    : { status: "published", published_at: p.published_at || new Date().toISOString() })}>
+                  {isPub ? "Unpublish" : "Publish"}
+                </button>
+                <button className="btn btn-ghost" style={{ fontSize: 11, padding: "2px 8px" }}
+                  onClick={() => setEditing(p)}>Edit</button>
+                <button className="btn btn-ghost" style={{ fontSize: 11, padding: "2px 8px", color: "#f77", borderColor: "rgba(220,70,70,.3)" }}
+                  onClick={() => deletePost(p.id)}>Delete</button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function NewsEditor({ initial, onSave, onCancel }) {
+  const [form, setForm] = useState({ ...EMPTY_NEWS, ...initial, event_date: initial.event_date || "" });
+  const [saving, setSaving] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+  const bodyRef = useRef();
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  // Insert a [[p:id|name]] token at the textarea caret.
+  function insertPlayer(p) {
+    const token = `[[p:${p.id}|${p.name}]]`;
+    const el = bodyRef.current;
+    const body = form.body || "";
+    const start = el?.selectionStart ?? body.length;
+    const end   = el?.selectionEnd ?? body.length;
+    const next = body.slice(0, start) + token + body.slice(end);
+    set("body", next);
+    // restore caret after the inserted token
+    requestAnimationFrame(() => {
+      if (!el) return;
+      el.focus();
+      const pos = start + token.length;
+      el.setSelectionRange(pos, pos);
+    });
+  }
+
+  async function submit() {
+    if (!form.title.trim()) { alert("Title is required."); return; }
+    setSaving(true);
+    await onSave(form);
+    setSaving(false);
+  }
+
+  return (
+    <div style={{ background: "rgba(255,255,255,.03)", border: "1px solid var(--border)", borderRadius: 10, padding: 20, maxWidth: 760 }}>
+      <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 16 }}>{initial.id ? "Edit Post" : "New Post"}</div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 12, marginBottom: 12 }}>
+        <div>
+          <label style={labelStyle}>Title</label>
+          <input className="input" style={{ width: "100%" }} value={form.title} onChange={e => set("title", e.target.value)} placeholder="Headline" />
+        </div>
+        <div>
+          <label style={labelStyle}>Event date (optional)</label>
+          <input className="input" type="date" style={{ width: "100%" }} value={form.event_date} onChange={e => set("event_date", e.target.value)} />
+        </div>
+      </div>
+
+      <div style={{ marginBottom: 6, display: "flex", alignItems: "flex-end", gap: 12 }}>
+        <div style={{ flex: 1 }}>
+          <label style={labelStyle}>Insert player link</label>
+          <PlayerMentionSearch onSelect={insertPlayer} />
+        </div>
+        <div style={{ fontSize: 10, opacity: .4, paddingBottom: 8 }}>
+          Formatting: <code>**bold**</code>, <code>[text](https://…)</code>
+        </div>
+      </div>
+
+      <div style={{ marginBottom: 12 }}>
+        <label style={labelStyle}>Body</label>
+        <textarea ref={bodyRef} className="input" rows={12} style={{ width: "100%", resize: "vertical", fontFamily: "inherit", lineHeight: 1.5 }}
+          value={form.body} onChange={e => set("body", e.target.value)}
+          placeholder="Write the article… Use Insert player to add a clickable player chip." />
+      </div>
+
+      <div style={{ display: "flex", gap: 16, alignItems: "center", marginBottom: 14, flexWrap: "wrap" }}>
+        <div>
+          <label style={labelStyle}>Status</label>
+          <select className="input" style={{ width: 140 }} value={form.status} onChange={e => set("status", e.target.value)}>
+            <option value="draft">Draft</option>
+            <option value="published">Published</option>
+          </select>
+        </div>
+        <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, opacity: .8, cursor: "pointer", marginTop: 16 }}>
+          <input type="checkbox" checked={form.pinned} onChange={e => set("pinned", e.target.checked)} /> Pinned
+        </label>
+        <div style={{ flex: 1 }}>
+          <label style={labelStyle}>Author (optional)</label>
+          <input className="input" style={{ width: 200 }} value={form.author_name || ""} onChange={e => set("author_name", e.target.value)} placeholder="e.g. BTP Staff" />
+        </div>
+        <button className="btn btn-ghost" style={{ fontSize: 12, marginTop: 16 }} onClick={() => setShowPreview(v => !v)}>
+          {showPreview ? "Hide preview" : "Preview"}
+        </button>
+      </div>
+
+      {showPreview && (
+        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 10, padding: 16, marginBottom: 14 }}>
+          <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".06em", opacity: .4, marginBottom: 8 }}>Preview</div>
+          <h2 style={{ margin: "0 0 10px", fontSize: 18 }}>{form.title || "Untitled"}</h2>
+          <div style={{ fontSize: 14, color: "rgba(255,255,255,.82)" }}>{renderArticleBody(form.body)}</div>
+        </div>
+      )}
+
+      <div style={{ display: "flex", gap: 8 }}>
+        <button className="btn btn-primary" style={{ fontSize: 12 }} disabled={saving} onClick={submit}>
+          {saving ? "Saving…" : "Save Post"}
+        </button>
+        <button className="btn btn-ghost" style={{ fontSize: 12 }} onClick={onCancel}>Cancel</button>
+      </div>
+    </div>
+  );
+}
+
+// Debounced vw_players type-ahead; calls onSelect(player) and clears.
+function PlayerMentionSearch({ onSelect }) {
+  const [query,       setQuery]       = useState("");
+  const [suggestions, setSuggestions] = useState([]);
+  const [open,        setOpen]        = useState(false);
+  const timeoutRef = useRef(null);
+  const wrapRef    = useRef(null);
+
+  function search(q) {
+    setQuery(q);
+    clearTimeout(timeoutRef.current);
+    if (q.trim().length < 2) { setSuggestions([]); setOpen(false); return; }
+    timeoutRef.current = setTimeout(async () => {
+      const { data } = await supabase.from("vw_players")
+        .select("id, name, primary_position, current_team")
+        .ilike("name", `%${q.trim()}%`).limit(8);
+      setSuggestions(data || []);
+      setOpen(true);
+    }, 220);
+  }
+
+  useEffect(() => {
+    function handler(e) { if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false); }
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  return (
+    <div ref={wrapRef} style={{ position: "relative" }}>
+      <input className="input" style={{ width: "100%" }} placeholder="Search player to insert…"
+        value={query} onChange={e => search(e.target.value)} />
+      {open && suggestions.length > 0 && (
+        <div style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0, zIndex: 999,
+          background: "#1a2233", border: "1px solid var(--border)", borderRadius: 8, overflow: "hidden",
+          boxShadow: "0 8px 24px rgba(0,0,0,.5)" }}>
+          {suggestions.map(p => (
+            <div key={p.id} onMouseDown={() => { onSelect(p); setQuery(""); setSuggestions([]); setOpen(false); }}
+              style={{ padding: "8px 12px", cursor: "pointer", borderBottom: "1px solid rgba(255,255,255,.06)" }}
+              onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,.06)"}
+              onMouseLeave={e => e.currentTarget.style.background = ""}>
+              <div style={{ fontWeight: 600, fontSize: 13 }}>{p.name}</div>
+              <div style={{ fontSize: 11, opacity: .45 }}>{[p.primary_position, p.current_team].filter(Boolean).join(" · ")}</div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { SiteHeader }       from "@/components/SiteHeader";
 import { PlayerCard }       from "@/components/PlayerCard";
 import { PlayerModal }      from "@/components/PlayerModal";
+import { SkillProfile }     from "@/components/SkillProfile";
 import { IntlPlayerModal }  from "@/components/IntlPlayerModal";
 import { PlayerFinder }     from "@/components/PlayerFinder";
 import { useAuth }          from "@/hooks/useAuth";
@@ -339,7 +340,9 @@ function btpPlayerScoreDisplay(p) {
   return sei * 0.50 + market * 0.15 + ath * 0.13 + ris * 0.08 + dds * 0.08 + cdi * 0.06;
 }
 
-function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], teamFreshmenAll = [], userTeam = "", customOrder, setCustomOrder, starterCounts, setStarterCounts, showRawValues = false }) {
+function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], teamFreshmenAll = [], rosterIntl = [], freshmanTiers = [], userTeam = "", customOrder, setCustomOrder, starterCounts, setStarterCounts, showRawValues = false }) {
+  const [includeIntl,     setIncludeIntl]     = useState(false);
+  const [includeFreshmen, setIncludeFreshmen] = useState(false);
   // Coaches see only letter grades. Admin/superadmin see raw dollar values
   // alongside the grades. Controlled by the `showRawValues` prop the parent
   // sets from useAdminTeam().isAdmin.
@@ -583,6 +586,52 @@ function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], teamFreshmenA
   const posCount       = POS_ORDER.filter(pos => (chart[pos] || []).length > 0).length;
   const hasFreshmen    = scoringPool.some(p => p._freshmanEffect != null || p._isTeamFreshman);
 
+  // ── Roster skill profile (5-axis BTP pentagon, slot-weighted across the roster) ─
+  // Base = domestic non-freshman rotation. Toggles fold in international players
+  // (their mapped BTP stats) and freshmen (real metrics, or a uniform value
+  // derived from their tier effect when they have no metrics).
+  const PROFILE_AXES = ["sei", "ath", "ris", "dds", "cdi"];
+  const isFreshmanP  = (p) => !!(p._isTeamFreshman || p._freshmanEffect != null);
+  const freshmanMaxEffect = Math.max(1, ...freshmanTiers.map(t => Number(t.effect) || 0));
+
+  function axisValues(p) {
+    if (p.stats && PROFILE_AXES.some(a => p.stats[a] != null)) {
+      return PROFILE_AXES.map(a => (p.stats[a] == null ? null : Number(p.stats[a])));
+    }
+    if (p._freshmanEffect != null) {
+      const v = Math.min(100, Math.round((p._freshmanEffect / freshmanMaxEffect) * 100));
+      return PROFILE_AXES.map(() => v);   // tier-only freshman → uniform across axes
+    }
+    return null;
+  }
+
+  const rosterProfile = (() => {
+    let pool = scoringPool.filter(p => !isFreshmanP(p));        // domestic rotation (intl already excluded)
+    if (includeFreshmen) pool = [...pool, ...scoringPool.filter(isFreshmanP)];
+    if (includeIntl)     pool = [...pool, ...rosterIntl];
+
+    const byPos = { Guard: [], Wing: [], Big: [] };
+    pool.forEach(p => { const b = bucketPosition(p.pos); if (byPos[b]) byPos[b].push(p); });
+
+    const acc = Object.fromEntries(PROFILE_AXES.map(a => [a, { sum: 0, w: 0 }]));
+    POS_ORDER.forEach(pos => {
+      const sorted = [...byPos[pos]].sort((a, b) => btpPlayerScoreDisplay(b) - btpPlayerScoreDisplay(a));
+      const n = starterCounts[pos] ?? 0;
+      sorted.forEach((p, i) => {
+        const w = slotWeightFor(i, n);
+        const vals = axisValues(p);
+        if (!vals) return;
+        PROFILE_AXES.forEach((a, idx) => {
+          if (vals[idx] != null) { acc[a].sum += vals[idx] * w; acc[a].w += w; }
+        });
+      });
+    });
+    const out = {};
+    let any = false;
+    PROFILE_AXES.forEach(a => { out[a] = acc[a].w ? acc[a].sum / acc[a].w : 0; if (acc[a].w) any = true; });
+    return any ? out : null;
+  })();
+
   return (
     <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 16 }}>
       {hasFreshmen && (
@@ -591,6 +640,34 @@ function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], teamFreshmenA
           projections / estimates — not verified production data.
         </div>
       )}
+
+      {/* Roster Skill Profile */}
+      <div style={{ background: "rgba(255,255,255,.04)", border: "1px solid var(--border)", borderRadius: 10, padding: "16px 20px" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10, marginBottom: 12 }}>
+          <span style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".06em", opacity: .4 }}>Roster Skill Profile</span>
+          <div style={{ display: "flex", gap: 6 }}>
+            {[["intl", "Include international", includeIntl, setIncludeIntl, rosterIntl.length],
+              ["fresh", "Include freshmen", includeFreshmen, setIncludeFreshmen, scoringPool.filter(isFreshmanP).length]
+            ].map(([key, label, on, set, count]) => (
+              <button key={key} onClick={() => set(v => !v)} disabled={!count} title={!count ? "None on this roster" : ""}
+                style={{ fontSize: 10, fontWeight: 600, padding: "3px 10px", borderRadius: 12, cursor: count ? "pointer" : "default",
+                  border: "1px solid", opacity: count ? 1 : .35,
+                  background:  on ? "rgba(91,156,246,.18)" : "transparent",
+                  color:       on ? "#5b9cf6" : "rgba(255,255,255,.45)",
+                  borderColor: on ? "rgba(91,156,246,.5)" : "rgba(255,255,255,.12)" }}>
+                {label}{count ? ` (${count})` : ""}
+              </button>
+            ))}
+          </div>
+        </div>
+        {rosterProfile
+          ? <SkillProfile stats={rosterProfile} accent="#34d399" />
+          : <div style={{ opacity: .4, fontSize: 13 }}>No metric'd players in the selected pool.</div>}
+        <div style={{ fontSize: 10, opacity: .35, marginTop: 10 }}>
+          Slot-weighted average across the rotation. International players use mapped BTP metrics;
+          freshmen without metrics are estimated from their impact tier.
+        </div>
+      </div>
 
       {/* Overall header */}
       <div style={{ background: "rgba(255,255,255,.04)", border: "1px solid var(--border)", borderRadius: 10, padding: "16px 20px", display: "flex", alignItems: "center", gap: 20, flexWrap: "wrap" }}>
@@ -1885,7 +1962,7 @@ export function AppPage() {
         )}
 
         {/* ── Roster Strength breakdown ───────────────────────────────────── */}
-        {viewMode === "strength" && <RosterStrengthPanel calc={calc} onOpenModal={handleOpenModal} allPlayers={board.state.board} teamFreshmenAll={board.allTeamFreshmen} userTeam={activeTeam} customOrder={depthChartOrder} setCustomOrder={setDepthChartOrder} starterCounts={depthStarterCounts} setStarterCounts={setDepthStarterCounts} showRawValues={isAdmin} />}
+        {viewMode === "strength" && <RosterStrengthPanel calc={calc} onOpenModal={handleOpenModal} allPlayers={board.state.board} teamFreshmenAll={board.allTeamFreshmen} rosterIntl={rosterPlayers.filter(p => p._typeKey === "intl")} freshmanTiers={board.freshmanTiers} userTeam={activeTeam} customOrder={depthChartOrder} setCustomOrder={setDepthChartOrder} starterCounts={depthStarterCounts} setStarterCounts={setDepthStarterCounts} showRawValues={isAdmin} />}
 
       </div>
 

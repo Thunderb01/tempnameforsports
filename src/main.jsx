@@ -20,6 +20,7 @@ const ComparePage           = lazy(() => import("@/pages/ComparePage").then(m =>
 const PortalRankingsPage    = lazy(() => import("@/pages/PortalRankingsPage").then(m => ({ default: m.PortalRankingsPage })));
 const PortalPage            = lazy(() => import("@/pages/PortalPage").then(m => ({ default: m.PortalPage })));
 const InternationalPage     = lazy(() => import("@/pages/InternationalPage").then(m => ({ default: m.InternationalPage })));
+const NewsPage              = lazy(() => import("@/pages/NewsPage").then(m => ({ default: m.NewsPage })));
 
 // ── Women's pages ────────────────────────────────────────────────────────────
 // Mirror men's pages 1:1 in shape; each is a fork that queries `w_*` tables
@@ -51,6 +52,7 @@ createRoot(document.getElementById("root")).render(
             <Route path="/rankings" element={<PortalRankingsPage />} />
             <Route path="/portal"        element={<PortalPage />} />
             <Route path="/international" element={<InternationalPage />} />
+            <Route path="/news"          element={<NewsPage />} />
           </Route>
 
           {/* Women's — admin-only. Non-admins hitting /w/* get bounced to /app. */}

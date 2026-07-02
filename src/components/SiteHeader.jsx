@@ -78,6 +78,9 @@ export function SiteHeader() {
           <NavLink to={pathForSport("/international", sport)} className={({ isActive }) => "nav-link" + (isActive ? " active" : "")}>
             International (coming soon)
           </NavLink>
+          <NavLink to="/news" className={({ isActive }) => "nav-link" + (isActive ? " active" : "")}>
+            News
+          </NavLink>
           {/* <NavLink to="/portal" className={({ isActive }) => "nav-link" + (isActive ? " active" : "")}>
             Portal Tracker
           </NavLink> */}
