@@ -75,7 +75,15 @@ export function PlayerModal({ player, onClose, onReplace, sport = "mens" }) {
       .eq("player_id", player.id)
       .order("calendar_year", { ascending: false })
       .then(({ data }) => {
-        setStats(data?.length ? data : null);
+        if (data?.length) {
+          setStats(data);
+        } else if (player.stats && PENTAGON_METRICS.some(m => player.stats[m.key] != null)) {
+          // Players not in player_stats (e.g. official freshmen from team_freshmen)
+          // carry their BTP metrics inline — render the skill profile from those.
+          setStats([{ ...player.stats, school: player.team ?? null, calendar_year: null }]);
+        } else {
+          setStats(null);
+        }
         setLoadingStats(false);
       });
   }, [player?.id]);

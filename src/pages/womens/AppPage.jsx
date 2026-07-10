@@ -1183,9 +1183,10 @@ export function WomensAppPage() {
 
     // Official, superadmin-added freshmen for this team (read-only).
     const officialFresh = (board.teamFreshmen || []).map(p => ({
-      id: p.id, name: p.name, pos: p.pos || "—", year: "FR",
+      id: p.id, name: p.name, pos: p.pos || "—", year: "FR", team: p.team,
       nilOffer: 0, _type: "Official FR", _typeKey: "official_fr", _readOnly: true,
-      freshman_tier: p.freshman_tier, stats: {},
+      freshman_tier: p.freshman_tier, stats: p.stats || {},
+      marketLow: p.marketLow || 0, marketHigh: p.marketHigh || 0, nilValuation: p.nilValuation || 0,
     }));
 
     return [...transfers, ...returning, ...undecided, ...leaving, ...custom, ...officialFresh];
