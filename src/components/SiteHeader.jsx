@@ -81,6 +81,9 @@ export function SiteHeader() {
           <NavLink to="/news" className={({ isActive }) => "nav-link" + (isActive ? " active" : "")}>
             News
           </NavLink>
+          <NavLink to="/historical" className={({ isActive }) => "nav-link" + (isActive ? " active" : "")}>
+            Time Machine
+          </NavLink>
           {/* <NavLink to="/portal" className={({ isActive }) => "nav-link" + (isActive ? " active" : "")}>
             Portal Tracker
           </NavLink> */}
