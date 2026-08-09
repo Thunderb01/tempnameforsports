@@ -16,6 +16,7 @@ import { track }            from "@/lib/track";
 import { money, letterGrade, gradeColor, bucketPosition } from "@/lib/display";
 import { MultiSelectFilter, RangeFilter, FilterChips, parseHeight, formatHeight, playerHeightInches } from "@/components/Filters";
 import { getTeamConference } from "@/lib/teamLookup";
+import { LEAVING_PLAYER_STATUSES } from "@/lib/playerStatus";
 
 // Absolute thresholds calibrated against portal rankings score distribution
 function rosterGrade(score) {
@@ -235,7 +236,7 @@ const TYPE_COLOR = {
 //                   scored on the same yardstick.
 //   Live lineup   = whatever you set in the sidebar (starterCounts).
 const STATIC_LINEUP = { Guard: 2, Wing: 2, Big: 1 };
-const CMP_LEAVING_STATUSES  = new Set(["declared", "transferring", "graduating"]);
+const CMP_LEAVING_STATUSES  = LEAVING_PLAYER_STATUSES;
 
 function slotWeightFor(slotIndex, startersN) {
   if (slotIndex < startersN)         return 1.00;   // starter
@@ -1018,7 +1019,6 @@ export function WomensAppPage() {
   const [heightMin,     setHeightMin]     = useState(null);
   const [heightMax,     setHeightMax]     = useState(null);
   const [portalOnly,    setPortalOnly]    = useState(true);
-  const [availableIds,  setAvailableIds]  = useState(new Set());
   const [boardMode,     setBoardMode]     = useState("domestic"); // "domestic" | "international"
   const [intlBoard,     setIntlBoard]     = useState(null);       // null until loaded
   const [modal,           setModal]           = useState(null);
@@ -1057,15 +1057,12 @@ export function WomensAppPage() {
     Promise.all(fetches);
   }, [activeTeam, userId]);
 
-  useEffect(() => {
-    supabase.from("w_portal_transfers").select("player_id, status")
-      .eq("season_year", 2026).neq("status", "withdrawn").not("player_id", "is", null)
-      .then(({ data }) => {
-        const uncommitted = new Set();
-        (data || []).forEach(r => { if (r.status === "uncommitted") uncommitted.add(r.player_id); });
-        setAvailableIds(uncommitted);
-      });
-  }, []);
+  // transfer_status now lives inline on each board row (added onto vw_w_players) —
+  // no separate w_portal_transfers query needed to know who's still available.
+  const availableIds = useMemo(
+    () => new Set(board.state.board.filter(p => p.transfer_status === "uncommitted").map(p => p.id)),
+    [board.state.board]
+  );
 
   useEffect(() => { setSettings(board.state.settings); }, [board.state.settings]);
 

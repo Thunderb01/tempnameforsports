@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { supabase }   from "@/lib/supabase";
-import { money, nilRange, letterGrade, gradeColor } from "@/lib/display";
+import { money } from "@/lib/display";
 import { InternationalAdminContent } from "@/pages/InternationalAdminPage";
 import { DefCard } from "@/components/DefCard";
 import { DOMESTIC_FIELDS, domesticValues, resolveArchetypeList, matchArchetypes } from "@/lib/archetypeMatch";
@@ -89,7 +89,10 @@ function TeamSearch({ value, onChange, placeholder = "Search team…" }) {
   );
 }
 
-const STATUS_OPTIONS = ["uncommitted", "committed", "enrolled", "withdrawn"];
+// Lifecycle of a player's transfer_status field (mirrors what the CBD sync
+// in import_portal.py writes: uncommitted | committed | withdrawn).
+const TRANSFER_STATUS_OPTIONS = ["uncommitted", "committed", "withdrawn"];
+const TRANSFER_STATUS_COLOR   = { committed: "#5b9cf6", withdrawn: "#e05c5c", uncommitted: "#94a3b8" };
 
 const CURRENT_SEASON = 2027;
 
@@ -111,25 +114,6 @@ const ARCHETYPE_OPTIONS = [
 ];
 const POSITION_OPTIONS = ["Guard", "Wing", "Big"];
 
-const PENTAGON_METRICS = [
-  { key: "sei", label: "SEI" },
-  { key: "ath", label: "ATH" },
-  { key: "ris", label: "RIS" },
-  { key: "dds", label: "DDS" },
-  { key: "cdi", label: "CDI" },
-];
-
-const EMPTY_FORM = {
-  player_id:            null,
-  existing_transfer_id: null,  // if set, Save will UPDATE this row instead of inserting
-  player_name:          "",
-  torvik_pid:           "",
-  from_team:            "",
-  to_team:              "",
-  season_year:          CURRENT_SEASON,
-  status:               "committed",
-};
-
 // ── Shared helpers ─────────────────────────────────────────────────────────
 function Section({ title, children }) {
   return (
@@ -142,304 +126,10 @@ function Section({ title, children }) {
   );
 }
 
-const STATUS_COLOR = { committed: "#5b9cf6", enrolled: "#4ade80", withdrawn: "#e05c5c", uncommitted: "#94a3b8" };
-function StatusBadge({ status }) {
-  const color = STATUS_COLOR[status] || "#94a3b8";
-  return (
-    <span style={{ display: "inline-block", padding: "2px 8px", borderRadius: 20,
-      fontSize: 11, fontWeight: 600, color, background: `${color}22`, border: `1px solid ${color}55` }}>
-      {status}
-    </span>
-  );
-}
-
 const labelStyle = {
   display: "block", fontSize: 10, textTransform: "uppercase",
   letterSpacing: ".06em", opacity: .45, marginBottom: 5, fontWeight: 600,
 };
-
-// ── Player typeahead ───────────────────────────────────────────────────────
-function PlayerSearch({ value, playerName, onChange }) {
-  const [query,       setQuery]       = useState(playerName || "");
-  const [suggestions, setSuggestions] = useState([]);
-  const [open,        setOpen]        = useState(false);
-  const timeoutRef = useRef(null);
-  const wrapRef    = useRef(null);
-
-  useEffect(() => { setQuery(playerName || ""); }, [playerName]);
-
-  function search(q) {
-    setQuery(q);
-    clearTimeout(timeoutRef.current);
-    if (q.trim().length < 2) { setSuggestions([]); setOpen(false); return; }
-    timeoutRef.current = setTimeout(async () => {
-      const { data } = await supabase
-        .from("vw_players")
-        .select("id, name, primary_position, year, current_team, espn_id, open_market_high, open_market_low, sei, ath, ris, dds, cdi")
-        .ilike("name", `%${q.trim()}%`)
-        .limit(8);
-      setSuggestions(data || []);
-      setOpen(true);
-    }, 220);
-  }
-
-  function select(p) {
-    setQuery(p.name);
-    setSuggestions([]);
-    setOpen(false);
-    onChange(p);
-  }
-
-  function clear() {
-    setQuery("");
-    setSuggestions([]);
-    setOpen(false);
-    onChange(null);
-  }
-
-  useEffect(() => {
-    function handler(e) {
-      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false);
-    }
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
-
-  return (
-    <div ref={wrapRef} style={{ position: "relative" }}>
-      <div style={{ display: "flex", gap: 6 }}>
-        <input
-          className="input" style={{ width: "100%" }}
-          placeholder="Search player…"
-          value={query}
-          onChange={e => search(e.target.value)}
-          onFocus={() => suggestions.length && setOpen(true)}
-        />
-        {value && (
-          <button className="btn btn-ghost" style={{ fontSize: 11, padding: "0 8px", flexShrink: 0 }} onClick={clear}>✕</button>
-        )}
-      </div>
-      {value && (
-        <div style={{ fontSize: 10, opacity: .35, marginTop: 3 }}>Linked: {value}</div>
-      )}
-      {open && suggestions.length > 0 && (
-        <div style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0, zIndex: 999,
-          background: "#1a2233", border: "1px solid var(--border)", borderRadius: 8, overflow: "hidden",
-          boxShadow: "0 8px 24px rgba(0,0,0,.5)" }}>
-          {suggestions.map(p => (
-            <div key={p.id} onMouseDown={() => select(p)}
-              style={{ padding: "8px 12px", cursor: "pointer", borderBottom: "1px solid rgba(255,255,255,.06)" }}
-              onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,.06)"}
-              onMouseLeave={e => e.currentTarget.style.background = ""}>
-              <div style={{ fontWeight: 600, fontSize: 13 }}>{p.name}</div>
-              <div style={{ fontSize: 11, opacity: .45 }}>{p.primary_position} · {p.year} · {p.current_team}</div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ── Player preview panel ───────────────────────────────────────────────────
-function PlayerPreviewPanel({ player }) {
-  const [stats, setStats] = useState(null);
-
-  useEffect(() => {
-    if (!player?.id) { setStats(null); return; }
-    supabase
-      .from("player_stats")
-      .select("ppg, rpg, apg, fg_pct, 3p_pct, ft_pct, usg, calendar_year")
-      .eq("player_id", player.id)
-      .order("calendar_year", { ascending: false })
-      .limit(1)
-      .then(({ data }) => setStats(data?.[0] || null));
-  }, [player?.id]);
-
-  if (!player) return null;
-
-  function fmt(val, key) {
-    if (val == null || val === "") return "—";
-    const pct = ["fg_pct", "ft_pct", "3p_pct"];
-    if (pct.includes(key)) return `${Number(val).toFixed(1)}%`;
-    return Number(val) % 1 === 0 ? String(Number(val)) : Number(val).toFixed(1);
-  }
-
-  return (
-    <div style={{ width: 280, flexShrink: 0, background: "rgba(255,255,255,.03)", border: "1px solid var(--border)",
-      borderRadius: 10, padding: 16, alignSelf: "flex-start", position: "sticky", top: 80 }}>
-
-      {/* Header */}
-      <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 14 }}>
-        {player.espn_id
-          ? <img
-              src={`https://a.espncdn.com/i/headshots/mens-college-basketball/players/full/${player.espn_id}.png`}
-              alt={player.name}
-              style={{ width: 56, height: 56, borderRadius: "50%", objectFit: "cover", background: "rgba(255,255,255,.06)", flexShrink: 0 }}
-              onError={e => { e.target.style.display = "none"; }}
-            />
-          : <div style={{ width: 56, height: 56, borderRadius: "50%", background: "rgba(255,255,255,.07)", flexShrink: 0 }} />
-        }
-        <div>
-          <div style={{ fontWeight: 700, fontSize: 14, lineHeight: 1.3 }}>{player.name}</div>
-          <div style={{ fontSize: 11, opacity: .45, marginTop: 2 }}>
-            {[player.primary_position, player.year, player.current_team].filter(Boolean).join(" · ")}
-          </div>
-          <div style={{ fontSize: 11, marginTop: 4, opacity: .7 }}>
-            {nilRange(player.open_market_low, player.open_market_high)}
-          </div>
-        </div>
-      </div>
-
-      {/* BTP Metrics */}
-      <div style={{ marginBottom: 14 }}>
-        <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".06em", opacity: .4, fontWeight: 600, marginBottom: 8 }}>
-          BTP Metrics
-        </div>
-        {PENTAGON_METRICS.map(({ key, label }) => {
-          const val   = player[key];
-          const grade = letterGrade(val);
-          const color = gradeColor(grade);
-          const pct   = val != null ? Math.min(Math.max(val / 100, 0), 1) * 100 : 0;
-          return (
-            <div key={key} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-              <div style={{ width: 28, fontSize: 10, opacity: .5, fontWeight: 600 }}>{label}</div>
-              <div style={{ flex: 1, height: 5, background: "rgba(255,255,255,.08)", borderRadius: 3, overflow: "hidden" }}>
-                <div style={{ width: `${pct}%`, height: "100%", background: color, borderRadius: 3 }} />
-              </div>
-              <div style={{ width: 26, fontSize: 11, fontWeight: 700, color, textAlign: "right" }}>{grade}</div>
-              <div style={{ width: 24, fontSize: 10, opacity: .4, textAlign: "right" }}>{val != null ? Math.round(val) : "—"}</div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Stats */}
-      {stats && (
-        <div>
-          <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".06em", opacity: .4, fontWeight: 600, marginBottom: 8 }}>
-            Stats {stats.calendar_year ? `(${stats.calendar_year})` : ""}
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6 }}>
-            {[["PPG", "ppg"], ["RPG", "rpg"], ["APG", "apg"], ["FG%", "fg_pct"], ["3P%", "3p_pct"], ["FT%", "ft_pct"]].map(([lbl, key]) => (
-              <div key={key} style={{ background: "rgba(255,255,255,.04)", borderRadius: 6, padding: "6px 8px", textAlign: "center" }}>
-                <div style={{ fontSize: 10, opacity: .4, marginBottom: 2 }}>{lbl}</div>
-                <div style={{ fontSize: 13, fontWeight: 700 }}>{fmt(stats[key], key)}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ── Transfer form ──────────────────────────────────────────────────────────
-function TransferForm({ initial = EMPTY_FORM, onSave, onCancel, saving }) {
-  const [form,          setForm]          = useState(initial);
-  const [linkedPlayer,  setLinkedPlayer]  = useState(null);
-  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
-
-  // When editing an existing record that already has a player_name set, keep it
-  useEffect(() => { setForm(initial); setLinkedPlayer(null); }, [initial.player_id]);
-
-  async function handlePlayerSelect(p) {
-    if (!p) {
-      setLinkedPlayer(null);
-      setForm(f => ({ ...f, player_id: null, player_name: "" }));
-      return;
-    }
-    setLinkedPlayer(p);
-
-    // Look up their existing transfer record to auto-fill fields and track the row ID
-    const { data: existing } = await supabase
-      .from("portal_transfers")
-      .select("id, to_team, from_team, status, season_year, torvik_pid")
-      .eq("player_id", p.id)
-      .order("season_year", { ascending: false })
-      .limit(1)
-      .single();
-
-    setForm(f => ({
-      ...f,
-      player_id:            p.id,
-      player_name:          p.name,
-      existing_transfer_id: existing?.id ?? null,
-      from_team:            existing?.from_team  || p.current_team || f.from_team,
-      to_team:              existing?.to_team    || f.to_team,
-      status:               existing?.status     || f.status,
-      season_year:          existing?.season_year ?? f.season_year,
-      torvik_pid:           existing?.torvik_pid  || f.torvik_pid,
-    }));
-  }
-
-  return (
-    <div style={{ display: "flex", gap: 16, alignItems: "flex-start", flexWrap: "wrap" }}>
-      {/* Form card */}
-      <div style={{ flex: "1 1 480px", maxWidth: 560, display: "flex", flexDirection: "column", gap: 10,
-        background: "rgba(255,255,255,.03)", border: "1px solid var(--border)", borderRadius: 10, padding: 16 }}>
-
-        <div style={{ gridColumn: "1 / -1" }}>
-          <label style={labelStyle}>Link Player (auto-fills from existing transfer record)</label>
-          <PlayerSearch
-            value={form.player_id}
-            playerName={form.player_name}
-            onChange={handlePlayerSelect}
-          />
-        </div>
-
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-          <div>
-            <label style={labelStyle}>Player Name</label>
-            <input className="input" style={{ width: "100%" }} value={form.player_name}
-              onChange={e => set("player_name", e.target.value)} placeholder="e.g. Tre Johnson" />
-          </div>
-          <div>
-            <label style={labelStyle}>Torvik PID</label>
-            <input className="input" style={{ width: "100%" }} value={form.torvik_pid}
-              onChange={e => set("torvik_pid", e.target.value)} placeholder="optional" />
-          </div>
-
-          <div>
-            <label style={labelStyle}>From Team</label>
-            <TeamSearch value={form.from_team} placeholder="From team…" onChange={v => set("from_team", v)} />
-          </div>
-          <div>
-            <label style={labelStyle}>To Team</label>
-            <TeamSearch value={form.to_team} placeholder="To team…" onChange={v => set("to_team", v)} />
-          </div>
-
-          <div>
-            <label style={labelStyle}>Season Year</label>
-            <input className="input" style={{ width: "100%" }} type="number" value={form.season_year}
-              onChange={e => set("season_year", Number(e.target.value))} />
-          </div>
-          <div>
-            <label style={labelStyle}>Status</label>
-            <select className="input" style={{ width: "100%" }} value={form.status}
-              onChange={e => set("status", e.target.value)}>
-              {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
-            </select>
-          </div>
-        </div>
-
-        <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
-          <button className="btn btn-primary" style={{ fontSize: 12 }}
-            disabled={saving || !form.player_name.trim()}
-            onClick={() => onSave(form)}>
-            {saving ? "Saving…" : form.existing_transfer_id ? "Update Record" : "Add New Record"}
-          </button>
-          {onCancel && (
-            <button className="btn btn-ghost" style={{ fontSize: 12 }} onClick={onCancel}>Cancel</button>
-          )}
-        </div>
-      </div>
-
-      {/* Player preview */}
-      <PlayerPreviewPanel player={linkedPlayer} />
-    </div>
-  );
-}
 
 // ── Main page ──────────────────────────────────────────────────────────────
 export function AdminPage() {
@@ -492,161 +182,108 @@ export function AdminPage() {
 }
 
 // ── Portal Transfers tab ───────────────────────────────────────────────────
+// Portal transfer data (destination team, sync status) now lives directly on
+// the player row — see PlayerEditForm's "Transfer Details" section — rather
+// than a separate portal_transfers table. This tab is a filtered view over
+// players where player_status = "transferring", linking into the same edit
+// form used everywhere else, so there's exactly one write path.
 function TransfersTab() {
-  const [transfers,  setTransfers]  = useState([]);
-  const [loading,    setLoading]    = useState(true);
-  const [saving,     setSaving]     = useState(false);
-  const [editId,     setEditId]     = useState(null);
-  const [yearFilter, setYearFilter] = useState(CURRENT_SEASON);
-  const [search,     setSearch]     = useState("");
+  const [transfers, setTransfers] = useState([]);
+  const [loading,    setLoading]  = useState(true);
+  const [saving,     setSaving]   = useState(false);
+  const [editId,     setEditId]   = useState(null);
+  const [search,     setSearch]   = useState("");
 
-  useEffect(() => { fetchTransfers(); }, [yearFilter]);
-
-  async function fetchTransfers() {
+  const fetchTransfers = useCallback(async () => {
     setLoading(true);
-    const { data } = await supabase
-      .from("portal_transfers")
+    const { data, error } = await supabase
+      .from("players")
       .select("*")
-      .eq("season_year", yearFilter)
-      .order("created_at", { ascending: false });
+      .eq("player_status", "transferring")
+      .order("name");
+    if (error) { console.error("transfers fetch:", error); setLoading(false); return; }
     setTransfers(data || []);
     setLoading(false);
-  }
+  }, []);
 
-  async function handleAdd(form) {
+  useEffect(() => { fetchTransfers(); }, [fetchTransfers]);
+
+  async function handleSave(id, patch) {
     setSaving(true);
-    const payload = {
-      player_id:   form.player_id         || null,
-      player_name: form.player_name.trim(),
-      torvik_pid:  form.torvik_pid.trim() || null,
-      from_team:   form.from_team.trim()  || null,
-      to_team:     form.to_team.trim()    || null,
-      season_year: form.season_year,
-      status:      form.status,
-    };
-
-    let error;
-    if (form.existing_transfer_id) {
-      ({ error } = await supabase.from("portal_transfers").update(payload).eq("id", form.existing_transfer_id));
-    } else {
-      ({ error } = await supabase.from("portal_transfers").insert(payload));
+    const { data, error } = await supabase.from("players").update(patch).eq("id", id).select();
+    if (error) {
+      alert("Error: " + error.message);
+      setSaving(false);
+      return;
     }
-    if (error) { alert("Error: " + error.message); }
-    else {
-      // Auto-mark the linked player as transferring
-      if (form.player_id) {
-        await supabase.from("players").update({ player_status: "transferring" }).eq("id", form.player_id);
-      }
-      await fetchTransfers();
+    if (!data || data.length === 0) {
+      alert("Save failed: no rows updated. Check RLS policy on players table.");
+      setSaving(false);
+      return;
     }
+    setEditId(null);
     setSaving(false);
-  }
-
-  async function handleUpdate(id, form) {
-    setSaving(true);
-    const { error } = await supabase.from("portal_transfers").update({
-      player_id:   form.player_id   || null,
-      player_name: form.player_name.trim(),
-      torvik_pid:  form.torvik_pid.trim() || null,
-      from_team:   form.from_team.trim(),
-      to_team:     form.to_team.trim(),
-      season_year: form.season_year,
-      status:      form.status,
-    }).eq("id", id);
-    if (error) { alert("Error: " + error.message); }
-    else {
-      if (form.player_id) {
-        await supabase.from("players").update({ player_status: "transferring" }).eq("id", form.player_id);
-      }
-      setEditId(null);
-      await fetchTransfers();
-    }
-    setSaving(false);
-  }
-
-  async function handleDelete(id) {
-    if (!confirm("Delete this transfer record?")) return;
-    await supabase.from("portal_transfers").delete().eq("id", id);
-    setTransfers(prev => prev.filter(t => t.id !== id));
-  }
-
-  async function handleStatusChange(id, status) {
-    await supabase.from("portal_transfers").update({ status }).eq("id", id);
-    setTransfers(prev => prev.map(t => t.id === id ? { ...t, status } : t));
+    await fetchTransfers(); // re-filter — a status change away from "transferring" drops it from this list
   }
 
   const filtered = transfers.filter(t => {
     if (!search.trim()) return true;
     const q = search.toLowerCase();
-    return (t.player_name || "").toLowerCase().includes(q)
-        || (t.from_team   || "").toLowerCase().includes(q)
-        || (t.to_team     || "").toLowerCase().includes(q);
+    return (t.name               || "").toLowerCase().includes(q)
+        || (t.current_team       || "").toLowerCase().includes(q)
+        || (t.transfer_to_team   || "").toLowerCase().includes(q);
   });
 
   return (
     <div>
-      <Section title="Add Transfer">
-        <TransferForm onSave={handleAdd} saving={saving} />
-      </Section>
-
-      <Section title={`Records — ${yearFilter} Season (${transfers.length})`}>
-        <div style={{ display: "flex", gap: 8, marginBottom: 14, alignItems: "center" }}>
-          <div style={{ display: "flex", gap: 6 }}>
-            {[2026, 2027, 2028].map(y => (
-              <button key={y} onClick={() => setYearFilter(y)} style={{
-                fontSize: 11, fontWeight: 600, padding: "3px 12px", borderRadius: 20, cursor: "pointer", border: "1px solid",
-                background:  yearFilter === y ? "rgba(91,156,246,.2)" : "transparent",
-                color:       yearFilter === y ? "#5b9cf6"             : "rgba(255,255,255,.35)",
-                borderColor: yearFilter === y ? "rgba(91,156,246,.4)" : "rgba(255,255,255,.1)",
-              }}>{y}</button>
-            ))}
-          </div>
-          <input className="input" placeholder="Search…" value={search}
-            onChange={e => setSearch(e.target.value)} style={{ width: 200, fontSize: 12 }} />
+      <Section title={`In the Portal (${transfers.length})`}>
+        <div style={{ fontSize: 12, opacity: .45, marginBottom: 16, maxWidth: 680 }}>
+          Every player whose status is set to <strong>Transferring</strong>. To add someone,
+          set their status on the Players tab or edit them here directly. Changing status away
+          from "Transferring" removes them from this list on save.
         </div>
+        <input className="input" placeholder="Search…" value={search}
+          onChange={e => setSearch(e.target.value)} style={{ width: 240, fontSize: 12, marginBottom: 14 }} />
 
         {loading ? (
           <div style={{ opacity: .4, fontSize: 13 }}>Loading…</div>
         ) : filtered.length === 0 ? (
-          <div style={{ opacity: .35, fontSize: 13 }}>No records.</div>
+          <div style={{ opacity: .35, fontSize: 13 }}>No players currently in the portal.</div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {filtered.map(t => (
               <div key={t.id}>
                 {editId === t.id ? (
-                  <TransferForm
-                                       initial={{ player_id: t.player_id || null, player_name: t.player_name || "",
-                      torvik_pid: t.torvik_pid || "", from_team: t.from_team, to_team: t.to_team,
-                      season_year: t.season_year, status: t.status }}
+                  <PlayerEditForm
+                    player={t}
+                    mode="edit"
                     saving={saving}
-                    onSave={form => handleUpdate(t.id, form)}
+                    onSave={patch => handleSave(t.id, patch)}
                     onCancel={() => setEditId(null)}
                   />
                 ) : (
                   <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap",
                     background: "rgba(255,255,255,.03)", border: "1px solid var(--border)",
                     borderRadius: 8, padding: "10px 14px" }}>
-                    <div style={{ flex: 1, minWidth: 160 }}>
-                      <div style={{ fontWeight: 600, fontSize: 13 }}>
-                        {t.player_name || <span style={{ opacity: .4 }}>—</span>}
-                        {!t.player_id && <span style={{ marginLeft: 6, fontSize: 10, opacity: .35, fontWeight: 400 }}>unlinked</span>}
-                      </div>
+                    <div style={{ flex: 1, minWidth: 200 }}>
+                      <div style={{ fontWeight: 600, fontSize: 13 }}>{t.name}</div>
                       <div style={{ fontSize: 11, opacity: .4, marginTop: 2 }}>
-                        {t.from_team} → {t.to_team} · {t.season_year}
-                        {t.torvik_pid && <span style={{ marginLeft: 6, opacity: .6 }}>pid: {t.torvik_pid}</span>}
+                        {t.current_team || "—"} → {t.transfer_to_team
+                          ? t.transfer_to_team
+                          : <span style={{ opacity: .6, fontStyle: "italic" }}>undecided</span>}
                       </div>
                     </div>
-                    <select className="input" value={t.status} style={{ fontSize: 11, padding: "2px 6px", width: "auto" }}
-                      onChange={e => handleStatusChange(t.id, e.target.value)}>
-                      {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
-                    </select>
-                    <StatusBadge status={t.status} />
-                    <div style={{ display: "flex", gap: 6 }}>
-                      <button className="btn btn-ghost" style={{ fontSize: 11, padding: "2px 8px" }}
-                        onClick={() => setEditId(t.id)}>Edit</button>
-                      <button className="btn btn-ghost" style={{ fontSize: 11, padding: "2px 8px", color: "#f77", borderColor: "rgba(220,70,70,.3)" }}
-                        onClick={() => handleDelete(t.id)}>Delete</button>
-                    </div>
+                    {t.transfer_status && (() => {
+                      const color = TRANSFER_STATUS_COLOR[t.transfer_status] || "#94a3b8";
+                      return (
+                        <span style={{ display: "inline-block", padding: "2px 8px", borderRadius: 20,
+                          fontSize: 11, fontWeight: 600, color, background: `${color}22`, border: `1px solid ${color}55` }}>
+                          {t.transfer_status}
+                        </span>
+                      );
+                    })()}
+                    <button className="btn btn-ghost" style={{ fontSize: 11, padding: "2px 8px" }}
+                      onClick={() => setEditId(t.id)}>Edit</button>
                   </div>
                 )}
               </div>
@@ -686,15 +323,19 @@ function PlayersTab() {
         const ids = players.map(p => p.id);
         const { data: statusRows } = await supabase
           .from("players")
-          .select("id, player_status, archetype_overwrite, archetypes, archetype_override")
+          .select("id, player_status, archetype_overwrite, archetypes, archetype_override, transfer_status, transfer_from_team, transfer_to_team, transfer_season_year")
           .in("id", ids);
         const byId = Object.fromEntries((statusRows || []).map(r => [r.id, r]));
         setResults(players.map(p => ({
           ...p,
-          player_status:       byId[p.id]?.player_status       ?? null,
-          archetype_overwrite: byId[p.id]?.archetype_overwrite ?? null,
-          archetypes:          byId[p.id]?.archetypes          ?? [],
-          archetype_override:  byId[p.id]?.archetype_override  ?? null,
+          player_status:        byId[p.id]?.player_status        ?? null,
+          archetype_overwrite:  byId[p.id]?.archetype_overwrite  ?? null,
+          archetypes:           byId[p.id]?.archetypes           ?? [],
+          archetype_override:   byId[p.id]?.archetype_override   ?? null,
+          transfer_status:      byId[p.id]?.transfer_status      ?? null,
+          transfer_from_team:   byId[p.id]?.transfer_from_team   ?? null,
+          transfer_to_team:     byId[p.id]?.transfer_to_team     ?? null,
+          transfer_season_year: byId[p.id]?.transfer_season_year ?? null,
         })));
       } else {
         setResults([]);
@@ -747,8 +388,12 @@ function PlayersTab() {
   }
 
   async function handlePlayerStatusChange(id, player_status) {
-    const { error } = await supabase.from("players").update({ player_status }).eq("id", id);
+    const { data, error } = await supabase.from("players").update({ player_status }).eq("id", id).select();
     if (error) { alert("Error: " + error.message); return; }
+    if (!data || data.length === 0) {
+      alert("Save failed: no rows updated. Check RLS policy on players table.");
+      return;
+    }
     setResults(prev => prev.map(p => p.id === id ? { ...p, player_status } : p));
   }
 
@@ -838,6 +483,10 @@ function PlayerEditForm({ player, mode = "edit", onSave, onCancel, saving }) {
     primary_position:    player.primary_position    || "",
     current_team:        player.current_team        || "",
     player_status:       player.player_status       || "",
+    transfer_status:      player.transfer_status      || "",
+    transfer_from_team:   player.transfer_from_team   || "",
+    transfer_to_team:     player.transfer_to_team     || "",
+    transfer_season_year: player.transfer_season_year ?? "",
   });
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
@@ -880,6 +529,22 @@ function PlayerEditForm({ player, mode = "edit", onSave, onCancel, saving }) {
       current_team:      form.current_team.trim()  || null,
       player_status:     form.player_status        || null,
     };
+    // Transfer detail fields only mean something while the player is
+    // actively transferring — only write them (and only clear them once
+    // status moves off "transferring") to avoid losing history for a player
+    // who's temporarily being edited for something unrelated.
+    if (form.player_status === "transferring") {
+      patch.transfer_status      = form.transfer_status      || null;
+      patch.transfer_from_team   = form.transfer_from_team.trim()   || null;
+      patch.transfer_to_team     = form.transfer_to_team.trim()     || null;
+      patch.transfer_season_year = form.transfer_season_year !== "" ? Number(form.transfer_season_year) : null;
+    } else if (player.player_status === "transferring") {
+      // Was transferring, no longer is — clear the now-stale transfer detail.
+      patch.transfer_status      = null;
+      patch.transfer_from_team   = null;
+      patch.transfer_to_team     = null;
+      patch.transfer_season_year = null;
+    }
     // Only write archetype fields once definitions have loaded, so we never
     // clobber a player's archetypes with an empty auto-match.
     if (defsLoaded) {
@@ -980,6 +645,37 @@ function PlayerEditForm({ player, mode = "edit", onSave, onCancel, saving }) {
         </div>
       </div>
 
+      {/* Transfer Details — only relevant while actively transferring */}
+      {form.player_status === "transferring" && (
+        <>
+          {sectionHead("Transfer Details")}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 10, marginBottom: 16 }}>
+            <div>
+              <label style={labelStyle}>From Team</label>
+              <TeamSearch value={form.transfer_from_team} placeholder="From team…"
+                onChange={v => set("transfer_from_team", v)} />
+            </div>
+            <div>
+              <label style={labelStyle}>To Team</label>
+              <TeamSearch value={form.transfer_to_team} placeholder="To team… (leave blank if undecided)"
+                onChange={v => set("transfer_to_team", v)} />
+            </div>
+            <div>
+              <label style={labelStyle}>Season Year</label>
+              <input className="input" style={{ width: "100%" }} type="number" value={form.transfer_season_year}
+                onChange={e => set("transfer_season_year", e.target.value)} placeholder={String(CURRENT_SEASON)} />
+            </div>
+            <div>
+              <label style={labelStyle}>Transfer Status</label>
+              <select className="input" style={{ width: "100%", color: TRANSFER_STATUS_COLOR[form.transfer_status] || "inherit" }}
+                value={form.transfer_status} onChange={e => set("transfer_status", e.target.value)}>
+                <option value="">— unset —</option>
+                {TRANSFER_STATUS_OPTIONS.map(s => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
+              </select>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Archetypes */}
       {sectionHead("Archetypes")}

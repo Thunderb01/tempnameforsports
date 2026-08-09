@@ -5,10 +5,12 @@ import { TeamAutocomplete } from "@/components/TeamAutocomplete";
 import { useAuth }         from "@/hooks/useAuth";
 import { useAdminTeam }    from "@/hooks/useAdminTeam";
 import { useRosterBoard }  from "@/hooks/useRosterBoard";
+import { useWomensRosterBoard } from "@/hooks/useWomensRosterBoard";
 import { supabase }        from "@/lib/supabase";
 import { getTeamConference } from "@/lib/teamLookup";
 import { useTeamLogos } from "@/hooks/useTeamLogos";
-import { money, nilValue, nilRange, heightToInches, tierColor, projectedTier } from "@/lib/display";
+import { money, nilValue, nilRange, heightToInches, tierColor, projectedTier, overallFor, overallColor } from "@/lib/display";
+import { useNilVisible } from "@/hooks/useNilVisible";
 import { MultiSelectFilter, RangeFilter, FilterChips, parseHeight, formatHeight, playerHeightInches } from "@/components/Filters";
 
 // label → getter(player)
@@ -22,17 +24,23 @@ const COLS = [
   { label: "PPG",       get: p => p.stats?.ppg    ?? "—" },
   { label: "RPG",       get: p => p.stats?.rpg    ?? "—" },
   { label: "APG",       get: p => p.stats?.apg    ?? "—" },
-  { label: "Mkt Low",   get: p => nilValue(p.marketLow) },
-  { label: "Mkt High",  get: p => nilValue(p.marketHigh) },
+  { label: "OVR",       get: p => overallFor(p) ?? "—" },
+  { label: "Mkt Low",   get: p => nilValue(p.marketLow),  nilOnly: true },
+  { label: "Mkt High",  get: p => nilValue(p.marketHigh), nilOnly: true },
   { label: "To Team",   get: p => p._toTeam || "—" },
 ];
 
+// The archetype filter/badge feature only exists on the men's side today —
+// women's archetype definitions/assignment aren't built out yet. Gated by
+// sport rather than silently extended or dropped; see CLAUDE.md fork notes.
+export function BoardPage({ sport = "men" }) {
+  const isWomens = sport === "women";
+  const useBoardHook = isWomens ? useWomensRosterBoard : useRosterBoard;
 
-export function BoardPage() {
   const { profile, user } = useAuth();
   const userId = user?.id || "";
   const { isAdmin, activeTeam, selectedTeam, setSelectedTeam, allTeams } = useAdminTeam(profile);
-  const board = useRosterBoard(activeTeam, userId);
+  const board = useBoardHook(activeTeam, userId);
   const teamLogos = useTeamLogos();
 
   const [loading,      setLoading]     = useState(true);
@@ -64,6 +72,8 @@ export function BoardPage() {
   const [archetypeOptions, setArchetypeOptions] = useState([]);
   const [archetypeColors,  setArchetypeColors]  = useState({});
   const [archetypesById,   setArchetypesById]   = useState({});
+  const [nilVisible] = useNilVisible();
+  const cols = useMemo(() => COLS.filter(c => nilVisible || !c.nilOnly), [nilVisible]);
   const YEAR_OPTIONS = ["Fr", "RS Fr", "So", "RS So", "Jr", "RS Jr", "Sr", "RS Sr", "Grad", "5th Year"];
   const conferences = [
     "A10", "ACC", "AE", "ASun", "Amer",
@@ -104,66 +114,63 @@ export function BoardPage() {
 
   const players = board.state.board;
 
-  // IDs of portal players who are currently available (uncommitted)
-  const [availableIds, setAvailableIds] = useState(new Set());
-  // IDs of all portal players (uncommitted + committed)
-  const [allPortalIds, setAllPortalIds] = useState(new Set());
-  // from_team / to_team keyed by player_id
-  const [portalInfo, setPortalInfo] = useState({});
+  // Portal availability/destination now live inline on each board row
+  // (transfer_status/transfer_from_team/transfer_to_team, added onto
+  // vw_players/vw_w_players) — no separate portal_transfers query needed.
+  const availableIds = useMemo(
+    () => new Set(players.filter(p => p.transfer_status === "uncommitted").map(p => p.id)),
+    [players]
+  );
+  const allPortalIds = useMemo(
+    () => new Set(players.filter(p => p.transfer_status && p.transfer_status !== "withdrawn").map(p => p.id)),
+    [players]
+  );
+  const portalInfo = useMemo(() => {
+    const info = {};
+    players.forEach(p => {
+      if (p.transfer_status && p.transfer_status !== "withdrawn") {
+        info[p.id] = { from_team: p.transfer_from_team, to_team: p.transfer_to_team };
+      }
+    });
+    return info;
+  }, [players]);
 
   // ── Load board via shared hook ───────────────────────────────────────────────
   useEffect(() => {
     setLoading(true);
     board.loadPortalBoard().then(() => setLoading(false));
 
-    supabase
-      .from("portal_transfers")
-      .select("player_id, from_team, to_team, status")
-      .eq("season_year", 2026)
-      .neq("status", "withdrawn")
-      .not("player_id", "is", null)
-      .then(({ data }) => {
-        const uncommitted = new Set();
-        const all = new Set();
-        const info = {};
-        (data || []).forEach(r => {
-          all.add(r.player_id);
-          info[r.player_id] = { from_team: r.from_team, to_team: r.to_team };
-          if (r.status === "uncommitted") uncommitted.add(r.player_id);
+    if (!isWomens) {
+      // Archetype filter: dropdown options are the definitions we've created;
+      // each player's resolved archetype comes from the players table.
+      // Men's-only feature — women's archetype assignment isn't built out yet.
+      supabase.from("archetype_defs").select("name, color").order("priority")
+        .then(({ data }) => {
+          setArchetypeOptions([...new Set((data || []).map(d => d.name))]);
+          setArchetypeColors(Object.fromEntries((data || []).map(d => [d.name, d.color || "#f5a623"])));
         });
-        setAvailableIds(uncommitted);
-        setAllPortalIds(all);
-        setPortalInfo(info);
-      });
 
-    // Archetype filter: dropdown options are the definitions we've created;
-    // each player's resolved archetype comes from the players table.
-    supabase.from("archetype_defs").select("name, color").order("priority")
-      .then(({ data }) => {
-        setArchetypeOptions([...new Set((data || []).map(d => d.name))]);
-        setArchetypeColors(Object.fromEntries((data || []).map(d => [d.name, d.color || "#f5a623"])));
-      });
-
-    (async () => {
-      const PAGE = 1000;
-      let from = 0, map = {};
-      for (;;) {
-        const { data, error } = await supabase
-          .from("players").select("id, archetype, archetypes")
-          .not("archetype", "is", null)
-          .range(from, from + PAGE - 1);
-        if (error || !data) break;
-        data.forEach(r => {
-          const list = Array.isArray(r.archetypes) && r.archetypes.length
-            ? r.archetypes : (r.archetype ? [r.archetype] : []);
-          if (list.length) map[r.id] = list;
-        });
-        if (data.length < PAGE) break;
-        from += PAGE;
-      }
-      setArchetypesById(map);
-    })();
-  }, []);
+      (async () => {
+        const PAGE = 1000;
+        let from = 0, map = {};
+        for (;;) {
+          const { data, error } = await supabase
+            .from("players").select("id, archetype, archetypes")
+            .not("archetype", "is", null)
+            .range(from, from + PAGE - 1);
+          if (error || !data) break;
+          data.forEach(r => {
+            const list = Array.isArray(r.archetypes) && r.archetypes.length
+              ? r.archetypes : (r.archetype ? [r.archetype] : []);
+            if (list.length) map[r.id] = list;
+          });
+          if (data.length < PAGE) break;
+          from += PAGE;
+        }
+        setArchetypesById(map);
+      })();
+    }
+  }, [isWomens]);
 
   // ── Tags ────────────────────────────────────────────────────────────────────
   // ── State/region → search terms ─────────────────────────────────────────────
@@ -271,7 +278,7 @@ export function BoardPage() {
         const pConf = getTeamConference(p.team) || p.conf;
         if (!confFilter.includes(pConf)) return false;
       }
-      if (archetypeFilter && !(archetypesById[p.id] || []).includes(archetypeFilter)) return false;
+      if (!isWomens && archetypeFilter && !(archetypesById[p.id] || []).includes(archetypeFilter)) return false;
       if (stateTerms && !matchesState(p.hometown || "", stateTerms)) return false;
       if (!includeUnevaluated && !(p.marketHigh > 0)) return false;
       if (toTeamFilter.trim()) {
@@ -290,7 +297,7 @@ export function BoardPage() {
       }
       return true;
     });
-  }, [players, search, posFilter, yearFilter, heightMin, heightMax, confFilter, archetypeFilter, archetypesById, stateFilter, portalOnly, includeCommitted, includeUnevaluated, advcFilters, toTeamFilter, availableIds, allPortalIds, portalInfo]);
+  }, [players, search, posFilter, yearFilter, heightMin, heightMax, confFilter, archetypeFilter, archetypesById, isWomens, stateFilter, portalOnly, includeCommitted, includeUnevaluated, advcFilters, toTeamFilter, availableIds, allPortalIds, portalInfo]);
 
   // ── Sort (separate so filter changes don't re-sort and vice versa) ──────────
   const sorted = useMemo(() => {
@@ -391,10 +398,12 @@ export function BoardPage() {
                 <option value="all">All locations</option>
                 {STATE_OPTIONS.map(o => <option key={o.label} value={o.label}>{o.label}</option>)}
               </select>
-              <select className="input" style={{ width: 180 }} value={archetypeFilter} onChange={e => setArchetypeFilter(e.target.value)}>
-                <option value="">All archetypes</option>
-                {archetypeOptions.map(a => <option key={a} value={a}>{a}</option>)}
-              </select>
+              {!isWomens && (
+                <select className="input" style={{ width: 180 }} value={archetypeFilter} onChange={e => setArchetypeFilter(e.target.value)}>
+                  <option value="">All archetypes</option>
+                  {archetypeOptions.map(a => <option key={a} value={a}>{a}</option>)}
+                </select>
+              )}
               <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, opacity: .7, cursor: "pointer", userSelect: "none" }}>
                 <input type="checkbox" checked={portalOnly} onChange={e => setPortalOnly(e.target.checked)} />
                 Available in portal
@@ -417,7 +426,7 @@ export function BoardPage() {
                 ...(heightMin != null ? [{ label: `Ht ≥ ${formatHeight(heightMin)}`, onClear: () => setHeightMin(null) }] : []),
                 ...(heightMax != null ? [{ label: `Ht ≤ ${formatHeight(heightMax)}`, onClear: () => setHeightMax(null) }] : []),
                 ...(stateFilter !== "all" ? [{ label: `Loc: ${stateFilter}`, onClear: () => setStateFilter("all") }] : []),
-                ...(archetypeFilter ? [{ label: `Archetype: ${archetypeFilter}`, onClear: () => setArchetypeFilter("") }] : []),
+                ...(!isWomens && archetypeFilter ? [{ label: `Archetype: ${archetypeFilter}`, onClear: () => setArchetypeFilter("") }] : []),
               ]}
               onClearAll={() => {
                 setPosFilter([]); setYearFilter([]); setConfFilter([]);
@@ -501,7 +510,14 @@ export function BoardPage() {
                             </div>
                           );
                         })()}
-                        <div className="row-sub">Market: {nilRange(p.marketLow, p.marketHigh)}</div>
+                        <div className="row-sub">
+                          <span style={{ fontWeight: 700, color: overallColor(overallFor(p)) }}>
+                            {overallFor(p) != null ? `${overallFor(p)} OVR` : "Unrated"}
+                          </span>
+                          {nilVisible && (p.marketLow > 0 || p.marketHigh > 0) && (
+                            <span style={{ opacity: .6 }}>{"  ·  "}{nilRange(p.marketLow, p.marketHigh)}</span>
+                          )}
+                        </div>
                         {(() => {
                           const s = p.stats || {};
                           const st = v => v != null && String(v) !== "NaN" ? Number(v).toFixed(1) : null;
@@ -513,7 +529,7 @@ export function BoardPage() {
                           ].filter(Boolean).join("  ·  ");
                           return line ? <div className="row-sub" style={{ opacity: .75 }}>{line}</div> : null;
                         })()}
-                        {(archetypesById[p.id] || []).length > 0 && (
+                        {!isWomens && (archetypesById[p.id] || []).length > 0 && (
                           <div style={{ marginTop: 6, display: "flex", flexWrap: "wrap", gap: 6 }}>
                             {archetypesById[p.id].map(name => {
                               const c = archetypeColors[name] || "#f5a623";
@@ -565,7 +581,7 @@ export function BoardPage() {
                   <thead>
                     <tr>
                       <th style={thStyle}>Action</th>
-                      {COLS.map(col => (
+                      {cols.map(col => (
                         <th key={col.label} style={{ ...thStyle, cursor: "pointer", userSelect: "none" }}
                           onClick={() => handleSort(col.label)}>
                           {col.label}{" "}
@@ -595,7 +611,7 @@ export function BoardPage() {
                               Shortlist
                             </button>
                           </td>
-                          {COLS.map(col => (
+                          {cols.map(col => (
                             <td key={col.label} style={tdStyle}>{col.get(row)}</td>
                           ))}
                         </tr>
@@ -625,13 +641,14 @@ export function BoardPage() {
 
         {/* ── Disclaimer ── */}
         <div style={{ marginTop: 24, textAlign: "center", fontSize: 11, opacity: .4 }}>
-          This is a Demo, all valuations are dynamic and subject to change. 
+          This is a Demo, all valuations are dynamic and subject to change.
         </div>
       </div>
 
       {modal && (
         <PlayerModal
           player={modal}
+          {...(isWomens ? { sport: "womens" } : {})}
           status={board.state.statusById?.[modal.id]}
           onStatus={setStatus}
           onClose={() => setModal(null)}

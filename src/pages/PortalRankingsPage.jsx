@@ -47,7 +47,7 @@ function depthCoeff(zeroIdx) {
 function scoreTeam(players) {
   let numPlayers = players.length;
   players.forEach((p, i) => {
-    if (p.open_market_high==0) numPlayers--; 
+    if (p.open_market_high==0) numPlayers--;
   });
   if (!players.length) return 0;
   const byPos = {};
@@ -205,7 +205,10 @@ function TeamExpandRow({ r, colCount, onOpenModal }) {
   );
 }
 
-export function PortalRankingsPage() {
+export function PortalRankingsPage({ sport = "men" }) {
+  const isWomens = sport === "women";
+  const vwPlayersTable = isWomens ? "vw_w_players" : "vw_players";
+
   const teamLogos = useTeamLogos();
   const [rows,      setRows]      = useState([]);
   const [loading,   setLoading]   = useState(true);
@@ -217,33 +220,25 @@ export function PortalRankingsPage() {
 
   useEffect(() => {
     async function load() {
-      const { data: transfers, error: tErr } = await supabase
-        .from("portal_transfers")
-        .select("to_team, player_id")
-        .eq("season_year", 2026)
-        .eq("status", "committed")
-        .not("player_id", "is", null)
-        .not("to_team", "is", null);
+      setLoading(true);
+      // Committed transfers and their destination team now live inline on
+      // the player row itself (transfer_status/transfer_to_team), so this
+      // is one query instead of a portal_transfers join followed by a
+      // second vw_players fetch for full player data.
+      const { data: players, error } = await supabase
+        .from(vwPlayersTable)
+        .select("id, name, primary_position, open_market_high, open_market_low, sei, ath, ris, dds, cdi, nil_valuation, year, ppg, rpg, apg, espn_id, current_team, conference, height, hometown, transfer_to_team")
+        .eq("transfer_status", "committed")
+        .not("transfer_to_team", "is", null);
 
-      if (tErr) { console.error(tErr); setLoading(false); return; }
-      if (!transfers?.length) { setLoading(false); return; }
-
-      const ids = [...new Set(transfers.map(r => r.player_id))];
-      const { data: players, error: pErr } = await supabase
-        .from("vw_players")
-        .select("id, name, primary_position, open_market_high, open_market_low, sei, ath, ris, dds, cdi, nil_valuation, year, ppg, rpg, apg, espn_id, current_team, conference, height, hometown")
-        .in("id", ids);
-
-      if (pErr) { console.error(pErr); setLoading(false); return; }
-
-      const playerById = Object.fromEntries((players || []).map(p => [p.id, p]));
+      if (error) { console.error(error); setLoading(false); return; }
+      if (!players?.length) { setRows([]); setLoading(false); return; }
 
       const teamMap = {};
-      transfers.forEach(r => {
-        const p = playerById[r.player_id];
-        if (!p) return;
-        if (!teamMap[r.to_team]) teamMap[r.to_team] = [];
-        teamMap[r.to_team].push(p);
+      players.forEach(p => {
+        const team = p.transfer_to_team;
+        if (!teamMap[team]) teamMap[team] = [];
+        teamMap[team].push(p);
       });
 
       const scored = Object.entries(teamMap).filter(([, players]) => players.length >= 3).map(([team, players]) => ({
@@ -274,7 +269,7 @@ export function PortalRankingsPage() {
       setLoading(false);
     }
     load();
-  }, []);
+  }, [vwPlayersTable]);
 
   const conferences = useMemo(() =>
     [...new Set(rows.map(r => r.conference).filter(Boolean))].sort(),
@@ -295,7 +290,7 @@ export function PortalRankingsPage() {
   return (
     <>
       <SiteHeader />
-      {modal && <PlayerModal player={modal} onClose={() => setModal(null)} />}
+      {modal && <PlayerModal player={modal} {...(isWomens ? { sport: "womens" } : {})} onClose={() => setModal(null)} />}
       <div className="app-shell">
         <div className="app-top">
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12, marginBottom: 16 }}>
