@@ -17,6 +17,31 @@ export function nilRange(low, high) {
   return low > 0 || high > 0 ? `${money(low)} – ${money(high)}` : "N/A";
 }
 
+// ── Overall rating (2K-style) ───────────────────────────────────────────────
+// Public-facing player VALUE is shown as a 60–99 "Overall", not a NIL dollar
+// figure. Monotonic in the underlying (calculated) value so the ranking order is
+// identical — the $3M cap maps to 99. Returns null for unrated (value ≤ 0) so
+// callers can show "—"/"N/A" instead of a misleading floor rating.
+const OVERALL_VALUE_CAP = 3_000_000;
+export function overallRating(value) {
+  const v = Math.max(0, Number(value) || 0);
+  if (v <= 0) return null;
+  const FLOOR = 60, CEIL = 99;
+  return Math.round(FLOOR + (CEIL - FLOOR) * Math.sqrt(Math.min(v / OVERALL_VALUE_CAP, 1)));
+}
+
+// Pick the best available calculated value off a player-shaped object and rate it.
+export function overallFor(p) {
+  if (!p) return null;
+  const v = p.marketHigh ?? p.open_market_high ?? p.nilValuation ?? p.nil_valuation ?? 0;
+  return overallRating(v);
+}
+
+// Color for a 60–99 overall (reuses the 0–100 metric palette).
+export function overallColor(rating) {
+  return gradeColorFromVal(rating);
+}
+
 // ── Position bucketing ────────────────────────────────────────────────────────
 // Canonical 3-bucket grouping used by roster strength + depth charts. The
 // domestic data already stores Guard/Wing/Big in players.primary_position, but

@@ -2,7 +2,8 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { SiteHeader }  from "@/components/SiteHeader";
 import { PlayerModal } from "@/components/PlayerModal";
 import { supabase }    from "@/lib/supabase";
-import { letterGrade, gradeColor } from "@/lib/display";
+import { letterGrade, gradeColor, money, overallRating, overallColor } from "@/lib/display";
+import { useNilVisible } from "@/hooks/useNilVisible";
 
 const CURRENT_YEAR = 2025;
 const FIRST_YEAR   = 2009;
@@ -30,6 +31,9 @@ function toModalPlayer(r) {
     height:   r.height,
     hometown: r.hometown,
     espn_id:  null,
+    marketLow:    r.open_market_low,
+    marketHigh:   r.open_market_high,
+    nilValuation: r.nil_valuation,
     stats: {
       sei: r.sei, ath: r.ath, ris: r.ris, dds: r.dds, cdi: r.cdi,
       ppg: r.ppg, rpg: r.rpg, apg: r.apg, "3p_pct": r["3p_pct"],
@@ -46,9 +50,10 @@ export function HistoricalPage() {
   const [rows,    setRows]    = useState([]);
   const [loading, setLoading] = useState(true);
   const [search,  setSearch]  = useState("");
-  const [sortKey, setSortKey] = useState("sei");
+  const [sortKey, setSortKey] = useState("nil_valuation");
   const [sortDir, setSortDir] = useState("desc");
   const [modal,   setModal]   = useState(null);
+  const [nilVisible] = useNilVisible();
 
   // Load the selected season's players (only when this page is mounted / year changes).
   useEffect(() => {
@@ -139,6 +144,7 @@ export function HistoricalPage() {
                   <th style={thStyle}>Conf</th>
                   <th style={thStyle}>Cl</th>
                   <th style={thStyle}>Pos</th>
+                  <Th k="nil_valuation" label="OVR" w={110} />
                   {METRIC_COLS.map(m => <Th key={m.key} k={m.key} label={m.label} w={52} />)}
                 </tr>
               </thead>
@@ -152,6 +158,15 @@ export function HistoricalPage() {
                     <td style={{ ...tdStyle, opacity: .5, fontSize: 12 }}>{r.conf}</td>
                     <td style={{ ...tdStyle, opacity: .5, fontSize: 12 }}>{r.class_yr}</td>
                     <td style={{ ...tdStyle, opacity: .6, fontSize: 12 }}>{r.pos}</td>
+                    {(() => {
+                      const ovr = overallRating(r.nil_valuation);
+                      return (
+                        <td style={{ ...tdStyle, fontWeight: 700, color: overallColor(ovr) }}>
+                          {ovr ?? "—"}
+                          {nilVisible && r.nil_valuation ? <span style={{ opacity: .5, fontWeight: 400, fontSize: 12 }}>{"  "}{money(r.nil_valuation)}</span> : null}
+                        </td>
+                      );
+                    })()}
                     {METRIC_COLS.map(m => {
                       const v = r[m.key];
                       const c = gradeColor(letterGrade(v));
@@ -162,7 +177,7 @@ export function HistoricalPage() {
                   </tr>
                 ))}
                 {shown.length === 0 && (
-                  <tr><td colSpan={10} style={{ ...tdStyle, opacity: .4, textAlign: "center", padding: 24 }}>
+                  <tr><td colSpan={11} style={{ ...tdStyle, opacity: .4, textAlign: "center", padding: 24 }}>
                     No players match.
                   </td></tr>
                 )}

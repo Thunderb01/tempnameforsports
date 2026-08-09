@@ -47,7 +47,7 @@ except ImportError:
 # Reuse the exact metric formulas + helpers from the live pipeline.
 from torvik_metrics import (
     compute_cdi, compute_dds, compute_sei, compute_ath, compute_ris,
-    normalise_pos, clamp,
+    compute_nil_valuation, normalise_pos, clamp,
 )
 
 SUPABASE_URL         = os.environ.get("SUPABASE_URL", "")
@@ -93,6 +93,8 @@ def prep(df):
     # falls back to the CSV's ast/tov. Create them so it doesn't KeyError.
     for c in ("sb_tot_ast", "sb_tot_mp", "sb_tot_tov"):
         df[c] = float("nan")
+    # sb_height powers the NIL size/versatility score (else it defaults to 0.5).
+    df["sb_height"] = df["ht"]
     return df
 
 
@@ -113,6 +115,10 @@ def build_rows(df, year):
     df["_sei"] = compute_sei(df, use_torvik=True)
     df["_ath"] = compute_ath(df, use_torvik=True)
     df["_ris"] = compute_ris(df, use_torvik=True)
+
+    # NIL valuation (production-based estimate) — reuses the exact live formula.
+    base_nil, mkt_low, mkt_high, proj_tier, _ = compute_nil_valuation(df)
+    df["_nil"], df["_mlow"], df["_mhigh"], df["_ptier"] = base_nil, mkt_low, mkt_high, proj_tier
 
     rows = []
     for _, r in df.iterrows():
@@ -145,7 +151,10 @@ def build_rows(df, year):
             "ris":         num(r.get("_ris")),
             "dds":         num(r.get("_dds")),
             "cdi":         num(r.get("_cdi")),
-            # NIL / projected_tier deferred (v1) — left null.
+            "nil_valuation":    (round(num(r.get("_nil"))   or 0)),
+            "open_market_low":  (round(num(r.get("_mlow"))  or 0)),
+            "open_market_high": (round(num(r.get("_mhigh")) or 0)),
+            "projected_tier":   (r.get("_ptier") or None),
             "torvik_usg":     num(r.get("usg")),
             "torvik_ts":      num(r.get("TS_per")),
             "torvik_efg":     num(r.get("eFG")),

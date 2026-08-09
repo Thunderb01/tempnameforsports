@@ -4,6 +4,7 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 import { useAdminTeam } from "@/hooks/useAdminTeam";
 import { useTeamLogos } from "@/hooks/useTeamLogos";
+import { useNilVisible } from "@/hooks/useNilVisible";
 import logo from "/logo.jpg";
 
 // Map a men's path → its women's equivalent and vice versa. Add entries as
@@ -32,6 +33,7 @@ export function SiteHeader() {
   const teamLogos = useTeamLogos();
   const navigate  = useNavigate();
   const { pathname } = useLocation();
+  const [nilVisible, toggleNil] = useNilVisible();
   const [bannerDismissed, setBannerDismissed] = useState(false);
   const canToggleSport = isAdmin || isSuperAdmin;
   const sport = pathname.startsWith("/w/") ? "women" : "men";
@@ -93,6 +95,12 @@ export function SiteHeader() {
               Admin
             </NavLink>
           )}
+
+          <button onClick={toggleNil}
+            title={nilVisible ? "Hide NIL dollar valuations (show Overall only)" : "Show NIL dollar valuations"}
+            className="btn btn-ghost" style={{ fontSize: 12, padding: "3px 10px" }}>
+            {nilVisible ? "🙈 Hide NIL $" : "👁 Show NIL $"}
+          </button>
 
           {canToggleSport && (
             <div title="Switch between men's and women's data sources"

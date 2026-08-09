@@ -34,9 +34,11 @@ create table if not exists public.historical_stats (
   dds           numeric,
   cdi           numeric,
 
-  -- Projected value (labeled estimate; may be null in v1 until NIL is wired)
-  nil_valuation numeric,
-  projected_tier text,
+  -- Projected value (labeled estimate — production-based, not real market data)
+  nil_valuation    numeric,
+  open_market_low  numeric,
+  open_market_high numeric,
+  projected_tier   text,
 
   -- Raw Torvik advanced columns surfaced in the modal's Advanced view
   torvik_usg     numeric,
@@ -56,6 +58,10 @@ create table if not exists public.historical_stats (
   created_at    timestamp with time zone default now(),
   unique (torvik_pid, year)
 );
+
+-- Backfill value columns onto a table created before NIL was wired.
+alter table public.historical_stats add column if not exists open_market_low  numeric;
+alter table public.historical_stats add column if not exists open_market_high numeric;
 
 create index if not exists historical_stats_year_team_idx on public.historical_stats (year, team);
 create index if not exists historical_stats_year_name_idx on public.historical_stats (year, name);

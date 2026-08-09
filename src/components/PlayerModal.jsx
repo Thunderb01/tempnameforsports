@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
-import { money, nilRange, tierColor, projectedTier } from "@/lib/display";
+import { money, nilRange, tierColor, projectedTier, overallFor, overallColor } from "@/lib/display";
 import { SkillProfile, PENTAGON_METRICS } from "@/components/SkillProfile";
+import { useNilVisible } from "@/hooks/useNilVisible";
 
 function fmt(val, key) {
   if (val === null || val === undefined || val === "" || (typeof val === "number" && isNaN(val)) || val === "NaN") return "—";
@@ -56,6 +57,8 @@ export function PlayerModal({ player, onClose, onReplace, sport = "mens" }) {
   const [showAdv, setShowAdv] = useState(false);
   const [archetypes, setArchetypes] = useState([]);
   const [archColors, setArchColors] = useState({});
+  const [nilVisible] = useNilVisible();
+  const overall = overallFor(player);
 
   const playersTable = sport === "womens" ? "w_players"        : "players";
   const defsTable    = sport === "womens" ? "w_archetype_defs" : "archetype_defs";
@@ -146,8 +149,18 @@ export function PlayerModal({ player, onClose, onReplace, sport = "mens" }) {
           <>
 
           <div className="modal-section">
-            <h4>Market Production Value Range</h4>
-            <div className="modal-sub">{nilRange(player.marketLow, player.marketHigh)}</div>
+            <h4>Overall</h4>
+            {overall != null ? (
+              <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+                <span style={{ fontSize: 34, fontWeight: 800, lineHeight: 1, color: overallColor(overall) }}>{overall}</span>
+                <span style={{ fontSize: 11, opacity: .4 }}>OVR</span>
+              </div>
+            ) : <div className="modal-sub">Unrated</div>}
+            {nilVisible && (player.marketLow > 0 || player.marketHigh > 0) && (
+              <div className="modal-sub" style={{ marginTop: 6 }}>
+                NIL value: {nilRange(player.marketLow, player.marketHigh)}
+              </div>
+            )}
             {player.nilValuation > 0 && (() => {
               const label = projectedTier(player.nilValuation);
               const color = tierColor(label);

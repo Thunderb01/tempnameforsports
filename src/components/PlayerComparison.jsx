@@ -1,5 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from "react";
-import { money, nilRange, letterGrade, tierColor, projectedTier } from "@/lib/display";
+import { money, nilRange, letterGrade, tierColor, projectedTier, overallFor, overallColor } from "@/lib/display";
+import { useNilVisible } from "@/hooks/useNilVisible";
 
 // One color per slot — consistent across the whole comparison
 const SLOT_COLORS = ["#5b9cf6", "#f97316", "#4ade80", "#a78bfa"];
@@ -299,6 +300,7 @@ export function PlayerComparison({ initialIds = [], allPlayers = [] }) {
   }
 
   const NIL_GET = p => p.nilValuation;
+  const [nilVisible] = useNilVisible();
 
   const thStyle = {
     padding: "8px 10px", fontSize: 11, fontWeight: 600,
@@ -407,7 +409,18 @@ export function PlayerComparison({ initialIds = [], allPlayers = [] }) {
                 </tr>
               </thead>
               <tbody>
-                {sectionHeader("NIL")}
+                {sectionHeader("Value")}
+                <tr>
+                  <td style={labelStyle}>Overall</td>
+                  {players.map((p, i) => {
+                    const ovr = p ? overallFor(p) : null;
+                    return (
+                      <td key={i} style={{ padding: "6px 8px", textAlign: "center", fontWeight: 800, color: overallColor(ovr) }}>
+                        {ovr ?? <span style={{ opacity: .2 }}>—</span>}
+                      </td>
+                    );
+                  })}
+                </tr>
                 <tr>
                   <td style={labelStyle}>Tier</td>
                   {players.map((p, i) => {
@@ -423,14 +436,16 @@ export function PlayerComparison({ initialIds = [], allPlayers = [] }) {
                     );
                   })}
                 </tr>
-                <tr>
-                  <td style={labelStyle}>NIL Range</td>
-                  {players.map((p, i) => (
-                    <td key={i} style={tdStyle(i, NIL_GET)}>
-                      {p ? nilRange(p.marketLow, p.marketHigh) : <span style={{ opacity: .2 }}>—</span>}
-                    </td>
-                  ))}
-                </tr>
+                {nilVisible && (
+                  <tr>
+                    <td style={labelStyle}>NIL Range</td>
+                    {players.map((p, i) => (
+                      <td key={i} style={tdStyle(i, NIL_GET)}>
+                        {p ? nilRange(p.marketLow, p.marketHigh) : <span style={{ opacity: .2 }}>—</span>}
+                      </td>
+                    ))}
+                  </tr>
+                )}
 
                 {sectionHeader("Stats (Most Recent Season)")}
                 {STAT_ROWS.map(row => (
