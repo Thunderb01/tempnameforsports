@@ -297,26 +297,32 @@ function TransfersTab() {
 
 // ── Players tab ────────────────────────────────────────────────────────────
 function PlayersTab() {
-  const [query,      setQuery]      = useState("");
-  const [results,    setResults]    = useState([]);
-  const [loading,    setLoading]    = useState(false);
-  const [editId,     setEditId]     = useState(null);
-  const [editPlayer, setEditPlayer] = useState(null);
-  const [addMode,    setAddMode]    = useState(false);
-  const [saving,     setSaving]     = useState(false);
+  const [query,       setQuery]       = useState("");
+  const [teamFilter,  setTeamFilter]  = useState("");
+  const [results,     setResults]     = useState([]);
+  const [loading,     setLoading]     = useState(false);
+  const [editId,      setEditId]      = useState(null);
+  const [editPlayer,  setEditPlayer]  = useState(null);
+  const [addMode,     setAddMode]     = useState(false);
+  const [saving,      setSaving]      = useState(false);
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [bulkStatus,  setBulkStatus]  = useState("");
+  const [bulkSaving,  setBulkSaving]  = useState(false);
   const timeoutRef = useRef(null);
 
-  const search = useCallback((q) => {
+  // Runs on a name search, a team filter (e.g. browse a whole roster to find
+  // graduating seniors), or both together — either alone is enough to search.
+  const search = useCallback((q, team) => {
     clearTimeout(timeoutRef.current);
-    if (q.trim().length < 2) { setResults([]); return; }
+    const hasQuery = q.trim().length >= 2;
+    const hasTeam  = team.trim().length > 0;
+    if (!hasQuery && !hasTeam) { setResults([]); return; }
     setLoading(true);
     timeoutRef.current = setTimeout(async () => {
-      const { data, error } = await supabase
-        .from("vw_players")
-        .select("*")
-        .ilike("name", `%${q.trim()}%`)
-        .order("name")
-        .limit(30);
+      let req = supabase.from("vw_players").select("*").order("name").limit(200);
+      if (hasQuery) req = req.ilike("name", `%${q.trim()}%`);
+      if (hasTeam)  req = req.ilike("current_team", `%${team.trim()}%`);
+      const { data, error } = await req;
       if (error) { console.error("Player search error:", error); setLoading(false); return; }
       const players = data || [];
       if (players.length) {
@@ -340,11 +346,42 @@ function PlayersTab() {
       } else {
         setResults([]);
       }
+      setSelectedIds(new Set());
       setLoading(false);
     }, 250);
   }, []);
 
-  useEffect(() => { search(query); }, [query]);
+  useEffect(() => { search(query, teamFilter); }, [query, teamFilter]);
+
+  function toggleSelected(id) {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    setSelectedIds(prev => prev.size === results.length ? new Set() : new Set(results.map(p => p.id)));
+  }
+
+  async function handleBulkStatusApply() {
+    if (!bulkStatus || selectedIds.size === 0) return;
+    setBulkSaving(true);
+    const ids = [...selectedIds];
+    const { data, error } = await supabase.from("players").update({ player_status: bulkStatus }).in("id", ids).select();
+    if (error) { alert("Error: " + error.message); setBulkSaving(false); return; }
+    if (!data || data.length === 0) {
+      alert("Save failed: no rows updated. Check RLS policy on players table.");
+      setBulkSaving(false);
+      return;
+    }
+    const idSet = new Set(ids);
+    setResults(prev => prev.map(p => idSet.has(p.id) ? { ...p, player_status: bulkStatus } : p));
+    setSelectedIds(new Set());
+    setBulkStatus("");
+    setBulkSaving(false);
+  }
 
   function handleEdit(p) {
     setEditPlayer(p);
@@ -399,10 +436,14 @@ function PlayersTab() {
 
   return (
     <div>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
         <input className="input" placeholder="Search player by name…" value={query}
           onChange={e => { setQuery(e.target.value); setEditId(null); setEditPlayer(null); setAddMode(false); }}
-          style={{ width: 300 }} />
+          style={{ width: 260 }} />
+        <div style={{ width: 220 }}>
+          <TeamSearch value={teamFilter} placeholder="Browse by team…"
+            onChange={v => { setTeamFilter(v); setEditId(null); setEditPlayer(null); setAddMode(false); }} />
+        </div>
         {loading && <span style={{ fontSize: 12, opacity: .4 }}>Searching…</span>}
         <button className="btn btn-primary" style={{ fontSize: 12, marginLeft: "auto" }}
           onClick={() => { setAddMode(true); setEditId(null); setEditPlayer(null); }}>
@@ -422,8 +463,35 @@ function PlayersTab() {
         </div>
       )}
 
-      {results.length === 0 && query.trim().length >= 2 && !loading && (
+      {results.length === 0 && (query.trim().length >= 2 || teamFilter.trim()) && !loading && (
         <div style={{ opacity: .35, fontSize: 13 }}>No players found.</div>
+      )}
+
+      {results.length > 0 && (
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10, fontSize: 12 }}>
+          <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", userSelect: "none", opacity: .6 }}>
+            <input type="checkbox" checked={selectedIds.size > 0 && selectedIds.size === results.length}
+              onChange={toggleSelectAll} />
+            Select all ({results.length})
+          </label>
+          {selectedIds.size > 0 && (
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginLeft: 8, padding: "4px 10px",
+              background: "rgba(245,166,35,.08)", border: "1px solid rgba(245,166,35,.25)", borderRadius: 8 }}>
+              <span style={{ opacity: .8 }}>{selectedIds.size} selected</span>
+              <select className="input" style={{ fontSize: 12, padding: "2px 6px", width: "auto" }}
+                value={bulkStatus} onChange={e => setBulkStatus(e.target.value)}>
+                <option value="">Set status to…</option>
+                {PLAYER_STATUS_OPTIONS.map(s => (
+                  <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
+                ))}
+              </select>
+              <button className="btn btn-primary" style={{ fontSize: 12, padding: "2px 10px" }}
+                disabled={!bulkStatus || bulkSaving} onClick={handleBulkStatusApply}>
+                {bulkSaving ? "Applying…" : `Apply to ${selectedIds.size}`}
+              </button>
+            </div>
+          )}
+        </div>
       )}
 
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -441,6 +509,7 @@ function PlayersTab() {
                 <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap",
                   background: "rgba(255,255,255,.03)", border: "1px solid var(--border)",
                   borderRadius: 8, padding: "10px 14px" }}>
+                  <input type="checkbox" checked={selectedIds.has(p.id)} onChange={() => toggleSelected(p.id)} />
                   <div style={{ flex: 1, minWidth: 180 }}>
                     <div style={{ fontWeight: 600, fontSize: 13 }}>{p.name}</div>
                     <div style={{ fontSize: 11, opacity: .4, marginTop: 2 }}>
