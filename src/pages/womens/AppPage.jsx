@@ -1059,8 +1059,10 @@ export function WomensAppPage() {
 
   // transfer_status now lives inline on each board row (added onto vw_w_players) —
   // no separate w_portal_transfers query needed to know who's still available.
+  // player_status === "transferring" is required too — transfer_status can be
+  // stale for a player who has since declared/graduated/returned.
   const availableIds = useMemo(
-    () => new Set(board.state.board.filter(p => p.transfer_status === "uncommitted").map(p => p.id)),
+    () => new Set(board.state.board.filter(p => p.player_status === "transferring" && p.transfer_status === "uncommitted").map(p => p.id)),
     [board.state.board]
   );
 

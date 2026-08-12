@@ -108,14 +108,21 @@ def main():
             current_status = status_by_id.get(player_id)
             new_player_status = "transferring" if current_status in (None, "transferring") else current_status
 
-            supabase.table("players").update({
-                "transfer_status":      transfer_status,
-                "transfer_from_team":   origin_team or None,
-                "transfer_to_team":     to_team,
-                "transfer_season_year": 2026,
-                "transfer_api_id":      entry["id"],
-                "player_status":        new_player_status,
-            }).eq("id", player_id).execute()
+            update = {"player_status": new_player_status}
+            # Only write transfer detail when the player is actually ending up
+            # "transferring" — writing it regardless (even when an existing
+            # status like "declared" or "graduating" wins) leaves stale
+            # transfer_status/transfer_to_team on players who aren't in the
+            # portal, which board/rankings pages would otherwise still show.
+            if new_player_status == "transferring":
+                update.update({
+                    "transfer_status":      transfer_status,
+                    "transfer_from_team":   origin_team or None,
+                    "transfer_to_team":     to_team,
+                    "transfer_season_year": 2026,
+                    "transfer_api_id":      entry["id"],
+                })
+            supabase.table("players").update(update).eq("id", player_id).execute()
             updated += 1
         else:
             unmatched_names.append(f"{full_name} ({origin_team or '?'})")

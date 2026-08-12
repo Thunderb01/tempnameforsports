@@ -228,6 +228,7 @@ export function PortalRankingsPage({ sport = "men" }) {
       const { data: players, error } = await supabase
         .from(vwPlayersTable)
         .select("id, name, primary_position, open_market_high, open_market_low, sei, ath, ris, dds, cdi, nil_valuation, year, ppg, rpg, apg, espn_id, current_team, conference, height, hometown, transfer_to_team")
+        .eq("player_status", "transferring")
         .eq("transfer_status", "committed")
         .not("transfer_to_team", "is", null);
 

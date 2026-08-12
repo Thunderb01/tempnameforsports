@@ -117,18 +117,21 @@ export function BoardPage({ sport = "men" }) {
   // Portal availability/destination now live inline on each board row
   // (transfer_status/transfer_from_team/transfer_to_team, added onto
   // vw_players/vw_w_players) — no separate portal_transfers query needed.
+  // player_status === "transferring" is required alongside transfer_status:
+  // transfer_status can be stale/leftover for a player who has since
+  // declared, graduated, or otherwise moved off "transferring".
   const availableIds = useMemo(
-    () => new Set(players.filter(p => p.transfer_status === "uncommitted").map(p => p.id)),
+    () => new Set(players.filter(p => p.player_status === "transferring" && p.transfer_status === "uncommitted").map(p => p.id)),
     [players]
   );
   const allPortalIds = useMemo(
-    () => new Set(players.filter(p => p.transfer_status && p.transfer_status !== "withdrawn").map(p => p.id)),
+    () => new Set(players.filter(p => p.player_status === "transferring" && p.transfer_status && p.transfer_status !== "withdrawn").map(p => p.id)),
     [players]
   );
   const portalInfo = useMemo(() => {
     const info = {};
     players.forEach(p => {
-      if (p.transfer_status && p.transfer_status !== "withdrawn") {
+      if (p.player_status === "transferring" && p.transfer_status && p.transfer_status !== "withdrawn") {
         info[p.id] = { from_team: p.transfer_from_team, to_team: p.transfer_to_team };
       }
     });

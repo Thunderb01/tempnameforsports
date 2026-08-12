@@ -232,9 +232,10 @@ export function createRosterBoardHook(cfg) {
         marketHigh:        row.open_market_high  ?? 0,
         nilValuation:      row.nil_valuation     ?? 0,
         archetype:         row.archetype         ?? null,
-        player_status:     row.player_status     ?? null,
-        transfer_status:   row.transfer_status   ?? null,
-        transfer_to_team:  row.transfer_to_team  ?? null,
+        player_status:      row.player_status      ?? null,
+        transfer_status:    row.transfer_status    ?? null,
+        transfer_from_team: row.transfer_from_team ?? null,
+        transfer_to_team:   row.transfer_to_team   ?? null,
         stats: {
           ppg:         row.ppg,
           rpg:         row.rpg,
@@ -261,7 +262,11 @@ export function createRosterBoardHook(cfg) {
       // are now inline on the row itself (vw_players/vw_w_players were
       // extended to expose them) — no second portal_transfers query needed.
       players.forEach(p => {
-        if (p.transfer_status === "committed" && p.transfer_to_team) {
+        // Require player_status === "transferring" too — transfer_status can
+        // be stale/leftover for a player who has since declared, graduated,
+        // or otherwise moved off "transferring" (e.g. a bulk backfill that
+        // only guarded player_status against clobbering, not transfer_status).
+        if (p.player_status === "transferring" && p.transfer_status === "committed" && p.transfer_to_team) {
           p._original_team = p.team;
           p._original_conf = p.conf;
           p.team           = p.transfer_to_team;
@@ -351,6 +356,7 @@ export function createRosterBoardHook(cfg) {
         const { data: incomingFull } = await supabase
           .from(cfg.vwPlayersTable)
           .select("*")
+          .eq("player_status", "transferring")
           .eq("transfer_status", "committed")
           .ilike("transfer_to_team", teamName);
 
@@ -433,7 +439,7 @@ export function createRosterBoardHook(cfg) {
       //   committed   = already committed to a new school (show as transferred)
       const portalRetentionMap = {};
       returning.forEach(p => {
-        if (p.transfer_status && p.transfer_status !== "withdrawn") {
+        if (p.player_status === "transferring" && p.transfer_status && p.transfer_status !== "withdrawn") {
           portalRetentionMap[p.id] = p.transfer_status === "committed" ? "transferred" : "entering_portal";
         }
       });
@@ -876,7 +882,7 @@ const MENS_CONFIG = {
   storageKeyPrefix:           "bp_roster_builder",
   legacyKeys:                 ["bp_roster_builder_v1", "bp_roster_builder"],
   sessionBoardKey:            "bp_board_cache",
-  sessionBoardVer:            8, // bumped from 7 — board rows now carry player_status/transfer_* inline instead of via a second portal_transfers query
+  sessionBoardVer:            9, // 7→8: board rows carry player_status/transfer_* inline instead of a second portal_transfers query. 8→9: added transfer_from_team (its absence blanked the from-team logo on the board).
 };
 
 const _mens = createRosterBoardHook(MENS_CONFIG);
