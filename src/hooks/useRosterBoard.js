@@ -45,6 +45,16 @@ export function createRosterBoardHook(cfg) {
   function getBoardCache() { return _boardCache; }
   function setBoardCache(players) { _boardCache = players; }
 
+  // Drop the cached board snapshot so the next loadPortalBoard() refetches.
+  // Admin writes that change what belongs on the board (player_status,
+  // transfer detail) must call this — otherwise the change isn't visible
+  // until the 4h TTL expires or the tab is closed, since sessionStorage
+  // survives even a hard refresh.
+  function clearBoardCache() {
+    _boardCache = [];
+    try { sessionStorage.removeItem(cfg.sessionBoardKey); } catch {}
+  }
+
   // Each (user, team) pair gets its own slot so switching teams loads the right
   // roster and edits to one team don't bleed into another.
   function storageKey(team, userId) {
@@ -867,7 +877,7 @@ export function createRosterBoardHook(cfg) {
     };
   }
 
-  return { useBoard, getBoardCache, setBoardCache };
+  return { useBoard, getBoardCache, setBoardCache, clearBoardCache };
 }
 
 const SESSION_BOARD_TTL = 4 * 60 * 60 * 1000; // 4 hours, shared across sports
@@ -882,10 +892,11 @@ const MENS_CONFIG = {
   storageKeyPrefix:           "bp_roster_builder",
   legacyKeys:                 ["bp_roster_builder_v1", "bp_roster_builder"],
   sessionBoardKey:            "bp_board_cache",
-  sessionBoardVer:            9, // 7→8: board rows carry player_status/transfer_* inline instead of a second portal_transfers query. 8→9: added transfer_from_team (its absence blanked the from-team logo on the board).
+  sessionBoardVer:            10, // 7→8: board rows carry player_status/transfer_* inline instead of a second portal_transfers query. 8→9: added transfer_from_team (its absence blanked the from-team logo). 9→10: force one clean refetch so sessions cached before admin-write invalidation existed don't keep showing players whose status has since changed.
 };
 
 const _mens = createRosterBoardHook(MENS_CONFIG);
-export const useRosterBoard = _mens.useBoard;
-export const getBoardCache  = _mens.getBoardCache;
-export const setBoardCache  = _mens.setBoardCache;
+export const useRosterBoard  = _mens.useBoard;
+export const getBoardCache   = _mens.getBoardCache;
+export const setBoardCache   = _mens.setBoardCache;
+export const clearBoardCache = _mens.clearBoardCache;

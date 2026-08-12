@@ -6,6 +6,19 @@ import { InternationalAdminContent } from "@/pages/InternationalAdminPage";
 import { DefCard } from "@/components/DefCard";
 import { DOMESTIC_FIELDS, domesticValues, resolveArchetypeList, matchArchetypes } from "@/lib/archetypeMatch";
 import { renderArticleBody } from "@/lib/renderArticle";
+// AdminPage's player/transfer tabs operate on the men's `players` table only,
+// so only the men's board cache can go stale from edits made here.
+import { clearBoardCache } from "@/hooks/useRosterBoard";
+
+// Transfer detail is only meaningful while a player is actually in the portal.
+// Any write that moves player_status off "transferring" must clear these, or
+// the row keeps stale destination/lifecycle data.
+const CLEARED_TRANSFER_FIELDS = {
+  transfer_status:      null,
+  transfer_from_team:   null,
+  transfer_to_team:     null,
+  transfer_season_year: null,
+};
 
 // Load every row from a table/view, paging past PostgREST's 1000-row cap.
 async function fetchAllRows(table, columns) {
@@ -221,6 +234,7 @@ function TransfersTab() {
       setSaving(false);
       return;
     }
+    clearBoardCache();
     setEditId(null);
     setSaving(false);
     await fetchTransfers(); // re-filter — a status change away from "transferring" drops it from this list
@@ -369,15 +383,19 @@ function PlayersTab() {
     if (!bulkStatus || selectedIds.size === 0) return;
     setBulkSaving(true);
     const ids = [...selectedIds];
-    const { data, error } = await supabase.from("players").update({ player_status: bulkStatus }).in("id", ids).select();
+    const patch = bulkStatus === "transferring"
+      ? { player_status: bulkStatus }
+      : { player_status: bulkStatus, ...CLEARED_TRANSFER_FIELDS };
+    const { data, error } = await supabase.from("players").update(patch).in("id", ids).select();
     if (error) { alert("Error: " + error.message); setBulkSaving(false); return; }
     if (!data || data.length === 0) {
       alert("Save failed: no rows updated. Check RLS policy on players table.");
       setBulkSaving(false);
       return;
     }
+    clearBoardCache();
     const idSet = new Set(ids);
-    setResults(prev => prev.map(p => idSet.has(p.id) ? { ...p, player_status: bulkStatus } : p));
+    setResults(prev => prev.map(p => idSet.has(p.id) ? { ...p, ...patch } : p));
     setSelectedIds(new Set());
     setBulkStatus("");
     setBulkSaving(false);
@@ -404,6 +422,7 @@ function PlayersTab() {
       setSaving(false);
       return;
     }
+    clearBoardCache();
     setResults(prev => prev.map(p => p.id === id ? { ...p, ...patch } : p));
     setEditId(null);
     setEditPlayer(null);
@@ -419,19 +438,24 @@ function PlayersTab() {
       setSaving(false);
       return;
     }
+    clearBoardCache();
     setAddMode(false);
     if (query.trim().length >= 2) search(query);
     setSaving(false);
   }
 
   async function handlePlayerStatusChange(id, player_status) {
-    const { data, error } = await supabase.from("players").update({ player_status }).eq("id", id).select();
+    const patch = player_status === "transferring"
+      ? { player_status }
+      : { player_status, ...CLEARED_TRANSFER_FIELDS };
+    const { data, error } = await supabase.from("players").update(patch).eq("id", id).select();
     if (error) { alert("Error: " + error.message); return; }
     if (!data || data.length === 0) {
       alert("Save failed: no rows updated. Check RLS policy on players table.");
       return;
     }
-    setResults(prev => prev.map(p => p.id === id ? { ...p, player_status } : p));
+    clearBoardCache();
+    setResults(prev => prev.map(p => p.id === id ? { ...p, ...patch } : p));
   }
 
   return (
