@@ -9,6 +9,7 @@ import { renderArticleBody } from "@/lib/renderArticle";
 // AdminPage's player/transfer tabs operate on the men's `players` table only,
 // so only the men's board cache can go stale from edits made here.
 import { clearBoardCache } from "@/hooks/useRosterBoard";
+import { POSITIONS, positionLabel } from "@/lib/positions";
 
 // Transfer detail is only meaningful while a player is actually in the portal.
 // Any write that moves player_status off "transferring" must clear these, or
@@ -119,13 +120,9 @@ const PLAYER_STATUS_COLOR   = {
 
 const YEAR_OPTIONS = ["Fr", "RS Fr", "So", "RS So", "Jr", "RS Jr", "Sr", "RS Sr", "Grad", "5th Year", "JuCo", "G League"];
 
-const ARCHETYPE_OPTIONS = [
-  "Three-Point Specialist",
-  "Playmaking Guard", "Two-Way Guard", "Scoring Guard",
-  "3-and-D Wing", "Scoring Wing", "Versatile Wing",
-  "Two-Way Big", "Rim Protector", "Stretch Big",
-];
-const POSITION_OPTIONS = ["Guard", "Wing", "Big"];
+// (ARCHETYPE_OPTIONS removed — nothing consumed it. Live archetype names come
+// from the admin-editable archetype_defs table, not a hardcoded list.)
+const POSITION_OPTIONS = POSITIONS;
 
 // ── Shared helpers ─────────────────────────────────────────────────────────
 function Section({ title, children }) {
@@ -343,12 +340,13 @@ function PlayersTab() {
         const ids = players.map(p => p.id);
         const { data: statusRows } = await supabase
           .from("players")
-          .select("id, player_status, archetype_overwrite, archetypes, archetype_override, transfer_status, transfer_from_team, transfer_to_team, transfer_season_year")
+          .select("id, player_status, positions, archetype_overwrite, archetypes, archetype_override, transfer_status, transfer_from_team, transfer_to_team, transfer_season_year")
           .in("id", ids);
         const byId = Object.fromEntries((statusRows || []).map(r => [r.id, r]));
         setResults(players.map(p => ({
           ...p,
           player_status:        byId[p.id]?.player_status        ?? null,
+          positions:            byId[p.id]?.positions            ?? null,
           archetype_overwrite:  byId[p.id]?.archetype_overwrite  ?? null,
           archetypes:           byId[p.id]?.archetypes           ?? [],
           archetype_override:   byId[p.id]?.archetype_override   ?? null,
@@ -537,7 +535,7 @@ function PlayersTab() {
                   <div style={{ flex: 1, minWidth: 180 }}>
                     <div style={{ fontWeight: 600, fontSize: 13 }}>{p.name}</div>
                     <div style={{ fontSize: 11, opacity: .4, marginTop: 2 }}>
-                      {[p.primary_position, p.year, p.current_team].filter(Boolean).join(" · ")}
+                      {[positionLabel(p), p.year, p.current_team].filter(Boolean).join(" · ")}
                     </div>
                   </div>
                   <select
@@ -574,6 +572,7 @@ function PlayerEditForm({ player, mode = "edit", onSave, onCancel, saving }) {
     year:                player.year                || "",
     eligibility_years:   player.eligibility_years   ?? "",
     primary_position:    player.primary_position    || "",
+    positions:           Array.isArray(player.positions) ? player.positions : [],
     current_team:        player.current_team        || "",
     player_status:       player.player_status       || "",
     transfer_status:      player.transfer_status      || "",
@@ -618,7 +617,10 @@ function PlayerEditForm({ player, mode = "edit", onSave, onCancel, saving }) {
       hometown:          form.hometown.trim()      || null,
       year:              form.year                 || null,
       eligibility_years: num(form.eligibility_years),
-      primary_position:  form.primary_position     || null,
+      // positions is the eligibility set; primary_position mirrors its first
+      // entry so every display path that still reads a single value works.
+      positions:         form.positions?.length ? form.positions : null,
+      primary_position:  form.positions?.length ? form.positions[0] : null,
       current_team:      form.current_team.trim()  || null,
       player_status:     form.player_status        || null,
     };
@@ -717,11 +719,27 @@ function PlayerEditForm({ player, mode = "edit", onSave, onCancel, saving }) {
             placeholder="1–5" />
         </div>
         <div>
-          <label style={labelStyle}>Position</label>
-          <select className="input" style={{ width: "100%" }} value={form.primary_position} onChange={e => set("primary_position", e.target.value)}>
-            <option value="">— unset —</option>
-            {POSITION_OPTIONS.map(p => <option key={p} value={p}>{p}</option>)}
-          </select>
+          <label style={labelStyle}>Positions</label>
+          {/* Multi-select: a player can be eligible at more than one spot. The
+              first selected becomes primary_position. */}
+          <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+            {POSITION_OPTIONS.map(p => {
+              const on = (form.positions || []).includes(p);
+              return (
+                <button key={p} type="button"
+                  onClick={() => set("positions", on
+                    ? (form.positions || []).filter(x => x !== p)
+                    : [...(form.positions || []), p])}
+                  style={{
+                    fontSize: 12, fontWeight: 600, padding: "4px 10px", borderRadius: 6,
+                    cursor: "pointer", border: "1px solid",
+                    background:  on ? "rgba(245,166,35,.15)" : "transparent",
+                    color:       on ? "#f5a623"              : "rgba(255,255,255,.4)",
+                    borderColor: on ? "rgba(245,166,35,.4)"  : "rgba(255,255,255,.12)",
+                  }}>{p}</button>
+              );
+            })}
+          </div>
         </div>
         <div>
           <label style={labelStyle}>Current Team</label>
@@ -1063,11 +1081,11 @@ function TeamFreshmenManager({ sport, tiers }) {
     const name = nameRef.current?.value?.trim();
     if (!name || !team) return;
     const { data, error } = await supabase.from(table)
-      .insert({ team, name, pos: posRef.current?.value || "Guard", tier: tierRef.current?.value || null })
+      .insert({ team, name, pos: posRef.current?.value || "PG", tier: tierRef.current?.value || null })
       .select();
     if (error) { alert("Add failed: " + error.message); return; }
     setRows(prev => [...prev, ...(data || [])]);
-    nameRef.current.value = ""; posRef.current.value = "Guard"; tierRef.current.value = "";
+    nameRef.current.value = ""; posRef.current.value = "PG"; tierRef.current.value = "";
   }
 
   async function save(id, patch) {
@@ -1095,8 +1113,8 @@ function TeamFreshmenManager({ sport, tiers }) {
         <>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center", marginBottom: 14 }}>
             <input className="input" placeholder="Freshman name" style={{ flex: "1 1 180px", fontSize: 13 }} ref={nameRef} defaultValue="" />
-            <select className="input" style={{ width: 96, fontSize: 13 }} ref={posRef} defaultValue="Guard">
-              <option value="Guard">Guard</option><option value="Wing">Wing</option><option value="Big">Big</option>
+            <select className="input" style={{ width: 96, fontSize: 13 }} ref={posRef} defaultValue="PG">
+              {POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}
             </select>
             <select className="input" style={{ width: 150, fontSize: 13 }} ref={tierRef} defaultValue="">
               <option value="">No impact</option>
@@ -1140,7 +1158,7 @@ function TeamFreshmanRow({ row, tiers, onSave, onDelete }) {
     const num = v => (v === "" || v == null ? null : Number(v));
     onSave({
       name: (form.name || "").trim() || "Unnamed",
-      pos:  form.pos || "Guard",
+      pos:  form.pos || "PG",
       tier: form.tier || null,
       nil_valuation: num(form.nil_valuation),
       ...Object.fromEntries(FRESH_METRICS.map(k => [k, num(form[k])])),
@@ -1153,8 +1171,8 @@ function TeamFreshmanRow({ row, tiers, onSave, onDelete }) {
       <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
         <input className="input" style={{ flex: "1 1 150px", fontSize: 13 }} value={form.name || ""}
           onChange={e => set("name", e.target.value)} />
-        <select className="input" style={{ width: 90, fontSize: 12 }} value={form.pos || "Guard"} onChange={e => set("pos", e.target.value)}>
-          <option value="Guard">Guard</option><option value="Wing">Wing</option><option value="Big">Big</option>
+        <select className="input" style={{ width: 90, fontSize: 12 }} value={form.pos || "PG"} onChange={e => set("pos", e.target.value)}>
+          {POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}
         </select>
         <select className="input" style={{ width: 140, fontSize: 12, opacity: hasMetrics ? .4 : 1 }}
           value={form.tier || ""} onChange={e => set("tier", e.target.value)}
@@ -1475,7 +1493,7 @@ function PlayerMentionSearch({ onSelect }) {
     if (q.trim().length < 2) { setSuggestions([]); setOpen(false); return; }
     timeoutRef.current = setTimeout(async () => {
       const { data } = await supabase.from("vw_players")
-        .select("id, name, primary_position, current_team")
+        .select("id, name, primary_position, positions, current_team")
         .ilike("name", `%${q.trim()}%`).limit(8);
       setSuggestions(data || []);
       setOpen(true);
@@ -1502,7 +1520,7 @@ function PlayerMentionSearch({ onSelect }) {
               onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,.06)"}
               onMouseLeave={e => e.currentTarget.style.background = ""}>
               <div style={{ fontWeight: 600, fontSize: 13 }}>{p.name}</div>
-              <div style={{ fontSize: 11, opacity: .45 }}>{[p.primary_position, p.current_team].filter(Boolean).join(" · ")}</div>
+              <div style={{ fontSize: 11, opacity: .45 }}>{[positionLabel(p), p.current_team].filter(Boolean).join(" · ")}</div>
             </div>
           ))}
         </div>

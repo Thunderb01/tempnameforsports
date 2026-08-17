@@ -13,10 +13,14 @@ import { TeamAutocomplete } from "@/components/TeamAutocomplete";
 import { supabase }         from "@/lib/supabase";
 import { exportRosterPDF }  from "@/lib/exportRoster";
 import { track }            from "@/lib/track";
-import { money, letterGrade, gradeColor, bucketPosition } from "@/lib/display";
+import { money, letterGrade, gradeColor } from "@/lib/display";
 import { MultiSelectFilter, RangeFilter, FilterChips, parseHeight, formatHeight, playerHeightInches } from "@/components/Filters";
 import { getTeamConference } from "@/lib/teamLookup";
 import { LEAVING_PLAYER_STATUSES } from "@/lib/playerStatus";
+import {
+  POSITIONS, DEFAULT_STARTER_COUNTS, positionsFor, positionLabel,
+  slotWeight, assignToPositions, computeOptimalLineup, scoreRoster,
+} from "@/lib/positions";
 
 // Absolute thresholds calibrated against portal rankings score distribution
 function rosterGrade(score) {
@@ -173,8 +177,8 @@ const CustomPlayersSection = memo(function CustomPlayersSection({ customPlayers,
       ))}
       <div style={{ padding: "10px 14px", display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center", borderTop: "1px solid var(--border)" }}>
         <input className="input" placeholder="Name" style={{ flex: "1 1 130px", fontSize: 12, padding: "5px 8px" }} ref={nameRef} defaultValue="" />
-        <select className="input" style={{ fontSize: 12, padding: "5px 8px", width: 84 }} ref={posRef} defaultValue="Guard" title="Position">
-          <option value="Guard">Guard</option><option value="Wing">Wing</option><option value="Big">Big</option>
+        <select className="input" style={{ fontSize: 12, padding: "5px 8px", width: 84 }} ref={posRef} defaultValue="PG" title="Position">
+          {POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}
         </select>
         <select className="input" style={{ fontSize: 12, padding: "5px 8px", width: 72 }} ref={yearRef} defaultValue="FR" title="Class">
           <option value="FR">FR</option><option value="RS FR">RS FR</option>
@@ -189,9 +193,9 @@ const CustomPlayersSection = memo(function CustomPlayersSection({ customPlayers,
         <button className="btn btn-ghost" style={{ fontSize: 12 }} onClick={async () => {
           const name = nameRef.current?.value?.trim();
           if (!name) return;
-          await onAdd({ name, nil_offer: nilRef.current?.value || 0, pos: posRef.current?.value || "Guard",
+          await onAdd({ name, nil_offer: nilRef.current?.value || 0, pos: posRef.current?.value || "PG",
             year_label: yearRef.current?.value || "FR", freshman_tier: tierRef.current?.value || null }, activeTeam, userId);
-          nameRef.current.value = ""; nilRef.current.value = ""; posRef.current.value = "Guard";
+          nameRef.current.value = ""; nilRef.current.value = ""; posRef.current.value = "PG";
           yearRef.current.value = "FR"; tierRef.current.value = "";
         }}>+ Add</button>
       </div>
@@ -235,80 +239,22 @@ const TYPE_COLOR = {
 //   Static lineup = 2 Guards + 2 Wings + 1 Big (always) → every team is
 //                   scored on the same yardstick.
 //   Live lineup   = whatever you set in the sidebar (starterCounts).
-const STATIC_LINEUP = { Guard: 2, Wing: 2, Big: 1 };
 const CMP_LEAVING_STATUSES  = LEAVING_PLAYER_STATUSES;
 
-function slotWeightFor(slotIndex, startersN) {
-  if (slotIndex < startersN)         return 1.00;   // starter
-  if (slotIndex < startersN + 3)     return 0.20;   // first 3 off the bench
-  return 0.04;                                       // depth
-}
+// slotWeightFor / computeOptimalLineup / the position-bucketed scorer all live
+// in @/lib/positions now — this file used to carry its own copies that had to
+// be kept in sync with the men's fork's and useRosterBoard's by hand.
+const slotWeightFor = slotWeight;
 
-// Pick the optimal 5-starter lineup for a team given each position's sorted
-// score array. Guarantees ≥1 starter from each position (Guard/Wing/Big) when
-// players exist there, then greedily fills the remaining slots with the
-// highest unused score from any position. Matches the user-facing
-// Auto-optimize button so static team baselines and the user's optimal live
-// build use identical lineup logic.
-function computeOptimalLineup(scoresByPos) {
-  const counts = { Guard: 0, Wing: 0, Big: 0 };
-  // 1. Floor: one starter per position when available
-  for (const pos of ["Guard", "Wing", "Big"]) {
-    if (scoresByPos[pos].length > 0) counts[pos] = 1;
-  }
-  // 2. Greedy fill up to 5 starters total
-  const used = { ...counts };
-  let total = counts.Guard + counts.Wing + counts.Big;
-  while (total < 5) {
-    let bestPos = null;
-    let bestScore = -Infinity;
-    for (const pos of ["Guard", "Wing", "Big"]) {
-      const next = scoresByPos[pos][used[pos]];
-      if (next == null) continue;
-      if (next > bestScore) { bestScore = next; bestPos = pos; }
-    }
-    if (!bestPos) break;  // no more players in any bucket
-    counts[bestPos]++;
-    used[bestPos]++;
-    total++;
-  }
-  return counts;
-}
-
-// Position-bucketed, weighted-slot scoring. Same function powers static team
+// Position-assigned, weighted-slot scoring. Same function powers static team
 // scores and the user's live score.
 //
 // `lineup` can be:
-//   • { Guard, Wing, Big } object → fixed starter counts per position
+//   • { PG, SG, SF, PF, C } object → fixed starter counts per position
 //   • "auto" → per-team optimal lineup (used for static team baselines, so
-//     every team is scored at its best possible 2-3-5 configuration with
-//     ≥1 per position, not jammed into a one-size-fits-all 2-2-1).
-function scoreTeamPlayers(players, scorer, lineup) {
-  const byPos = { Guard: [], Wing: [], Big: [] };
-  for (const p of players) {
-    if (!p || p.source === "intl") continue;
-    byPos[bucketPosition(p.pos)].push(p);
-  }
-  const scoresByPos = {
-    Guard: byPos.Guard.map(scorer).sort((a, b) => b - a),
-    Wing:  byPos.Wing.map(scorer).sort((a, b) => b - a),
-    Big:   byPos.Big.map(scorer).sort((a, b) => b - a),
-  };
-  const resolved = lineup === "auto"
-    ? computeOptimalLineup(scoresByPos)
-    : lineup;
-  const posScores = {};
-  let total = 0;
-  for (const pos of ["Guard", "Wing", "Big"]) {
-    const n = resolved[pos] ?? 0;
-    const sorted = scoresByPos[pos];
-    let posTotal = 0;
-    sorted.forEach((s, i) => { posTotal += s * slotWeightFor(i, n); });
-    posScores[pos] = posTotal;
-    total += posTotal;
-  }
-  return { score: total, posScores };
-}
+//     every team is scored at its best possible configuration with ≥1 per
+//     filled position, not jammed into a one-size-fits-all starting five).
+const scoreTeamPlayers = scoreRoster;
 const BTP_METRICS = [
   { key: "sei", label: "SEI", desc: "Scoring Efficiency" },
   { key: "ath", label: "ATH", desc: "Athleticism" },
@@ -347,7 +293,7 @@ function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], teamFreshmenA
   const { scoringPool = [] } = calc;
   // Single toggle drives both the team-comparison list AND all grades on this page.
   const [cmpScope, setCmpScope] = useState("conference");
-  const POS_ORDER = ["Guard", "Wing", "Big"];
+  const POS_ORDER = POSITIONS;
 
   // Convert a 1-indexed rank within a pool of N to a percentile (0-100).
   // Rank 1 → 100, rank N → 0. Smooth across the pool.
@@ -441,12 +387,9 @@ function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], teamFreshmenA
   // International players are excluded from the strength chart since they're
   // also excluded from scoring. They still appear in the Roster tab.
   const defaultChart = (() => {
-    const groups = { Guard: [], Wing: [], Big: [] };
-    scoringPool.forEach(p => {
-      if (p?.source === "intl") return;
-      const pos = bucketPosition(p.pos);
-      groups[pos].push(p);
-    });
+    // One player, one column — multi-position players are eligible for several
+    // but occupy exactly one, so nobody appears twice in the depth chart.
+    const groups = assignToPositions(scoringPool, starterCounts, btpPlayerScoreDisplay);
     POS_ORDER.forEach(pos => groups[pos].sort((a, b) => btpPlayerScoreDisplay(b) - btpPlayerScoreDisplay(a)));
     return groups;
   })();
@@ -591,8 +534,7 @@ function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], teamFreshmenA
     if (includeFreshmen) pool = [...pool, ...scoringPool.filter(isFreshmanP)];
     if (includeIntl)     pool = [...pool, ...rosterIntl];
 
-    const byPos = { Guard: [], Wing: [], Big: [] };
-    pool.forEach(p => { const b = bucketPosition(p.pos); if (byPos[b]) byPos[b].push(p); });
+    const byPos = assignToPositions(pool, starterCounts, btpPlayerScoreDisplay);
 
     const acc = Object.fromEntries(PROFILE_AXES.map(a => [a, { sum: 0, w: 0 }]));
     POS_ORDER.forEach(pos => {
@@ -687,7 +629,7 @@ function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], teamFreshmenA
             return (
               <div key={pos} style={{ flex: "1 1 100px" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                  <span style={{ fontSize: 12, opacity: .55 }}>{pos}s</span>
+                  <span style={{ fontSize: 12, opacity: .55 }}>{pos}</span>
                   <span style={{ background: pg.color, color: "#0e1521", fontWeight: 700, fontSize: 10, padding: "1px 7px", borderRadius: 8 }}>{pg.label}</span>
                 </div>
                 <div style={{ height: 6, background: "rgba(255,255,255,.08)", borderRadius: 3 }}>
@@ -711,7 +653,7 @@ function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], teamFreshmenA
       <div style={{ display: "flex", gap: 12, alignItems: "start" }}>
 
         {/* Depth chart columns */}
-        <div style={{ flex: 1, display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, alignItems: "start" }}>
+        <div style={{ flex: 1, display: "grid", gridTemplateColumns: `repeat(${POS_ORDER.length}, 1fr)`, gap: 12, alignItems: "start" }}>
           {POS_ORDER.map(pos => {
             const players = chart[pos] || [];
             const pg      = posGrades[pos];
@@ -720,7 +662,7 @@ function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], teamFreshmenA
               <div key={pos} style={{ background: "rgba(255,255,255,.03)", border: "1px solid var(--border)", borderRadius: 10, overflow: "hidden" }}>
                 {/* Column header */}
                 <div style={{ padding: "10px 14px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ fontWeight: 700, fontSize: 14 }}>{pos}s</span>
+                  <span style={{ fontWeight: 700, fontSize: 14 }}>{pos}</span>
                   <span style={{ fontSize: 11, opacity: .35 }}>{players.length}</span>
                   <span style={{ marginLeft: "auto", background: pg.color, color: "#0e1521", fontWeight: 700, fontSize: 10, padding: "1px 7px", borderRadius: 8 }}>{pg.label}</span>
                   <span style={{ fontSize: 12, opacity: .45 }} title={`${(chartPosScores[pos] / 1000000).toFixed(2)}M raw`}>{Math.round(posPct)}p</span>
@@ -800,7 +742,7 @@ function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], teamFreshmenA
             const maxSlot = (chart[pos] || []).length;
             return (
               <div key={pos} style={{ marginBottom: 14 }}>
-                <div style={{ fontSize: 12, opacity: .55, marginBottom: 6 }}>{pos}s</div>
+                <div style={{ fontSize: 12, opacity: .55, marginBottom: 6 }}>{pos}</div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <button
                     onClick={() => setStarterCounts(prev => ({ ...prev, [pos]: Math.max(0, count - 1) }))}
@@ -825,41 +767,15 @@ function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], teamFreshmenA
                     <div style={{ fontSize: 10, color: "#fbbf24", marginTop: 4, opacity: .8 }}>standard is 5</div>
                   )}
                   <button
-                    title="Picks the top 5 players by score with at least one Guard, Wing, and Big."
+                    title="Picks the top 5 players by score with at least one starter at each filled position."
                     onClick={() => {
-                      // Auto-optimize the starting 5:
-                      //   1) guarantee one starter from each position (highest-scoring there)
-                      //   2) fill the remaining 2 slots with the next-highest scorers
-                      //      across any position
-                      const topByPos = {};
-                      POS_ORDER.forEach(pos => {
-                        topByPos[pos] = (chart[pos] || [])
-                          .filter(p => p?.source !== "intl")
-                          .slice()
-                          .sort((a, b) => btpPlayerScoreDisplay(b) - btpPlayerScoreDisplay(a));
-                      });
-                      const next = { Guard: 0, Wing: 0, Big: 0 };
-                      // Step 1: one starter per position (if available).
-                      POS_ORDER.forEach(pos => {
-                        if (topByPos[pos].length > 0) next[pos] = 1;
-                      });
-                      // Step 2: greedy fill the remaining slots up to 5.
-                      const used = { Guard: next.Guard, Wing: next.Wing, Big: next.Big };
-                      while (next.Guard + next.Wing + next.Big < 5) {
-                        // Candidate from each position = the player at `used[pos]` index.
-                        let bestPos = null, bestScore = -Infinity;
-                        POS_ORDER.forEach(pos => {
-                          const idx = used[pos];
-                          const p   = topByPos[pos][idx];
-                          if (!p) return;
-                          const s = btpPlayerScoreDisplay(p);
-                          if (s > bestScore) { bestScore = s; bestPos = pos; }
-                        });
-                        if (!bestPos) break;  // no more players in any position
-                        next[bestPos] += 1;
-                        used[bestPos] += 1;
-                      }
-                      setStarterCounts(next);
+                      // One starter per filled position, then greedily fill the
+                      // rest by score. Shared with static team baselines so the
+                      // user's optimal build and every-team scoring agree.
+                      const pool = Object.fromEntries(
+                        POS_ORDER.map(pos => [pos, (chart[pos] || []).filter(p => p?.source !== "intl")])
+                      );
+                      setStarterCounts(computeOptimalLineup(pool, btpPlayerScoreDisplay));
                     }}
                     style={{
                       marginTop: 8, fontSize: 11, fontWeight: 600, cursor: "pointer", width: "100%",
@@ -870,7 +786,7 @@ function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], teamFreshmenA
                     ⚡ Auto-optimize
                   </button>
                   {total !== 5 && (
-                    <button onClick={() => setStarterCounts({ Guard: 2, Wing: 2, Big: 1 })}
+                    <button onClick={() => setStarterCounts({ ...DEFAULT_STARTER_COUNTS })}
                       style={{ marginTop: 6, fontSize: 10, opacity: .45, background: "none", border: "1px solid rgba(255,255,255,.1)", borderRadius: 6, padding: "3px 8px", cursor: "pointer", color: "inherit" }}>Reset to 2-2-1</button>
                   )}
                 </>
@@ -1037,7 +953,7 @@ export function WomensAppPage() {
 
   // Depth chart state — lifted here so it survives view switches
   const [depthChartOrder,  setDepthChartOrder]  = useState(null);
-  const [depthStarterCounts, setDepthStarterCounts] = useState({ Guard: 2, Wing: 2, Big: 1 });
+  const [depthStarterCounts, setDepthStarterCounts] = useState({ ...DEFAULT_STARTER_COUNTS });
 
   const handleCustomNilChange = useCallback((id, val) => board.updateCustomPlayerNil(id, val), [board.updateCustomPlayerNil]);
   const handleCustomNilBlur   = useCallback((id, val) => board.persistCustomPlayerNil(id, val), [board.persistCustomPlayerNil]);
@@ -1102,11 +1018,9 @@ export function WomensAppPage() {
     const q = search.trim().toLowerCase();
     return intlBoard.filter(p => {
       if (q && !p.name.toLowerCase().includes(q) && !(p.league || "").toLowerCase().includes(q)) return false;
-      if (posFilter.length) {
-        const raw = String(p.primary_position || "").toUpperCase();
-        const bucket = raw.includes("G") ? "Guard" : raw === "C" || raw === "PF" ? "Big" : "Wing";
-        if (!posFilter.includes(bucket)) return false;
-      }
+      // Was an inline re-bucketing that used a substring test, so "BIG"
+      // matched as a Guard. Goes through the shared helper now.
+      if (posFilter.length && !positionsFor(p).some(pos => posFilter.includes(pos))) return false;
       if (heightMin != null || heightMax != null) {
         const inches = playerHeightInches(p.height);
         if (inches == null) return false;
@@ -1125,7 +1039,7 @@ export function WomensAppPage() {
       .filter(p => {
         if (portalOnly && !availableIds.has(p.id)) return false;
         if (q && !p.name.toLowerCase().includes(q) && !(p.team || "").toLowerCase().includes(q)) return false;
-        if (posFilter.length  && !posFilter.includes(p.pos))   return false;
+        if (posFilter.length  && !positionsFor(p).some(pos => posFilter.includes(pos))) return false;
         if (yearFilter.length && !yearFilter.includes(p.year)) return false;
         if (heightMin != null || heightMax != null) {
           const inches = playerHeightInches(p.height);
@@ -1463,7 +1377,7 @@ export function WomensAppPage() {
                 </div>
                 <div className="panel-tools" style={{ flexWrap: "wrap" }}>
                   <input className="input" type="search" placeholder="Search…" value={search} onChange={e => setSearch(e.target.value)} />
-                  <MultiSelectFilter label="positions" options={["Guard", "Wing", "Big"]}
+                  <MultiSelectFilter label="positions" options={POSITIONS}
                     value={posFilter} onChange={setPosFilter} width={130} />
                   {boardMode === "domestic" && (
                     <MultiSelectFilter label="years"

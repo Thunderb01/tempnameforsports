@@ -1,5 +1,6 @@
 import { memo } from "react";
 import { nilRange, overallFor, overallColor } from "@/lib/display";
+import { positionLabel } from "@/lib/positions";
 import { useNilVisible } from "@/hooks/useNilVisible";
 
 export const PlayerCard = memo(function PlayerCard({ player, inRoster, inShortlist, onRoster, onShortlist, onClick, archetypeColor = "#f5a623" }) {
@@ -20,7 +21,7 @@ export const PlayerCard = memo(function PlayerCard({ player, inRoster, inShortli
     <div className="row row-click" onClick={e => { if (!e.target.closest("button,select")) onClick?.(player); }}>
       <div className="row-main">
         <div className="row-title">{player.name}</div>
-        <div className="row-sub">{player.team} · {player.pos} · {player.year}</div>
+        <div className="row-sub">{player.team} · {positionLabel(player)} · {player.year}</div>
         <div className="row-sub">
           <span style={{ fontWeight: 700, color: overallColor(overall) }}>
             {overall != null ? `${overall} OVR` : "Unrated"}

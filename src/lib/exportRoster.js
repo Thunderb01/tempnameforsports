@@ -1,3 +1,5 @@
+import { positionLabel } from "@/lib/positions";
+
 function fmtStat(val, key) {
   if (val === null || val === undefined || val === "" || (typeof val === "number" && isNaN(val)) || val === "NaN") return "—";
   const pct = ["fg_pct", "ft_pct", "3p_pct"];
@@ -33,7 +35,7 @@ export function exportRosterPDF({ team, settings, players, projectedLow, project
     return `
       <tr>
         <td><strong>${p.name}</strong> ${badge}</td>
-        <td>${p.pos || "—"}</td>
+        <td>${positionLabel(p)}</td>
         <td>${p.year || "—"}</td>
         <td>${p.height || "—"}</td>
         <td>${fmtStat(s.ppg,     "ppg")}</td>

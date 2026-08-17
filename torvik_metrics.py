@@ -260,6 +260,19 @@ def display_school(team_str):
 # ── POSITION NORMALISATION ─────────────────────────────────────────────────────
 # Torvik's 'role' column values (e.g. "Wing F", "Combo G", "Big") are mapped
 # to three position buckets so percentile ranks are position-relative.
+#
+# DO NOT CHANGE normalise_pos OR percentrank_by_pos WITHOUT INTENDING TO
+# REVALUE THE ENTIRE DATABASE. Every BTP metric (sei/ath/ris/dds/cdi) and
+# every NIL figure is a percentile computed *within* the bucket this returns,
+# so altering the grouping silently rewrites every number in the app. The
+# five-position model deliberately runs alongside this rather than replacing
+# it — see torvik_role_to_positions below.
+#
+# Known quirk, preserved intentionally: "Stretch 4" matches none of these
+# branches and falls through to Wing. It is a stretch *four*, so Big would be
+# more accurate, but correcting it re-ranks those players' peer group and
+# moves their metrics. Left as-is; the five-position mapping below reports
+# Stretch 4 correctly as PF for display/lineup purposes.
 
 def normalise_pos(role):
     role = str(role).strip().lower()
@@ -270,6 +283,38 @@ def normalise_pos(role):
     if any(x in role for x in ["big", "pf", "center", "power"]) or role in ("c",) or role.startswith("c ") or role.endswith(" c"):
         return "Big"
     return "Wing"  # default
+
+
+# ── FIVE-POSITION MAPPING ──────────────────────────────────────────────────────
+# Torvik's eight roles → the PG/SG/SF/PF/C eligibility set stored in
+# players.positions. Four roles are inherently dual, which is where
+# multi-position eligibility comes from. This feeds display, filtering and
+# lineup construction only — never the percentile math above.
+TORVIK_ROLE_TO_POSITIONS = {
+    "pure pg":    ["PG"],
+    "scoring pg": ["PG"],
+    "combo g":    ["PG", "SG"],
+    "wing g":     ["SG", "SF"],
+    "wing f":     ["SF", "PF"],
+    "stretch 4":  ["PF"],
+    "pf/c":       ["PF", "C"],
+    "c":          ["C"],
+}
+
+# Fallback when Torvik has no role for a player: expand the three-bucket
+# value so they still land somewhere plausible. Mirrors the same expansion in
+# src/lib/positions.js.
+_BUCKET_TO_POSITIONS = {"Guard": ["PG", "SG"], "Wing": ["SF"], "Big": ["PF", "C"]}
+
+
+def torvik_role_to_positions(role):
+    """Map a Torvik role to its five-position eligibility set.
+
+    Returns [] when the role is blank/unrecognised so callers can decide
+    whether to fall back rather than silently writing a wrong position.
+    """
+    key = str(role).strip().lower()
+    return list(TORVIK_ROLE_TO_POSITIONS.get(key, []))
 
 
 def percentrank_by_pos(df, col, pos_col="pos_bucket", scale=100):
@@ -1181,9 +1226,16 @@ def main():
             hometown = str(row.get("type", "")).strip()
             if hometown and hometown not in ("nan", ""):
                 player_patch["hometown"] = hometown
-            pos = normalise_pos(row.get("role", ""))
-            if pos:
-                player_patch["primary_position"] = pos
+            # Five-position eligibility set. Falls back to expanding the
+            # three-bucket value when Torvik has no usable role, so a blank
+            # role never wipes an existing position.
+            role_raw = row.get("role", "")
+            positions = torvik_role_to_positions(role_raw)
+            if not positions:
+                positions = list(_BUCKET_TO_POSITIONS.get(normalise_pos(role_raw), []))
+            if positions:
+                player_patch["positions"] = positions
+                player_patch["primary_position"] = positions[0]
             YR_MAP = {"Fr": "Freshman", "So": "Sophomore", "Jr": "Junior", "Sr": "Senior", "Gr": "Graduate"}
             yr_raw = str(row.get("yr", "")).strip()
             yr_mapped = YR_MAP.get(yr_raw)

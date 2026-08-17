@@ -1,6 +1,10 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
-import { money, bucketPosition } from "@/lib/display";
+import { money } from "@/lib/display";
+import {
+  POSITIONS, DEFAULT_STARTER_COUNTS, expandPosition,
+  assignToPositions, computeOptimalLineup, slotWeight,
+} from "@/lib/positions";
 import { getCanonicalTeamName, getTeamConference } from "@/lib/teamLookup";
 import { PLAYER_STATUS_TO_RETENTION, LEAVING_RETENTION_STATUSES } from "@/lib/playerStatus";
 
@@ -125,7 +129,10 @@ export function createRosterBoardHook(cfg) {
       name:             p.name,
       team:             p.league,            // league shown where "team" usually goes
       conf:             null,
-      pos:              bucketPosition(p.primary_position),
+      // International rows already store the five-position vocabulary, so keep
+      // it verbatim rather than collapsing to a three-bucket label as before.
+      pos:              p.primary_position ?? null,
+      positions:        expandPosition(p.primary_position),
       year:             p.recruiting_class ? `'${String(p.recruiting_class).slice(-2)}` : "Intl",
       height:           p.height           ?? null,
       hometown:         p.country_of_origin ?? null,
@@ -233,6 +240,7 @@ export function createRosterBoardHook(cfg) {
         team:           row.current_team,
         conf:           row.conference ?? null,
         pos:            row.primary_position,
+        positions:      row.positions ?? null,
         year:           row.year,
         height:            row.height            ?? null,
         hometown:          row.hometown          ?? null,
@@ -377,6 +385,7 @@ export function createRosterBoardHook(cfg) {
             name:           row.name,
             team:           row.current_team,
             pos:            row.primary_position,
+            positions:      row.positions ?? null,
             year:           row.year,
             height:         row.height   ?? null,
             hometown:       row.hometown ?? null,
@@ -751,35 +760,13 @@ export function createRosterBoardHook(cfg) {
       const projectedHigh      = rosterPlayers.reduce((sum, p) => sum + (p.marketHigh || 0), 0);
 
       // BTP Roster Score — matches RosterStrengthPanel's static-team scoring:
-      // auto-optimal lineup per roster (≥1 Guard/Wing/Big, greedy fill to 5),
-      // 1.00 weight for starter slots, 0.20 for the next 3 off the bench, 0.04
-      // for depth. International players excluded.
-      function slotWeight(i, n) {
-        if (i < n)         return 1.00;
-        if (i < n + 3)     return 0.20;
-        return 0.04;
-      }
-      function pickOptimalLineup(scoresByPos) {
-        const counts = { Guard: 0, Wing: 0, Big: 0 };
-        for (const pos of ["Guard", "Wing", "Big"]) {
-          if (scoresByPos[pos].length > 0) counts[pos] = 1;
-        }
-        const used = { ...counts };
-        let total = counts.Guard + counts.Wing + counts.Big;
-        while (total < 5) {
-          let bestPos = null, bestScore = -Infinity;
-          for (const pos of ["Guard", "Wing", "Big"]) {
-            const next = scoresByPos[pos][used[pos]];
-            if (next == null) continue;
-            if (next > bestScore) { bestScore = next; bestPos = pos; }
-          }
-          if (!bestPos) break;
-          counts[bestPos]++;
-          used[bestPos]++;
-          total++;
-        }
-        return counts;
-      }
+      // auto-optimal lineup per roster (≥1 per filled position, greedy fill to
+      // 5), 1.00 weight for starter slots, 0.20 for the next 3 off the bench,
+      // 0.04 for depth. International players excluded.
+      //
+      // slotWeight / assignToPositions / computeOptimalLineup now come from
+      // @/lib/positions — this file used to carry its own copies that had to be
+      // kept in sync with AppPage's by hand.
       // Players whose most recent stats are from a prior season (didn't play enough this year)
       // but had meaningful minutes that year get an 80% NIL discount to reflect uncertainty.
       const CURRENT_STATS_YEAR = 2025;  // most recently completed season's calendar_year
@@ -824,19 +811,16 @@ export function createRosterBoardHook(cfg) {
         _seen.add(p.id);
         return true;
       });
-      const byPos = { Guard: [], Wing: [], Big: [] };
-      scoringPool.forEach(p => {
-        if (p?.source === "intl") return;
-        byPos[bucketPosition(p.pos)].push(p);
-      });
-      const sortedScoresByPos = {
-        Guard: byPos.Guard.map(btpPlayerScore).sort((a, b) => b - a),
-        Wing:  byPos.Wing.map(btpPlayerScore).sort((a, b) => b - a),
-        Big:   byPos.Big.map(btpPlayerScore).sort((a, b) => b - a),
-      };
-      const optimalLineup = pickOptimalLineup(sortedScoresByPos);
+      // Assign each player to exactly one position (multi-position players are
+      // eligible for several but occupy one), then weight by rank within it.
+      const byPos = assignToPositions(scoringPool, DEFAULT_STARTER_COUNTS, btpPlayerScore);
+      const sortedScoresByPos = {};
+      for (const pos of POSITIONS) {
+        sortedScoresByPos[pos] = byPos[pos].map(btpPlayerScore).sort((a, b) => b - a);
+      }
+      const optimalLineup = computeOptimalLineup(byPos, btpPlayerScore);
       let rosterScore = 0;
-      for (const pos of ["Guard", "Wing", "Big"]) {
+      for (const pos of POSITIONS) {
         const n = optimalLineup[pos] ?? 0;
         sortedScoresByPos[pos].forEach((s, i) => { rosterScore += s * slotWeight(i, n); });
       }

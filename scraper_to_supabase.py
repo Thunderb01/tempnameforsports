@@ -60,9 +60,19 @@ HEADERS = {
     "Accept-Language": "en-US,en;q=0.9",
 }
 
+# Sports-Reference position codes → the five-position eligibility set.
+# Their codes are inherently coarse (a bare "G" says nothing about point vs
+# shooting), so most map to two positions. Torvik is the more precise source
+# and overwrites these on its next run; this is the fallback for players
+# Torvik never matched.
 POS_MAP = {
-    "G": "Guard", "G-F": "Wing", "F-G": "Wing",
-    "F": "Wing",  "F-C": "Big", "C-F": "Big", "C": "Big",
+    "G":   ["PG", "SG"],
+    "G-F": ["SG", "SF"],
+    "F-G": ["SG", "SF"],
+    "F":   ["SF", "PF"],
+    "F-C": ["PF", "C"],
+    "C-F": ["PF", "C"],
+    "C":   ["C"],
 }
 CLASS_MAP = {
     "FR": "Freshman", "SO": "Sophomore", "JR": "Junior",
@@ -301,8 +311,13 @@ def per40(stat, mp):
 def calc_ast_tov(ast, tov):
     return round(ast / tov, 1) if tov else round(ast, 1)
 
-def normalise_pos(raw):
-    return POS_MAP.get(str(raw).strip(), "Guard")
+def normalise_positions(raw):
+    """Sports-Reference position code → five-position eligibility list.
+
+    Unknown codes fall back to the guard pair, matching the old behaviour of
+    defaulting to "Guard".
+    """
+    return list(POS_MAP.get(str(raw).strip(), ["PG", "SG"]))
 
 def normalise_class(raw):
     return CLASS_MAP.get(str(raw).strip().upper(), str(raw).strip())
@@ -369,13 +384,13 @@ def scrape_player(url, team_name, year):
     name = tag.get_text(strip=True) if tag else "Unknown"
 
     # Bio
-    pos, yr = "", ""
+    positions, yr = [], ""
     height, weight = None, None
     bio = soup.find("div", {"id": "info"})
     if bio:
         text = bio.get_text(" ", strip=True)
         pm = re.search(r"Position[:\s]+([A-Z\-]+)", text)
-        if pm: pos = normalise_pos(pm.group(1))
+        if pm: positions = normalise_positions(pm.group(1))
         cm = re.search(r"\b(FR|SO|JR|SR|GR|Freshman|Sophomore|Junior|Senior|Graduate)\b", text, re.I)
         if cm: yr = normalise_class(cm.group(1))
         # Height: e.g. "6-4" or "6 ft 4 in"
@@ -415,7 +430,7 @@ def scrape_player(url, team_name, year):
         raw_usg = safe_float(adv.get("USG%", 0))
         usg = round(raw_usg * 100 if raw_usg <= 1.5 else raw_usg, 1)
 
-    if not pos and pg is not None: pos = normalise_pos(pg.get("Pos", "G"))
+    if not positions and pg is not None: positions = normalise_positions(pg.get("Pos", "G"))
     if not yr  and pg is not None: yr  = normalise_class(pg.get("Class", ""))
 
     # Totals (raw counting stats for the season)
@@ -445,7 +460,8 @@ def scrape_player(url, team_name, year):
     player_row = {
         "name":             name,
         "current_team":     team_name,
-        "primary_position": pos,
+        "primary_position": positions[0] if positions else None,
+        "positions":        positions or None,
         "year":             yr,
         "source":           "program",
         "playmaker_tags":   auto_playmaker_tags(apg, ast_tov, usg or 0),

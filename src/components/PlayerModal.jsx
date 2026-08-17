@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { money, nilRange, tierColor, projectedTier, overallFor, overallColor } from "@/lib/display";
+import { positionLabel } from "@/lib/positions";
 import { SkillProfile, PENTAGON_METRICS } from "@/components/SkillProfile";
 import { useNilVisible } from "@/hooks/useNilVisible";
 
@@ -127,7 +128,7 @@ export function PlayerModal({ player, onClose, onReplace, sport = "mens" }) {
                 <div className="modal-kicker">Player Card</div>
                 <h3 className="modal-title" id="modal-title">{player.name}</h3>
                 <div className="modal-sub">
-                  {[player.team, player.conf, player.pos, player.year, player.height, player.hometown]
+                  {[player.team, player.conf, positionLabel(player), player.year, player.height, player.hometown]
                     .filter(Boolean).join(" · ")}
                 </div>
               </div>
@@ -288,7 +289,7 @@ export function PlayerModal({ player, onClose, onReplace, sport = "mens" }) {
               )}
             </div>
             <div style={{ fontSize: 11, opacity: .4, marginBottom: 10 }}>
-              Grades reflect percentile rank within position group (Guard, Wing, or Big).
+              Grades reflect percentile rank within position group (guards, wings, or bigs).
             </div>
             {loadingStats ? (
               <div style={{ opacity: .4, fontSize: 13 }}>Loading…</div>

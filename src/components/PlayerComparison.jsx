@@ -1,5 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { money, nilRange, letterGrade, tierColor, projectedTier, overallFor, overallColor } from "@/lib/display";
+import { positionLabel } from "@/lib/positions";
 import { useNilVisible } from "@/hooks/useNilVisible";
 
 // One color per slot — consistent across the whole comparison
@@ -108,7 +109,7 @@ function PlayerAutocomplete({ value, onChange, allPlayers, label, color }) {
               onMouseLeave={e => e.currentTarget.style.background = "transparent"}
             >
               <span style={{ fontWeight: 600 }}>{p.name}</span>
-              <span style={{ opacity: .45, marginLeft: 8 }}>{p.team} · {p.pos}</span>
+              <span style={{ opacity: .45, marginLeft: 8 }}>{p.team} · {positionLabel(p)}</span>
             </div>
           ))}
         </div>
@@ -398,7 +399,7 @@ export function PlayerComparison({ initialIds = [], allPlayers = [] }) {
                             <div>
                               <div style={{ fontSize: 13, fontWeight: 700, color }}>{p.name}</div>
                               <div style={{ fontSize: 10, opacity: .5, marginTop: 2, fontWeight: 400 }}>
-                                {[p.team, p.pos, p.year, p.height].filter(Boolean).join(" · ")}
+                                {[p.team, positionLabel(p), p.year, p.height].filter(Boolean).join(" · ")}
                               </div>
                             </div>
                           </div>

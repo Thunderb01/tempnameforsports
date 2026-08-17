@@ -47,7 +47,8 @@ create or replace view public.vw_players as
     p.transfer_from_team,
     p.transfer_to_team,
     p.transfer_season_year,
-    p.transfer_api_id
+    p.transfer_api_id,
+    p.positions
    FROM players p
      LEFT JOIN LATERAL ( SELECT player_stats.id,
             player_stats.player_id,
@@ -163,7 +164,8 @@ create or replace view public.vw_w_players as
     p.transfer_from_team,
     p.transfer_to_team,
     p.transfer_season_year,
-    p.transfer_api_id
+    p.transfer_api_id,
+    p.positions
    FROM w_players p
      LEFT JOIN LATERAL ( SELECT ps.id,
             ps.player_id,

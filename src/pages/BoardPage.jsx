@@ -12,12 +12,13 @@ import { useTeamLogos } from "@/hooks/useTeamLogos";
 import { money, nilValue, nilRange, heightToInches, tierColor, projectedTier, overallFor, overallColor } from "@/lib/display";
 import { useNilVisible } from "@/hooks/useNilVisible";
 import { MultiSelectFilter, RangeFilter, FilterChips, parseHeight, formatHeight, playerHeightInches } from "@/components/Filters";
+import { POSITIONS, positionsFor, positionLabel } from "@/lib/positions";
 
 // label → getter(player)
 const COLS = [
   { label: "Player",    get: p => p.name },
   { label: "Team",      get: p => p.team },
-  { label: "Pos",       get: p => p.pos },
+  { label: "Pos",       get: p => positionLabel(p) },
   { label: "Yr",        get: p => p.year },
   { label: "Ht",        get: p => p.height   || "—" },
   { label: "Hometown",  get: p => p.hometown || "—" },
@@ -269,7 +270,7 @@ export function BoardPage({ sport = "men" }) {
       if (q && !p.name.toLowerCase().includes(q) &&
                !(p.team||"").toLowerCase().includes(q) &&
                !(p.hometown||"").toLowerCase().includes(q)) return false;
-      if (posFilter.length  && !posFilter.includes(p.pos))   return false;
+      if (posFilter.length  && !positionsFor(p).some(pos => posFilter.includes(pos))) return false;
       if (yearFilter.length && !yearFilter.includes(p.year)) return false;
       if (heightMin != null || heightMax != null) {
         const inches = playerHeightInches(p.height);
@@ -387,7 +388,7 @@ export function BoardPage({ sport = "men" }) {
                 value={toTeamFilter} onChange={e => setToTeamFilter(e.target.value)} />
             </div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
-              <MultiSelectFilter label="positions" options={["Guard", "Wing", "Big"]} value={posFilter}  onChange={setPosFilter}  width={130} />
+              <MultiSelectFilter label="positions" options={POSITIONS} value={posFilter}  onChange={setPosFilter}  width={130} />
               <MultiSelectFilter label="years"     options={YEAR_OPTIONS}             value={yearFilter} onChange={setYearFilter} width={120} />
               <MultiSelectFilter label="confs"     options={conferences}              value={confFilter} onChange={setConfFilter} width={140} />
               <RangeFilter

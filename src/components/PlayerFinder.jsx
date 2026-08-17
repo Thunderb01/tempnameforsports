@@ -1,7 +1,8 @@
 import { useState, useMemo, useEffect } from "react";
 import { PlayerModal } from "@/components/PlayerModal";
 import { track } from "@/lib/track";
-import { money, nilRange, gradeColorFromVal as gradeColor } from "@/lib/display";
+import { money, nilRange, gradeColorFromVal as gradeColor, bucketPosition } from "@/lib/display";
+import { POSITIONS, positionsFor, positionLabel } from "@/lib/positions";
 
 // BtP skill metrics shown in the finder
 const METRICS = [
@@ -19,7 +20,13 @@ const PRIORITY_OPTIONS = [
   { value: 3, label: "High" },
 ];
 
-const POSITIONS = ["All", "Guard", "Wing", "Big"];
+const POS_FILTER_OPTIONS = ["All", ...POSITIONS];
+
+// Two players are interchangeable if their eligibility sets overlap at all.
+const sharesPosition = (a, b) => {
+  const bp = positionsFor(b);
+  return positionsFor(a).some(pos => bp.includes(pos));
+};
 
 const MAX_METRIC_DIST = Math.sqrt(5) * 100; // ~223.6, theoretical max across 5 metrics each 0–100
 
@@ -27,8 +34,12 @@ function euclideanDistance(a, b) {
   return Math.sqrt(a.reduce((s, v, i) => s + (v - b[i]) ** 2, 0));
 }
 
-function classifyArchetype(pos, stats) {
+// Fallback naming for players with no archetype assigned in the DB. The names
+// are inherently three-bucket, so collapse the five-position value back to a
+// bucket rather than leaving every player unnamed.
+function classifyArchetype(rawPos, stats) {
   if (!stats) return null;
+  const pos = bucketPosition(rawPos);
   const { sei = 0, dds = 0, cdi = 0, ath = 0, ris = 0 } = stats;
 
   // Cross-position: high SEI, almost no rim presence, low creation = pure shooter
@@ -88,7 +99,7 @@ export function PlayerFinder({ board, returningPlayers, retentionById, onClose, 
 
     // Position filter
     if (posFilter !== "All") {
-      pool = pool.filter(p => p.pos === posFilter);
+      pool = pool.filter(p => positionsFor(p).includes(posFilter));
     }
 
     // Budget filter — use marketLow as the minimum the player might accept
@@ -118,7 +129,7 @@ export function PlayerFinder({ board, returningPlayers, retentionById, onClose, 
         ? pool.filter(p => getArchetype(p) === targetArchetype)
         : [];
       const fallbackPool = archetypePool.length < 5
-        ? pool.filter(p => p.pos === leaving.pos && !archetypePool.find(ap => ap.id === p.id))
+        ? pool.filter(p => sharesPosition(p, leaving) && !archetypePool.find(ap => ap.id === p.id))
         : [];
 
       scored = [...archetypePool, ...fallbackPool].map(p => {
@@ -225,7 +236,7 @@ export function PlayerFinder({ board, returningPlayers, retentionById, onClose, 
               <div>
                 <div style={{ fontSize: 11, opacity: .5, marginBottom: 6, textTransform: "uppercase", letterSpacing: ".06em" }}>Position</div>
                 <div style={{ display: "flex", gap: 4 }}>
-                  {POSITIONS.map(pos => (
+                  {POS_FILTER_OPTIONS.map(pos => (
                     <button key={pos} onClick={() => setPosFilter(pos)} style={{
                       fontSize: 11, fontWeight: 600, padding: "4px 12px", borderRadius: 20, cursor: "pointer", border: "1px solid",
                       background:  posFilter === pos ? "rgba(255,255,255,.1)" : "transparent",
@@ -309,7 +320,7 @@ export function PlayerFinder({ board, returningPlayers, retentionById, onClose, 
                             )}
                           </div>
                           <div style={{ fontSize: 11, opacity: .4, marginTop: 2 }}>
-                            {[p.team, p.pos, p.year].filter(Boolean).join(" · ")}
+                            {[p.team, positionLabel(p), p.year].filter(Boolean).join(" · ")}
                           </div>
                         </div>
 

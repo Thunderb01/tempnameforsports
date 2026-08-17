@@ -4,6 +4,7 @@ import { PlayerModal } from "@/components/PlayerModal";
 import { supabase }   from "@/lib/supabase";
 import { useTeamLogos } from "@/hooks/useTeamLogos";
 import { money, nilValue } from "@/lib/display";
+import { POSITIONS, DEFAULT_STARTER_COUNTS, assignToPositions, positionLabel } from "@/lib/positions";
 
 // ── Previous BTP scoring formula (kept for reference) ─────────────────────
 // const SLOT_WEIGHTS = [1.0, 0.55, 0.30, 0.15, 0.08];
@@ -45,17 +46,14 @@ function depthCoeff(zeroIdx) {
 
 // Team score = sum of (MPV * C_i) per position group, players sorted by MPV desc within group.
 function scoreTeam(players) {
-  let numPlayers = players.length;
-  players.forEach((p, i) => {
-    if (p.open_market_high==0) numPlayers--;
-  });
   if (!players.length) return 0;
-  const byPos = {};
-  players.forEach(p => {
-    const pos = p.primary_position || "Wing";
-    if (!byPos[pos]) byPos[pos] = [];
-    byPos[pos].push(p);
-  });
+  // Players with no market value don't count toward the class-size divisor.
+  const numPlayers = players.filter(p => (p.open_market_high || 0) > 0).length;
+  if (!numPlayers) return 0;   // guard: an all-zero-value class used to divide by 0 → NaN
+
+  // Assign each player to one position so a multi-position player isn't
+  // counted in two depth groups.
+  const byPos = assignToPositions(players, DEFAULT_STARTER_COUNTS, p => p.open_market_high || 0);
   let total = 0;
   Object.values(byPos).forEach(group => {
     group
@@ -111,6 +109,7 @@ function toModalPlayer(p) {
     team:         p.current_team ?? null,
     conf:         p.conference ?? null,
     pos:          p.primary_position ?? null,
+    positions:    p.positions ?? null,
     year:         p.year ?? null,
     height:       p.height   ?? null,
     hometown:     p.hometown ?? null,
@@ -120,19 +119,21 @@ function toModalPlayer(p) {
   };
 }
 
-const POS_ORDER = ["Guard", "Wing", "Big"];
-
 function TeamExpandRow({ r, colCount, onOpenModal }) {
   const sortedPlayers = useMemo(() => {
+    // Sort by the position each player was actually assigned to, so the list
+    // order matches the position groups rendered above it.
+    const posOf = {};
+    for (const pos of POSITIONS) for (const p of (r.byPos[pos] || [])) posOf[p.id] = pos;
     return [...r.players].sort((a, b) => {
-      const posA = POS_ORDER.indexOf(a.primary_position || "Wing");
-      const posB = POS_ORDER.indexOf(b.primary_position || "Wing");
+      const posA = POSITIONS.indexOf(posOf[a.id] ?? "SF");
+      const posB = POSITIONS.indexOf(posOf[b.id] ?? "SF");
       if (posA !== posB) return posA - posB;
       return playerScore(b) - playerScore(a);
     });
-  }, [r.players]);
+  }, [r.players, r.byPos]);
 
-  const posCounts = POS_ORDER.map(pos => ({
+  const posCounts = POSITIONS.map(pos => ({
     pos,
     players: (r.byPos[pos] || []).sort((a, b) => playerScore(b) - playerScore(a)),
   })).filter(g => g.players.length > 0);
@@ -146,7 +147,7 @@ function TeamExpandRow({ r, colCount, onOpenModal }) {
             {posCounts.map(({ pos, players }) => {
               return (
                 <div key={pos} style={{ flex: "1 1 200px", minWidth: 180, background: "rgba(255,255,255,.04)", borderRadius: 8, padding: "10px 14px" }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".06em", opacity: .5, marginBottom: 8 }}>{pos}s</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".06em", opacity: .5, marginBottom: 8 }}>{pos}</div>
                   {players.map((p, i) => {
                     const pct = Math.min(((p.open_market_high || 0) / 2_000_000) * 100, 100);
                     const g = grade(p.open_market_high);
@@ -189,7 +190,7 @@ function TeamExpandRow({ r, colCount, onOpenModal }) {
                   onMouseLeave={e => e.currentTarget.style.background = ""}
                 >
                   <td style={{ padding: "6px 10px", fontWeight: 500 }}>{displayName(p.name)}</td>
-                  <td style={{ padding: "6px 10px", opacity: .6 }}>{p.primary_position || "—"}</td>
+                  <td style={{ padding: "6px 10px", opacity: .6 }}>{positionLabel(p)}</td>
                   <td style={{ padding: "6px 10px", opacity: .6 }}>{p.year || "—"}</td>
                   <td style={{ padding: "6px 10px" }}>{nilValue(p.open_market_high)}</td>
                   <td style={{ padding: "6px 10px", opacity: .7 }}>{p.ppg != null ? Number(p.ppg).toFixed(1) : "—"}</td>
@@ -227,7 +228,7 @@ export function PortalRankingsPage({ sport = "men" }) {
       // second vw_players fetch for full player data.
       const { data: players, error } = await supabase
         .from(vwPlayersTable)
-        .select("id, name, primary_position, open_market_high, open_market_low, sei, ath, ris, dds, cdi, nil_valuation, year, ppg, rpg, apg, espn_id, current_team, conference, height, hometown, transfer_to_team")
+        .select("id, name, primary_position, positions, open_market_high, open_market_low, sei, ath, ris, dds, cdi, nil_valuation, year, ppg, rpg, apg, espn_id, current_team, conference, height, hometown, transfer_to_team")
         .eq("player_status", "transferring")
         .eq("transfer_status", "committed")
         .not("transfer_to_team", "is", null);
@@ -248,12 +249,9 @@ export function PortalRankingsPage({ sport = "men" }) {
         conference: players.find(p => p.conference)?.conference ?? null,
         raw: scoreTeam(players),
         commits: players.length,
-        byPos: players.reduce((acc, p) => {
-          const pos = p.primary_position || "Wing";
-          if (!acc[pos]) acc[pos] = [];
-          acc[pos].push(p);
-          return acc;
-        }, {}),
+        // Same one-player-one-slot assignment scoreTeam uses, so the displayed
+        // position groups match what was actually scored.
+        byPos: assignToPositions(players, DEFAULT_STARTER_COUNTS, p => p.open_market_high || 0),
         topCommit: [...players].sort((a, b) => (b.open_market_high || 0) - (a.open_market_high || 0))[0],
         marketTotal: players.reduce((s, p) => s + (p.open_market_high || 0), 0),
       }));
@@ -286,7 +284,9 @@ export function PortalRankingsPage({ sport = "men" }) {
     });
   }, [rows, search, posFilter, confFilter]);
 
-  const COL_COUNT = 10;
+  // Total header count: "", Rank, Team, Grade, Class Score, Commits,
+  // <one per position>, Proj. Transfer Value, Top Commit.
+  const COL_COUNT = 8 + POSITIONS.length;   // 13 with five positions
 
   return (
     <>
@@ -309,9 +309,7 @@ export function PortalRankingsPage({ sport = "men" }) {
               </select>
               <select className="input" value={posFilter} onChange={e => setPosFilter(e.target.value)}>
                 <option value="all">All positions</option>
-                <option value="Guard">Guards</option>
-                <option value="Wing">Wings</option>
-                <option value="Big">Bigs</option>
+                {POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}
               </select>
             </div>
           </div>
@@ -326,7 +324,7 @@ export function PortalRankingsPage({ sport = "men" }) {
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                 <thead>
                   <tr>
-                    {["", "Rank", "Team", "Grade", "Class Score", "Commits", "Guard", "Wing", "Big", "Proj. Transfer Value", "Top Commit"].map(h => (
+                    {["", "Rank", "Team", "Grade", "Class Score", "Commits", ...POSITIONS, "Proj. Transfer Value", "Top Commit"].map(h => (
                       <th key={h} style={thStyle}>{h}</th>
                     ))}
                   </tr>
@@ -376,21 +374,19 @@ export function PortalRankingsPage({ sport = "men" }) {
                           </td>
                           <td style={{ ...tdStyle, fontWeight: 600 }}>{money(r.raw)}</td>
                           <td style={tdStyle}>{r.commits}</td>
-                          <td style={tdStyle}>{posScore("Guard")}</td>
-                          <td style={tdStyle}>{posScore("Wing")}</td>
-                          <td style={tdStyle}>{posScore("Big")}</td>
+                          {POSITIONS.map(pos => <td key={pos} style={tdStyle}>{posScore(pos)}</td>)}
                           <td style={tdStyle}>{money(r.marketTotal)}</td>
                           <td style={tdStyle}>
                             {r.topCommit
                               ? <div>
                                   <div style={{ fontWeight: 500 }}>{displayName(r.topCommit.name)}</div>
-                                  <div style={{ fontSize: 11, opacity: .45 }}>{r.topCommit.primary_position} · {nilValue(r.topCommit.open_market_high)}</div>
+                                  <div style={{ fontSize: 11, opacity: .45 }}>{positionLabel(r.topCommit)} · {nilValue(r.topCommit.open_market_high)}</div>
                                 </div>
                               : "—"
                             }
                           </td>
                         </tr>
-                        {isOpen && <TeamExpandRow key={`${r.team}-expand`} r={r} colCount={COL_COUNT + 1} onOpenModal={p => setModal(toModalPlayer(p))} />}
+                        {isOpen && <TeamExpandRow key={`${r.team}-expand`} r={r} colCount={COL_COUNT} onOpenModal={p => setModal(toModalPlayer(p))} />}
                       </>
                     );
                   })}

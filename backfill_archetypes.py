@@ -41,7 +41,25 @@ SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")
 
 
 # ── Archetype logic (mirrors PlayerFinder.jsx classifyArchetype) ───────────────
+# Archetype names are inherently three-bucket ("Playmaking Guard", "3-and-D
+# Wing", "Two-Way Big"), so classification still groups that way even though
+# players are now stored as PG/SG/SF/PF/C. Collapse the five-position value
+# back to a bucket rather than leaving every new-vocabulary player unclassified.
+_POSITION_TO_BUCKET = {
+    "PG": "Guard", "SG": "Guard",
+    "SF": "Wing",
+    "PF": "Big",   "C":  "Big",
+    "Guard": "Guard", "Wing": "Wing", "Big": "Big",   # legacy passthrough
+}
+
+
+def to_bucket(pos):
+    """PG/SG/SF/PF/C (or a legacy bucket) → Guard | Wing | Big. None if unknown."""
+    return _POSITION_TO_BUCKET.get(str(pos).strip())
+
+
 def classify_archetype(pos, sei=0, ath=0, ris=0, dds=0, cdi=0):
+    pos  = to_bucket(pos)
     sei  = sei  or 0
     ath  = ath  or 0
     ris  = ris  or 0
@@ -191,7 +209,9 @@ def run_analyze(players):
             skipped_no_metrics += 1
             continue
         arch = classify_archetype(pos, **{k: p.get(k) for k in METRICS})
-        classified.append({ "name": p.get("name", ""), "pos": pos, "arch": arch,
+        # Store the bucket, not the raw position: the borderline analysis below
+        # and the per-position grouping are both three-bucket concepts.
+        classified.append({ "name": p.get("name", ""), "pos": to_bucket(pos), "arch": arch,
                              **{k: p.get(k) or 0 for k in METRICS} })
 
     total = len(classified)

@@ -270,6 +270,9 @@ def display_school(team_str):
 # ── POSITION NORMALISATION ─────────────────────────────────────────────────────
 # Torvik's 'role' column values (e.g. "Wing F", "Combo G", "Big") are mapped
 # to three position buckets so percentile ranks are position-relative.
+#
+# DO NOT CHANGE normalise_pos OR percentrank_by_pos WITHOUT INTENDING TO
+# REVALUE THE ENTIRE DATABASE. See the matching note in torvik_metrics.py.
 
 def normalise_pos(role):
     role = str(role).strip().lower()
@@ -280,6 +283,29 @@ def normalise_pos(role):
     if any(x in role for x in ["big", "pf", "center", "power"]) or role in ("c",) or role.startswith("c ") or role.endswith(" c"):
         return "Big"
     return "Wing"  # default
+
+
+# ── FIVE-POSITION MAPPING ──────────────────────────────────────────────────────
+# Kept in sync with torvik_metrics.py and src/lib/positions.js. Feeds display,
+# filtering and lineup construction only — never the percentile math above.
+TORVIK_ROLE_TO_POSITIONS = {
+    "pure pg":    ["PG"],
+    "scoring pg": ["PG"],
+    "combo g":    ["PG", "SG"],
+    "wing g":     ["SG", "SF"],
+    "wing f":     ["SF", "PF"],
+    "stretch 4":  ["PF"],
+    "pf/c":       ["PF", "C"],
+    "c":          ["C"],
+}
+
+_BUCKET_TO_POSITIONS = {"Guard": ["PG", "SG"], "Wing": ["SF"], "Big": ["PF", "C"]}
+
+
+def torvik_role_to_positions(role):
+    """Map a Torvik role to its five-position eligibility set. [] if unknown."""
+    key = str(role).strip().lower()
+    return list(TORVIK_ROLE_TO_POSITIONS.get(key, []))
 
 
 def percentrank_by_pos(df, col, pos_col="pos_bucket", scale=100):
@@ -1191,9 +1217,15 @@ def main():
             hometown = str(row.get("type", "")).strip()
             if hometown and hometown not in ("nan", ""):
                 player_patch["hometown"] = hometown
-            pos = normalise_pos(row.get("role", ""))
-            if pos:
-                player_patch["primary_position"] = pos
+            # Five-position eligibility set; falls back to expanding the
+            # three-bucket value so a blank role never wipes a position.
+            role_raw = row.get("role", "")
+            positions = torvik_role_to_positions(role_raw)
+            if not positions:
+                positions = list(_BUCKET_TO_POSITIONS.get(normalise_pos(role_raw), []))
+            if positions:
+                player_patch["positions"] = positions
+                player_patch["primary_position"] = positions[0]
             YR_MAP = {"Fr": "Freshman", "So": "Sophomore", "Jr": "Junior", "Sr": "Senior", "Gr": "Graduate"}
             yr_raw = str(row.get("yr", "")).strip()
             yr_mapped = YR_MAP.get(yr_raw)

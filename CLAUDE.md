@@ -50,20 +50,43 @@ UConn vs Connecticut, BYU, etc.).
 
 ---
 
-## Scoring math (Roster Strength)
+## Positions (PG/SG/SF/PF/C, multi-position)
 
-Static-team scoring and the user's live build run through the SAME function
-(`scoreTeamPlayers`). Only the lineup differs:
+`src/lib/positions.js` is the single source of truth. Players carry a
+`positions text[]` **eligibility set** — the spots they can credibly play —
+derived from Bart Torvik's `role` column, four values of which are inherently
+dual (`Combo G`, `Wing G`, `Wing F`, `PF/C`). `primary_position` mirrors
+element 0 so single-value display paths keep working.
 
-- **Static** = canonical 2 Guards + 2 Wings + 1 Big.
-- **Live**   = the user's sidebar (`starterCounts`).
+**A player is eligible at several positions but occupies exactly one.**
+`assignToPositions()` enforces this. Never fan a player into multiple buckets:
+every scoring path sums all buckets, so a dual-position player counted twice
+inflates versatile rosters against specialist ones and silently reorders every
+ranking.
 
-Slot weights inside each position bucket:
-`1.00` for starter slots, `0.20` for the next 3 off the bench, `0.04` for
-deeper depth. International players are excluded from both pools.
+Slot weights within a position: `1.00` starters, `0.20` the next 3 off the
+bench, `0.04` deeper depth. International players are excluded from scoring.
 
-If you add a third "score view," reuse `scoreTeamPlayers` rather than
-re-implementing the weighting — it lives in `src/pages/AppPage.jsx`.
+Use `positionsFor(player)` to read positions (it handles the array, a single
+value, and legacy Guard/Wing/Big rows) and `positionLabel(player)` to display
+them ("PG/SG"). Reuse `scoreRoster` / `computeOptimalLineup` / `slotWeight`
+rather than re-implementing — four divergent copies of the lineup algorithm
+previously existed and had to be hand-synced.
+
+`scripts/test-positions.mjs` covers this module and runs as part of
+`npm run build`.
+
+### Metric peer groups are deliberately still 3-bucket
+
+`torvik_metrics.py`'s `normalise_pos` / `percentrank_by_pos` group by
+Guard/Wing/Big, and every BTP metric (sei/ath/ris/dds/cdi) **and every NIL
+valuation** is a percentile computed *within* that group. This is intentionally
+untouched by the five-position migration — changing it revalues the entire
+database. Do not "tidy" it without meaning to.
+
+One known consequence: `Stretch 4` matches no branch in `normalise_pos` and
+falls through to Wing, so those players display as PF but are ranked against
+wings. Correcting it is a one-line change plus a `torvik_metrics.py` re-run.
 
 ---
 
@@ -72,10 +95,19 @@ re-implementing the weighting — it lives in `src/pages/AppPage.jsx`.
 The app supports two sports. **They do not share a code path.** Each sport
 has its own pages, its own data hook, and its own scoring constants.
 
-| Sport   | Pages                    | Data hook               | Scoring                                       | Tables |
-|---------|--------------------------|-------------------------|-----------------------------------------------|--------|
-| Men's   | `src/pages/*.jsx`        | `useRosterBoard`        | inlined in `AppPage.jsx`                      | `players`, `vw_players`, `portal_transfers`, … |
-| Women's | `src/pages/womens/*.jsx` | `useWomensRosterBoard`  | `WOMENS_SCORING_CONFIG` from `@/lib/scoring`  | `w_players`, `vw_w_players`, `w_portal_transfers`, … |
+| Sport   | Pages                    | Data hook               | Scoring                        | Tables |
+|---------|--------------------------|-------------------------|--------------------------------|--------|
+| Men's   | `src/pages/*.jsx`        | `useRosterBoard`        | `@/lib/positions` + inlined weights in `AppPage.jsx` | `players`, `vw_players`, … |
+| Women's | `src/pages/womens/*.jsx` | `useWomensRosterBoard`  | same shared module             | `w_players`, `vw_w_players`, … |
+
+Note: `src/lib/scoring.js` exports a `WOMENS_SCORING_CONFIG` that **nothing
+imports**, and its coefficients have drifted from the live inlined ones. Don't
+treat it as a source of truth — it's a leftover.
+
+Several things once forked have since been merged and are now shared, driven by
+a `sport` prop or config rather than duplicated files: `useRosterBoard` /
+`useWomensRosterBoard` (one factory), `BoardPage`, and `PortalRankingsPage`.
+`AppPage` remains genuinely forked.
 
 Pages currently forked: `AppPage`, `BoardPage`, `ComparePage`, `PortalRankingsPage`, `InternationalPage`. Exports are prefixed `Womens*`. Add new forks to `M_TO_W` in `SiteHeader.jsx` and the routes in `main.jsx`.
 
