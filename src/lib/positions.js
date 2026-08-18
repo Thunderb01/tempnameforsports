@@ -91,6 +91,25 @@ export function positionLabel(player) {
   return list.length > 0 ? list.join("/") : "—";
 }
 
+// ── Coarse three-bucket view ────────────────────────────────────────────────
+// The Full Board deliberately still presents Guard/Wing/Big: scanning hundreds
+// of rows is easier against three groups than five, and it matches the
+// percentile peer groups the metrics on that page are computed against. The
+// five-position detail surfaces in player modals, the roster builder, and
+// portal rankings.
+export const LEGACY_BUCKETS = ["Guard", "Wing", "Big"];
+
+/** Guard | Wing | Big for a player, derived from their primary position. */
+export function legacyBucketFor(player) {
+  switch (positionsFor(player)[0]) {
+    case "PG":
+    case "SG": return "Guard";
+    case "PF":
+    case "C":  return "Big";
+    default:   return "Wing";   // SF
+  }
+}
+
 /**
  * Weight a player contributes based on their rank within their position group:
  * starters full value, the next three off the bench a fifth, deeper depth

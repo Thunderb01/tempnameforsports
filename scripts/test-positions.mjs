@@ -1,6 +1,7 @@
 import {
   POSITIONS, DEFAULT_STARTER_COUNTS, expandPosition, positionsFor,
   positionLabel, slotWeight, assignToPositions, computeOptimalLineup, scoreRoster,
+  LEGACY_BUCKETS, legacyBucketFor,
 } from "../src/lib/positions.js";
 
 let failures = 0;
@@ -34,6 +35,18 @@ check("empty array falls through to primary", positionsFor({ positions: [], prim
 check("unknown falls back to SF", positionsFor({ primary_position: "???" }), ["SF"]);
 check("nothing at all falls back to SF", positionsFor({}), ["SF"]);
 check("label", positionLabel({ positions: ["PG", "SG"] }), "PG/SG");
+
+console.log("\n── legacyBucketFor (Full Board still shows Guard/Wing/Big) ──");
+check("PG -> Guard", legacyBucketFor({ positions: ["PG"] }), "Guard");
+check("SG -> Guard", legacyBucketFor({ positions: ["SG"] }), "Guard");
+check("SF -> Wing",  legacyBucketFor({ positions: ["SF"] }), "Wing");
+check("PF -> Big",   legacyBucketFor({ positions: ["PF"] }), "Big");
+check("C  -> Big",   legacyBucketFor({ positions: ["C"] }),  "Big");
+check("dual uses primary (PG/SG -> Guard)", legacyBucketFor({ positions: ["PG", "SG"] }), "Guard");
+check("dual uses primary (SF/PF -> Wing)",  legacyBucketFor({ positions: ["SF", "PF"] }), "Wing");
+check("legacy row passes through", legacyBucketFor({ primary_position: "Big" }), "Big");
+check("unknown -> Wing", legacyBucketFor({}), "Wing");
+check("bucket list", LEGACY_BUCKETS, ["Guard", "Wing", "Big"]);
 
 console.log("\n── slotWeight ──");
 check("starter", slotWeight(0, 2), 1.0);
