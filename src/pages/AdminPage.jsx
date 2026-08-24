@@ -93,12 +93,13 @@ const STATUS_OPTIONS = ["uncommitted", "committed", "enrolled", "withdrawn"];
 
 const CURRENT_SEASON = 2027;
 
-const PLAYER_STATUS_OPTIONS = ["returning", "graduating", "transferring", "declared"];
+const PLAYER_STATUS_OPTIONS = ["returning", "graduating", "transferring", "declared", "drafted"];
 const PLAYER_STATUS_COLOR   = {
   returning:   "#4ade80",
   graduating:  "#5b9cf6",
   transferring: "#f5a623",
   declared:    "#c084fc",
+  drafted:     "#fbbf24",
 };
 
 const YEAR_OPTIONS = ["Fr", "RS Fr", "So", "RS So", "Jr", "RS Jr", "Sr", "RS Sr", "Grad", "5th Year", "JuCo", "G League"];

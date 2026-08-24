@@ -58,6 +58,7 @@ export function BoardPage() {
   const [includeCommitted,  setIncludeCommitted]  = useState(false);
   const [includeUnevaluated, setIncludeUnevaluated] = useState(false);
   const [toTeamFilter,      setToTeamFilter]      = useState("");
+  const [statusFilter,      setStatusFilter]      = useState("");
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [confFilter,  setConfFilter]  = useState([]);
   const [archetypeFilter,  setArchetypeFilter]  = useState("");
@@ -94,6 +95,14 @@ export function BoardPage() {
   ];
   const emptyAdvc = () => Object.fromEntries(ADVC_FIELDS.map(f => [f.key, { min: "", max: "" }]));
   const [advcFilters, setAdvcFilters] = useState(emptyAdvc);
+
+  const STATUS_FILTER_OPTIONS = [
+    { value: "returning",    label: "Returning" },
+    { value: "graduating",   label: "Graduating" },
+    { value: "transferring", label: "Transferring" },
+    { value: "declared",     label: "Declared for Draft" },
+    { value: "drafted",      label: "Drafted" },
+  ];
 
   function setAdvc(key, side, val) {
     setAdvcFilters(prev => ({ ...prev, [key]: { ...prev[key], [side]: val } }));
@@ -246,7 +255,11 @@ export function BoardPage() {
 
 
   // Reset to page 0 whenever filters or sort change
-  useEffect(() => setPage(0), [search, posFilter, yearFilter, heightMin, heightMax, stateFilter, confFilter, archetypeFilter, sortKey, sortDir, portalOnly, includeCommitted, includeUnevaluated, advcFilters, toTeamFilter]);
+  useEffect(() => setPage(0), [search, posFilter, yearFilter, heightMin, heightMax, stateFilter, confFilter, archetypeFilter, sortKey, sortDir, portalOnly, includeCommitted, includeUnevaluated, advcFilters, toTeamFilter, statusFilter]);
+
+  // Players spotlighted regardless of the active filters — a reflective look-back,
+  // not tied to portal availability.
+  const draftedPlayers = useMemo(() => players.filter(p => p.player_status === "drafted"), [players]);
 
   // ── Filter ──────────────────────────────────────────────────────────────────
   const filtered = useMemo(() => {
@@ -278,7 +291,9 @@ export function BoardPage() {
         const dest = (portalInfo[p.id]?.to_team || "").toLowerCase();
         if (!dest.includes(toTeamFilter.trim().toLowerCase())) return false;
       }
-      if (portalOnly) {
+      if (statusFilter) {
+        if (p.player_status !== statusFilter) return false;
+      } else if (portalOnly) {
         const portalSet = includeCommitted ? allPortalIds : availableIds;
         if (!portalSet.has(p.id)) return false;
       }
@@ -290,7 +305,7 @@ export function BoardPage() {
       }
       return true;
     });
-  }, [players, search, posFilter, yearFilter, heightMin, heightMax, confFilter, archetypeFilter, archetypesById, stateFilter, portalOnly, includeCommitted, includeUnevaluated, advcFilters, toTeamFilter, availableIds, allPortalIds, portalInfo]);
+  }, [players, search, posFilter, yearFilter, heightMin, heightMax, confFilter, archetypeFilter, archetypesById, stateFilter, portalOnly, includeCommitted, includeUnevaluated, advcFilters, toTeamFilter, statusFilter, availableIds, allPortalIds, portalInfo]);
 
   // ── Sort (separate so filter changes don't re-sort and vice versa) ──────────
   const sorted = useMemo(() => {
@@ -366,6 +381,46 @@ export function BoardPage() {
             </div>
           </div>
 
+          {/* Draft Spotlight — reflective look-back at players marked drafted, not a live feed */}
+          {!loading && draftedPlayers.length > 0 && (
+            <div style={{ marginBottom: 18 }}>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 10 }}>
+                <span style={{ fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".05em", opacity: .65 }}>
+                  Draft Spotlight
+                </span>
+                <span style={{ fontSize: 12, opacity: .4 }}>{draftedPlayers.length} drafted</span>
+                {statusFilter !== "drafted" && (
+                  <button className="btn btn-ghost" style={{ fontSize: 11, padding: "1px 8px", marginLeft: "auto" }}
+                    onClick={() => setStatusFilter("drafted")}>
+                    View all
+                  </button>
+                )}
+              </div>
+              <div style={{ display: "flex", gap: 10, overflowX: "auto", paddingBottom: 6 }}>
+                {draftedPlayers.map(p => (
+                  <div key={p.id} className="row-click"
+                    onClick={() => setModal(p)}
+                    style={{
+                      minWidth: 190, flexShrink: 0, cursor: "pointer",
+                      background: "var(--panel)", border: "1px solid rgba(251,191,36,.35)",
+                      borderRadius: 10, padding: "10px 12px",
+                    }}>
+                    <div style={{ fontWeight: 600, fontSize: 13 }}>{p.name}</div>
+                    <div style={{ fontSize: 11, opacity: .55, marginTop: 2 }}>
+                      {[p.team, p.pos, p.year].filter(Boolean).join(" · ")}
+                    </div>
+                    <span style={{
+                      display: "inline-block", marginTop: 6, fontSize: 10, fontWeight: 700,
+                      color: "#0e1521", background: "#fbbf24", padding: "1px 8px", borderRadius: 8,
+                    }}>
+                      Drafted
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Filters */}
           <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 }}>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
@@ -395,12 +450,16 @@ export function BoardPage() {
                 <option value="">All archetypes</option>
                 {archetypeOptions.map(a => <option key={a} value={a}>{a}</option>)}
               </select>
-              <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, opacity: .7, cursor: "pointer", userSelect: "none" }}>
-                <input type="checkbox" checked={portalOnly} onChange={e => setPortalOnly(e.target.checked)} />
+              <select className="input" style={{ width: 180 }} value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
+                <option value="">All statuses</option>
+                {STATUS_FILTER_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+              <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, opacity: statusFilter ? .3 : .7, cursor: statusFilter ? "default" : "pointer", userSelect: "none" }}>
+                <input type="checkbox" checked={portalOnly} disabled={!!statusFilter} onChange={e => setPortalOnly(e.target.checked)} />
                 Available in portal
               </label>
-              <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, opacity: portalOnly ? .7 : .3, cursor: portalOnly ? "pointer" : "default", userSelect: "none", paddingLeft: 10, borderLeft: "2px solid rgba(255,255,255,.1)" }}>
-                <input type="checkbox" checked={includeCommitted} disabled={!portalOnly} onChange={e => setIncludeCommitted(e.target.checked)} />
+              <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, opacity: (portalOnly && !statusFilter) ? .7 : .3, cursor: (portalOnly && !statusFilter) ? "pointer" : "default", userSelect: "none", paddingLeft: 10, borderLeft: "2px solid rgba(255,255,255,.1)" }}>
+                <input type="checkbox" checked={includeCommitted} disabled={!portalOnly || !!statusFilter} onChange={e => setIncludeCommitted(e.target.checked)} />
                 + already committed
               </label>
               <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, opacity: .7, cursor: "pointer", userSelect: "none" }}>
@@ -418,11 +477,12 @@ export function BoardPage() {
                 ...(heightMax != null ? [{ label: `Ht ≤ ${formatHeight(heightMax)}`, onClear: () => setHeightMax(null) }] : []),
                 ...(stateFilter !== "all" ? [{ label: `Loc: ${stateFilter}`, onClear: () => setStateFilter("all") }] : []),
                 ...(archetypeFilter ? [{ label: `Archetype: ${archetypeFilter}`, onClear: () => setArchetypeFilter("") }] : []),
+                ...(statusFilter ? [{ label: `Status: ${STATUS_FILTER_OPTIONS.find(o => o.value === statusFilter)?.label}`, onClear: () => setStatusFilter("") }] : []),
               ]}
               onClearAll={() => {
                 setPosFilter([]); setYearFilter([]); setConfFilter([]);
                 setHeightMin(null); setHeightMax(null); setStateFilter("all");
-                setArchetypeFilter("");
+                setArchetypeFilter(""); setStatusFilter("");
               }}
             />
           </div>

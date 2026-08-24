@@ -486,6 +486,7 @@ export function useRosterBoard(team, userId) {
       graduating:  "graduating",
       transferring: "entering_portal",
       declared:    "entering_draft",
+      drafted:     "entering_draft",
     };
     const adminStatusMap = {};
     (playerStatusData || []).forEach(r => {
