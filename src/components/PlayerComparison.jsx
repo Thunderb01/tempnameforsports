@@ -221,7 +221,7 @@ function MetricSidebar({ players, slotIds }) {
 }
 
 // ── Main comparison ───────────────────────────────────────────────────────────
-export function PlayerComparison({ initialIds = [], allPlayers = [] }) {
+export function PlayerComparison({ initialIds = [], allPlayers = [], sport = "mens" }) {
   const [numSlots, setNumSlots] = useState(2);
   const [slotIds, setSlotIds] = useState(() => {
     const base = ["", "", "", ""];
@@ -386,7 +386,7 @@ export function PlayerComparison({ initialIds = [], allPlayers = [] }) {
                           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
                             {p.espn_id ? (
                               <img
-                                src={`https://a.espncdn.com/i/headshots/mens-college-basketball/players/full/${p.espn_id}.png`}
+                                src={`https://a.espncdn.com/i/headshots/${sport === "womens" ? "womens-college-basketball" : "mens-college-basketball"}/players/full/${p.espn_id}.png`}
                                 alt={p.name}
                                 style={{ width: 52, height: 52, borderRadius: "50%", objectFit: "cover", background: "rgba(255,255,255,.06)", border: `2px solid ${color}60` }}
                                 onError={e => { e.target.style.display = "none"; }}
