@@ -6,6 +6,7 @@ import { InternationalAdminContent } from "@/pages/InternationalAdminPage";
 import { DefCard } from "@/components/DefCard";
 import { DOMESTIC_FIELDS, domesticValues, resolveArchetypeList, matchArchetypes } from "@/lib/archetypeMatch";
 import { renderArticleBody } from "@/lib/renderArticle";
+import { PLAYER_STATUS_OPTIONS, PLAYER_STATUS_COLOR, PLAYER_STATUS_LABELS } from "@/lib/playerStatus";
 
 // Load every row from a table/view, paging past PostgREST's 1000-row cap.
 async function fetchAllRows(table, columns) {
@@ -92,15 +93,6 @@ function TeamSearch({ value, onChange, placeholder = "Search team…" }) {
 const STATUS_OPTIONS = ["uncommitted", "committed", "enrolled", "withdrawn"];
 
 const CURRENT_SEASON = 2027;
-
-const PLAYER_STATUS_OPTIONS = ["returning", "graduating", "transferring", "declared", "drafted"];
-const PLAYER_STATUS_COLOR   = {
-  returning:   "#4ade80",
-  graduating:  "#5b9cf6",
-  transferring: "#f5a623",
-  declared:    "#c084fc",
-  drafted:     "#fbbf24",
-};
 
 const YEAR_OPTIONS = ["Fr", "RS Fr", "So", "RS So", "Jr", "RS Jr", "Sr", "RS Sr", "Grad", "5th Year", "JuCo", "G League"];
 
@@ -661,6 +653,11 @@ function TransfersTab() {
 
 // ── Players tab ────────────────────────────────────────────────────────────
 function PlayersTab() {
+  const [sport,      setSport]      = useState("mens"); // "mens" | "womens"
+  const cfg = sport === "mens"
+    ? { view: "vw_players",   players: "players"   }
+    : { view: "vw_w_players", players: "w_players" };
+
   const [query,      setQuery]      = useState("");
   const [results,    setResults]    = useState([]);
   const [loading,    setLoading]    = useState(false);
@@ -676,7 +673,7 @@ function PlayersTab() {
     setLoading(true);
     timeoutRef.current = setTimeout(async () => {
       const { data, error } = await supabase
-        .from("vw_players")
+        .from(cfg.view)
         .select("*")
         .ilike("name", `%${q.trim()}%`)
         .order("name")
@@ -686,7 +683,7 @@ function PlayersTab() {
       if (players.length) {
         const ids = players.map(p => p.id);
         const { data: statusRows } = await supabase
-          .from("players")
+          .from(cfg.players)
           .select("id, player_status, archetype_overwrite, archetypes, archetype_override")
           .in("id", ids);
         const byId = Object.fromEntries((statusRows || []).map(r => [r.id, r]));
@@ -702,9 +699,11 @@ function PlayersTab() {
       }
       setLoading(false);
     }, 250);
-  }, []);
+  }, [cfg.view, cfg.players]);
 
-  useEffect(() => { search(query); }, [query]);
+  // Sport switch invalidates any in-flight search against the other sport's tables.
+  useEffect(() => { setQuery(""); setResults([]); setEditId(null); setEditPlayer(null); setAddMode(false); }, [sport]);
+  useEffect(() => { search(query); }, [query, search]);
 
   function handleEdit(p) {
     setEditPlayer(p);
@@ -714,7 +713,7 @@ function PlayersTab() {
 
   async function handleSave(id, patch) {
     setSaving(true);
-    const { data, error } = await supabase.from("players").update(patch).eq("id", id).select();
+    const { data, error } = await supabase.from(cfg.players).update(patch).eq("id", id).select();
     if (error) {
       console.error("handleSave error:", error);
       alert("Error: " + error.message);
@@ -735,7 +734,7 @@ function PlayersTab() {
 
   async function handleAdd(patch) {
     setSaving(true);
-    const { data, error } = await supabase.from("players").insert(patch).select();
+    const { data, error } = await supabase.from(cfg.players).insert(patch).select();
     if (error) {
       console.error("handleAdd error:", error);
       alert("Error: " + error.message);
@@ -748,25 +747,43 @@ function PlayersTab() {
   }
 
   async function handlePlayerStatusChange(id, player_status) {
-    const { error } = await supabase.from("players").update({ player_status }).eq("id", id);
+    const { error } = await supabase.from(cfg.players).update({ player_status }).eq("id", id);
     if (error) { alert("Error: " + error.message); return; }
     setResults(prev => prev.map(p => p.id === id ? { ...p, player_status } : p));
   }
 
   return (
     <div>
+      {/* Men's / Women's toggle — Add/Edit stay men's-only for now since PlayerEditForm's
+          archetype editing is wired to the men's archetype_defs table; status quick-edit
+          below works for both. */}
+      <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
+        {[["mens", "Men's"], ["womens", "Women's"]].map(([val, lbl]) => (
+          <button key={val} className="btn btn-ghost" style={{
+            fontSize: 12, padding: "4px 12px",
+            background:  sport === val ? "rgba(245,166,35,.15)" : "transparent",
+            color:       sport === val ? "#f5a623"              : "rgba(255,255,255,.4)",
+            borderColor: sport === val ? "rgba(245,166,35,.4)"  : "rgba(255,255,255,.12)",
+          }} onClick={() => setSport(val)}>
+            {lbl}
+          </button>
+        ))}
+      </div>
+
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
         <input className="input" placeholder="Search player by name…" value={query}
           onChange={e => { setQuery(e.target.value); setEditId(null); setEditPlayer(null); setAddMode(false); }}
           style={{ width: 300 }} />
         {loading && <span style={{ fontSize: 12, opacity: .4 }}>Searching…</span>}
-        <button className="btn btn-primary" style={{ fontSize: 12, marginLeft: "auto" }}
-          onClick={() => { setAddMode(true); setEditId(null); setEditPlayer(null); }}>
-          + Add Player
-        </button>
+        {sport === "mens" && (
+          <button className="btn btn-primary" style={{ fontSize: 12, marginLeft: "auto" }}
+            onClick={() => { setAddMode(true); setEditId(null); setEditPlayer(null); }}>
+            + Add Player
+          </button>
+        )}
       </div>
 
-      {addMode && (
+      {addMode && sport === "mens" && (
         <div style={{ marginBottom: 20 }}>
           <PlayerEditForm
             player={{}}
@@ -785,7 +802,7 @@ function PlayersTab() {
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         {results.map(p => (
           <div key={p.id}>
-            {editId === p.id
+            {editId === p.id && sport === "mens"
               ? <PlayerEditForm
                   player={editPlayer || p}
                   mode="edit"
@@ -812,11 +829,13 @@ function PlayersTab() {
                   >
                     <option value="">— status —</option>
                     {PLAYER_STATUS_OPTIONS.map(s => (
-                      <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
+                      <option key={s} value={s}>{PLAYER_STATUS_LABELS[s]}</option>
                     ))}
                   </select>
-                  <button className="btn btn-ghost" style={{ fontSize: 11, padding: "2px 8px" }}
-                    onClick={() => handleEdit(p)}>Edit</button>
+                  {sport === "mens" && (
+                    <button className="btn btn-ghost" style={{ fontSize: 11, padding: "2px 8px" }}
+                      onClick={() => handleEdit(p)}>Edit</button>
+                  )}
                 </div>
               )
             }
@@ -976,7 +995,7 @@ function PlayerEditForm({ player, mode = "edit", onSave, onCancel, saving }) {
           <select className="input" style={{ width: "100%", color: PLAYER_STATUS_COLOR[form.player_status] || "inherit" }}
             value={form.player_status} onChange={e => set("player_status", e.target.value)}>
             <option value="">— unset —</option>
-            {PLAYER_STATUS_OPTIONS.map(s => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
+            {PLAYER_STATUS_OPTIONS.map(s => <option key={s} value={s}>{PLAYER_STATUS_LABELS[s]}</option>)}
           </select>
         </div>
       </div>

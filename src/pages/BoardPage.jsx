@@ -10,6 +10,8 @@ import { getTeamConference } from "@/lib/teamLookup";
 import { useTeamLogos } from "@/hooks/useTeamLogos";
 import { money, nilValue, nilRange, heightToInches, tierColor, projectedTier } from "@/lib/display";
 import { MultiSelectFilter, RangeFilter, FilterChips, parseHeight, formatHeight, playerHeightInches } from "@/components/Filters";
+import { DraftSpotlight } from "@/components/DraftSpotlight";
+import { PLAYER_STATUS_OPTIONS, PLAYER_STATUS_LABELS } from "@/lib/playerStatus";
 
 // label → getter(player)
 const COLS = [
@@ -96,13 +98,7 @@ export function BoardPage() {
   const emptyAdvc = () => Object.fromEntries(ADVC_FIELDS.map(f => [f.key, { min: "", max: "" }]));
   const [advcFilters, setAdvcFilters] = useState(emptyAdvc);
 
-  const STATUS_FILTER_OPTIONS = [
-    { value: "returning",    label: "Returning" },
-    { value: "graduating",   label: "Graduating" },
-    { value: "transferring", label: "Transferring" },
-    { value: "declared",     label: "Declared for Draft" },
-    { value: "drafted",      label: "Drafted" },
-  ];
+  const STATUS_FILTER_OPTIONS = PLAYER_STATUS_OPTIONS.map(value => ({ value, label: PLAYER_STATUS_LABELS[value] }));
 
   function setAdvc(key, side, val) {
     setAdvcFilters(prev => ({ ...prev, [key]: { ...prev[key], [side]: val } }));
@@ -382,43 +378,13 @@ export function BoardPage() {
           </div>
 
           {/* Draft Spotlight — reflective look-back at players marked drafted, not a live feed */}
-          {!loading && draftedPlayers.length > 0 && (
-            <div style={{ marginBottom: 18 }}>
-              <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 10 }}>
-                <span style={{ fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".05em", opacity: .65 }}>
-                  Draft Spotlight
-                </span>
-                <span style={{ fontSize: 12, opacity: .4 }}>{draftedPlayers.length} drafted</span>
-                {statusFilter !== "drafted" && (
-                  <button className="btn btn-ghost" style={{ fontSize: 11, padding: "1px 8px", marginLeft: "auto" }}
-                    onClick={() => setStatusFilter("drafted")}>
-                    View all
-                  </button>
-                )}
-              </div>
-              <div style={{ display: "flex", gap: 10, overflowX: "auto", paddingBottom: 6 }}>
-                {draftedPlayers.map(p => (
-                  <div key={p.id} className="row-click"
-                    onClick={() => setModal(p)}
-                    style={{
-                      minWidth: 190, flexShrink: 0, cursor: "pointer",
-                      background: "var(--panel)", border: "1px solid rgba(251,191,36,.35)",
-                      borderRadius: 10, padding: "10px 12px",
-                    }}>
-                    <div style={{ fontWeight: 600, fontSize: 13 }}>{p.name}</div>
-                    <div style={{ fontSize: 11, opacity: .55, marginTop: 2 }}>
-                      {[p.team, p.pos, p.year].filter(Boolean).join(" · ")}
-                    </div>
-                    <span style={{
-                      display: "inline-block", marginTop: 6, fontSize: 10, fontWeight: 700,
-                      color: "#0e1521", background: "#fbbf24", padding: "1px 8px", borderRadius: 8,
-                    }}>
-                      Drafted
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
+          {!loading && (
+            <DraftSpotlight
+              players={draftedPlayers}
+              onSelect={setModal}
+              onViewAll={() => setStatusFilter("drafted")}
+              viewAllActive={statusFilter === "drafted"}
+            />
           )}
 
           {/* Filters */}

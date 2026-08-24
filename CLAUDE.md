@@ -105,3 +105,21 @@ Why forked and not toggle-driven:
 3. Swap any scoring imports to `WOMENS_SCORING_CONFIG`.
 4. Add a lazy route under `/w/<path>` in `src/main.jsx`.
 5. Add the path-pair to `M_TO_W` in `SiteHeader.jsx` so the toggle navigates.
+
+**When you add a feature to a forked pair (e.g. men's + women's `BoardPage`):**
+Before copy-pasting JSX/logic into both files, check whether the piece is
+actually sport-specific. Most UI-only additions (a filter dropdown's option
+list, a badge, a spotlight strip) aren't — they just read a field that
+happens to be sourced from `players` on one side and `w_players` on the
+other. Put those in `src/components/` or `src/lib/` (per rule 3) and import
+into both page files, rather than hand-duplicating the JSX. Example:
+`src/lib/playerStatus.js` (the `player_status` vocabulary/colors/labels) and
+`src/components/DraftSpotlight.jsx` are shared this way between
+`BoardPage.jsx` and `womens/BoardPage.jsx`. Only the *data loading* (which
+table, which hook) stays forked.
+
+Admin editors that manage both sides' data from one page (`AdminPage.jsx`)
+use a local `sport` toggle that swaps table names (`players`/`w_players`,
+`vw_players`/`vw_w_players`, `archetype_defs`/`w_archetype_defs`, …) rather
+than forking the admin page itself — see `ArchetypesTab`, `FreshmanTiersTab`,
+`PlayersTab`. Prefer this pattern for new admin tabs that touch both sports.

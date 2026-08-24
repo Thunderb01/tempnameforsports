@@ -10,6 +10,8 @@ import { getTeamConference } from "@/lib/teamLookup";
 import { useTeamLogos } from "@/hooks/useTeamLogos";
 import { money, nilValue, nilRange, heightToInches, tierColor, projectedTier } from "@/lib/display";
 import { MultiSelectFilter, RangeFilter, FilterChips, parseHeight, formatHeight, playerHeightInches } from "@/components/Filters";
+import { DraftSpotlight } from "@/components/DraftSpotlight";
+import { PLAYER_STATUS_OPTIONS, PLAYER_STATUS_LABELS } from "@/lib/playerStatus";
 
 // label → getter(player)
 const COLS = [
@@ -58,8 +60,10 @@ export function WomensBoardPage() {
   const [includeCommitted,  setIncludeCommitted]  = useState(false);
   const [includeUnevaluated, setIncludeUnevaluated] = useState(false);
   const [toTeamFilter,      setToTeamFilter]      = useState("");
+  const [statusFilter,      setStatusFilter]      = useState("");
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [confFilter,  setConfFilter]  = useState([]);
+  const STATUS_FILTER_OPTIONS = PLAYER_STATUS_OPTIONS.map(value => ({ value, label: PLAYER_STATUS_LABELS[value] }));
   const YEAR_OPTIONS = ["Fr", "RS Fr", "So", "RS So", "Jr", "RS Jr", "Sr", "RS Sr", "Grad", "5th Year"];
   const conferences = [
     "A10", "ACC", "AE", "ASun", "Amer",
@@ -214,7 +218,11 @@ export function WomensBoardPage() {
 
 
   // Reset to page 0 whenever filters or sort change
-  useEffect(() => setPage(0), [search, posFilter, yearFilter, heightMin, heightMax, stateFilter, confFilter, sortKey, sortDir, portalOnly, includeCommitted, includeUnevaluated, advcFilters, toTeamFilter]);
+  useEffect(() => setPage(0), [search, posFilter, yearFilter, heightMin, heightMax, stateFilter, confFilter, sortKey, sortDir, portalOnly, includeCommitted, includeUnevaluated, advcFilters, toTeamFilter, statusFilter]);
+
+  // Players spotlighted regardless of the active filters — a reflective look-back,
+  // not tied to portal availability.
+  const draftedPlayers = useMemo(() => players.filter(p => p.player_status === "drafted"), [players]);
 
   // ── Filter ──────────────────────────────────────────────────────────────────
   const filtered = useMemo(() => {
@@ -245,7 +253,9 @@ export function WomensBoardPage() {
         const dest = (portalInfo[p.id]?.to_team || "").toLowerCase();
         if (!dest.includes(toTeamFilter.trim().toLowerCase())) return false;
       }
-      if (portalOnly) {
+      if (statusFilter) {
+        if (p.player_status !== statusFilter) return false;
+      } else if (portalOnly) {
         const portalSet = includeCommitted ? allPortalIds : availableIds;
         if (!portalSet.has(p.id)) return false;
       }
@@ -257,7 +267,7 @@ export function WomensBoardPage() {
       }
       return true;
     });
-  }, [players, search, posFilter, yearFilter, heightMin, heightMax, confFilter, stateFilter, portalOnly, includeCommitted, includeUnevaluated, advcFilters, toTeamFilter, availableIds, allPortalIds, portalInfo]);
+  }, [players, search, posFilter, yearFilter, heightMin, heightMax, confFilter, stateFilter, portalOnly, includeCommitted, includeUnevaluated, advcFilters, toTeamFilter, statusFilter, availableIds, allPortalIds, portalInfo]);
 
   // ── Sort (separate so filter changes don't re-sort and vice versa) ──────────
   const sorted = useMemo(() => {
@@ -333,6 +343,16 @@ export function WomensBoardPage() {
             </div>
           </div>
 
+          {/* Draft Spotlight — reflective look-back at players marked drafted, not a live feed */}
+          {!loading && (
+            <DraftSpotlight
+              players={draftedPlayers}
+              onSelect={setModal}
+              onViewAll={() => setStatusFilter("drafted")}
+              viewAllActive={statusFilter === "drafted"}
+            />
+          )}
+
           {/* Filters */}
           <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 }}>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
@@ -358,12 +378,16 @@ export function WomensBoardPage() {
                 <option value="all">All locations</option>
                 {STATE_OPTIONS.map(o => <option key={o.label} value={o.label}>{o.label}</option>)}
               </select>
-              <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, opacity: .7, cursor: "pointer", userSelect: "none" }}>
-                <input type="checkbox" checked={portalOnly} onChange={e => setPortalOnly(e.target.checked)} />
+              <select className="input" style={{ width: 180 }} value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
+                <option value="">All statuses</option>
+                {STATUS_FILTER_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+              <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, opacity: statusFilter ? .3 : .7, cursor: statusFilter ? "default" : "pointer", userSelect: "none" }}>
+                <input type="checkbox" checked={portalOnly} disabled={!!statusFilter} onChange={e => setPortalOnly(e.target.checked)} />
                 Available in portal
               </label>
-              <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, opacity: portalOnly ? .7 : .3, cursor: portalOnly ? "pointer" : "default", userSelect: "none", paddingLeft: 10, borderLeft: "2px solid rgba(255,255,255,.1)" }}>
-                <input type="checkbox" checked={includeCommitted} disabled={!portalOnly} onChange={e => setIncludeCommitted(e.target.checked)} />
+              <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, opacity: (portalOnly && !statusFilter) ? .7 : .3, cursor: (portalOnly && !statusFilter) ? "pointer" : "default", userSelect: "none", paddingLeft: 10, borderLeft: "2px solid rgba(255,255,255,.1)" }}>
+                <input type="checkbox" checked={includeCommitted} disabled={!portalOnly || !!statusFilter} onChange={e => setIncludeCommitted(e.target.checked)} />
                 + already committed
               </label>
               <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, opacity: .7, cursor: "pointer", userSelect: "none" }}>
@@ -380,10 +404,12 @@ export function WomensBoardPage() {
                 ...(heightMin != null ? [{ label: `Ht ≥ ${formatHeight(heightMin)}`, onClear: () => setHeightMin(null) }] : []),
                 ...(heightMax != null ? [{ label: `Ht ≤ ${formatHeight(heightMax)}`, onClear: () => setHeightMax(null) }] : []),
                 ...(stateFilter !== "all" ? [{ label: `Loc: ${stateFilter}`, onClear: () => setStateFilter("all") }] : []),
+                ...(statusFilter ? [{ label: `Status: ${STATUS_FILTER_OPTIONS.find(o => o.value === statusFilter)?.label}`, onClear: () => setStatusFilter("") }] : []),
               ]}
               onClearAll={() => {
                 setPosFilter([]); setYearFilter([]); setConfFilter([]);
                 setHeightMin(null); setHeightMax(null); setStateFilter("all");
+                setStatusFilter("");
               }}
             />
           </div>
