@@ -1,0 +1,56 @@
+# .github/workflows/seed-womens-torvik.yml
+# One-time (manually triggered) seed of the women's board from the Bart Torvik
+# CSV already checked into data/trank_ncaaw_2026.csv: player rows, BTP metrics
+# + NIL valuation, and ESPN IDs for headshots. Not scheduled — run from the
+# Actions tab (or via API) whenever the women's dataset needs a fresh pass.
+#
+# All three scripts are safe to re-run: import_w_torvik.py upserts on
+# (name, current_team, source), torvik_metrics_w.py recomputes the same
+# metric columns, espn_id_lookup.py only sets espn_id. No deletes.
+#
+# Prerequisites:
+#   1. supabase/womens_tables.sql already run (w_players / w_player_stats exist).
+#   2. w_players has an espn_id column — ALTER TABLE public.w_players
+#      ADD COLUMN IF NOT EXISTS espn_id text; (only needed if it predates
+#      the men's-side espn_id column being added before w_players was created).
+#   3. Repo secrets SUPABASE_URL and SUPABASE_SERVICE_KEY are set
+#      (Settings → Secrets and variables → Actions).
+
+name: Seed Women's Torvik Data (One-Time)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  seed:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install pandas supabase requests
+
+      - name: Seed w_players + w_player_stats from Torvik CSV
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: python import_w_torvik.py
+
+      - name: Compute BTP metrics + NIL valuation
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: python torvik_metrics_w.py --use-torvik-data
+
+      - name: Backfill ESPN IDs for headshots
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: python espn_id_lookup.py --sport womens
