@@ -81,7 +81,7 @@ export function WomensComparePage() {
           {loading ? (
             <div style={{ opacity: .4, fontSize: 13 }}>Loading players…</div>
           ) : (
-            <PlayerComparison initialIds={initialIds} allPlayers={allPlayers} />
+            <PlayerComparison initialIds={initialIds} allPlayers={allPlayers} sport="womens" />
           )}
         </div>
       </div>
