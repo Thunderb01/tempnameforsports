@@ -141,6 +141,12 @@ def build_stats_row(row, year):
 
     return {
         "year":            year,
+        # calendar_year is the column the frontend's "Season" display actually
+        # queries/sorts by (PlayerModal, AppPage) — torvik_metrics_w.py's
+        # follow-up pass looks up existing rows by (player_id, calendar_year),
+        # so this seed row must set it too or the metrics pass can't match it
+        # and the modal's Season column shows blank.
+        "calendar_year":   year,
         "name":            str(row["player_name"]).strip(),
         # per-game from Torvik per-game fields
         "ppg":             safe_float(row.get("pts")),

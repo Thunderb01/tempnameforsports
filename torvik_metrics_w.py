@@ -1259,7 +1259,11 @@ def main():
 
         # ── Upsert player_stats row keyed on (player_id, calendar_year) ───────
         YR_MAP = {"Fr": "Freshman", "So": "Sophomore", "Jr": "Junior", "Sr": "Senior", "Gr": "Graduate"}
-        stats_patch = {**torvik, "name": name, "school": display_school(team), "year": YR_MAP.get(yr, yr)}
+        # calendar_year belongs in the patch itself, not just the insert-only
+        # literal below — otherwise a row matched via the update branch never
+        # gets calendar_year set/corrected, and the frontend's Season column
+        # (which queries/sorts by calendar_year) shows blank for it.
+        stats_patch = {**torvik, "name": name, "school": display_school(team), "year": YR_MAP.get(yr, yr), "calendar_year": args.year}
         for key_m, val in [("cdi", cdi), ("dds", dds), ("sei", sei), ("ath", ath), ("ris", ris)]:
             if val is not None:
                 stats_patch[key_m] = val
@@ -1275,7 +1279,6 @@ def main():
             db.table("w_player_stats").insert({
                 **stats_patch,
                 "player_id":    player_id,
-                "calendar_year": args.year,
             }).execute()
 
         matched += 1
@@ -1362,6 +1365,7 @@ def main():
                 "name":   name,
                 "school": display_school(team),
                 "year":   {"Fr": "Freshman", "So": "Sophomore", "Jr": "Junior", "Sr": "Senior", "Gr": "Graduate"}.get(str(row.get("yr", "")).strip(), str(row.get("yr", "")).strip()),
+                "calendar_year": args.year,
             }
 
             stats_id = stats_lookup.get((player_id, args.year))
@@ -1371,7 +1375,6 @@ def main():
                 db.table("w_player_stats").insert({
                     **stats_patch,
                     "player_id":     player_id,
-                    "calendar_year": args.year,
                 }).execute()
             written += 1
         print(f"  Wrote basic stats for {written} low-minutes players (no metrics/NIL)")
