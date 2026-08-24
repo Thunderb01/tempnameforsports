@@ -337,17 +337,22 @@ def percentrank_by_pos(df, col, pos_col="pos_bucket", scale=100):
 #   blk_per, stl_per, pfr, ftr, gbpm, ogbpm, dgbpm, Min_per, GP
 #   ast/tov
 
-def compute_cdi(df):
+def compute_cdi(df, use_torvik=False):
     pos_mult = df["pos_bucket"].map({"Guard": 1.15, "Wing": 1.08, "Big": 1.0})
 
     # AST_per: Torvik's pace-adjusted assist %, available for everyone
     ast_score = df["AST_per"]
 
-    # ast_tov from Torvik — direct measure of decision quality
-    # Use totals-derived when available, fall back to Torvik column
-    ast_40  = (df["sb_tot_ast"] / df["sb_tot_mp"].replace(0, float("nan"))) * 40
-    tov_40  = (df["sb_tot_tov"] / df["sb_tot_mp"].replace(0, float("nan"))) * 40
-    ast_tov = (ast_40 / tov_40.replace(0, float("nan"))).fillna(df["ast/tov"])
+    # ast_tov from Torvik — direct measure of decision quality.
+    # Use totals-derived when the Supabase sb_* merge ran and produced them,
+    # fall back to the Torvik CSV's own ast/tov column otherwise (always the
+    # case for --use-torvik-data, and for any sport with no box-score scraper).
+    if not use_torvik and "sb_tot_ast" in df.columns and "sb_tot_mp" in df.columns:
+        ast_40  = (df["sb_tot_ast"] / df["sb_tot_mp"].replace(0, float("nan"))) * 40
+        tov_40  = (df["sb_tot_tov"] / df["sb_tot_mp"].replace(0, float("nan"))) * 40
+        ast_tov = (ast_40 / tov_40.replace(0, float("nan"))).fillna(df["ast/tov"])
+    else:
+        ast_tov = df["ast/tov"]
 
     df["_cdi_raw"] = ast_score * (ast_tov ** 0.5) * pos_mult
 
@@ -1011,7 +1016,7 @@ def main():
         df["_weight_pct"] = percentrank_by_pos(df, "sb_weight")
 
     use_torvik = args.use_torvik_data
-    df["_cdi"] = compute_cdi(df)
+    df["_cdi"] = compute_cdi(df, use_torvik=use_torvik)
     df["_dds"] = compute_dds(df, use_torvik=use_torvik)
     df["_sei"] = compute_sei(df, use_torvik=use_torvik)
     df["_ath"] = compute_ath(df, use_torvik=use_torvik)

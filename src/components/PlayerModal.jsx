@@ -118,7 +118,7 @@ export function PlayerModal({ player, onClose, onReplace, sport = "mens" }) {
             <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
               {player.espn_id && (
                 <img
-                  src={`https://a.espncdn.com/i/headshots/mens-college-basketball/players/full/${player.espn_id}.png`}
+                  src={`https://a.espncdn.com/i/headshots/${sport === "womens" ? "womens-college-basketball" : "mens-college-basketball"}/players/full/${player.espn_id}.png`}
                   alt={player.name}
                   style={{ width: 64, height: 64, borderRadius: "50%", objectFit: "cover", background: "rgba(255,255,255,.06)", flexShrink: 0 }}
                   onError={e => { e.target.style.display = "none"; }}

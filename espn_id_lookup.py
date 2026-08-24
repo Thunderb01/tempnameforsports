@@ -10,9 +10,12 @@ Usage:
     python espn_id_lookup.py --dry-run    # preview matches, no DB writes
     python espn_id_lookup.py              # write espn_id to Supabase
     python espn_id_lookup.py --skip-existing  # only fill null espn_id rows
+    python espn_id_lookup.py --sport womens   # same, against w_players / ESPN's
+                                               # womens-college-basketball API
 
 Prerequisites (run once in Supabase SQL Editor):
-    ALTER TABLE public.players ADD COLUMN IF NOT EXISTS espn_id text;
+    ALTER TABLE public.players   ADD COLUMN IF NOT EXISTS espn_id text;
+    ALTER TABLE public.w_players ADD COLUMN IF NOT EXISTS espn_id text;
 
 Environment variables:
     $env:SUPABASE_URL="https://YOUR_PROJECT.supabase.co"
@@ -38,8 +41,12 @@ except ImportError:
 SUPABASE_URL         = os.environ.get("SUPABASE_URL", "")
 SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")
 
-ESPN_TEAMS_URL  = "https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/teams"
-ESPN_ROSTER_URL = "https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/teams/{team_id}/roster"
+ESPN_SPORT_PATH = {
+    "mens":   "mens-college-basketball",
+    "womens": "womens-college-basketball",
+}
+ESPN_TEAMS_URL  = "https://site.api.espn.com/apis/site/v2/sports/basketball/{sport_path}/teams"
+ESPN_ROSTER_URL = "https://site.api.espn.com/apis/site/v2/sports/basketball/{sport_path}/teams/{team_id}/roster"
 ESPN_HEADERS    = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36"}
 REQUEST_DELAY   = 0.4
 
@@ -107,6 +114,9 @@ def parse_args():
     p.add_argument("--team",          type=str, default=None, help="Only process players from this team (e.g. 'Queens')")
     p.add_argument("--list-unmatched-teams", action="store_true")
     p.add_argument("--debug-teams",   action="store_true", help="Print raw ESPN teams API response and exit")
+    p.add_argument("--sport", choices=["mens", "womens"], default="mens",
+                   help="mens (default) reads/writes players via ESPN's mens-college-basketball API; "
+                        "womens reads/writes w_players via womens-college-basketball.")
     return p.parse_args()
 
 
@@ -120,7 +130,7 @@ def normalise(s):
 
 
 
-def load_team_map():
+def load_team_map(sport_path):
     """
     Returns {name_variant: espn_team_id} by fetching all teams from ESPN.
     Indexes each team by: shortDisplayName, displayName, abbreviation, and location.
@@ -131,7 +141,7 @@ def load_team_map():
     while True:
         try:
             resp = requests.get(
-                ESPN_TEAMS_URL,
+                ESPN_TEAMS_URL.format(sport_path=sport_path),
                 params={"limit": 500, "page": page},
                 headers=ESPN_HEADERS,
                 timeout=15,
@@ -177,9 +187,9 @@ def load_team_map():
     return team_map
 
 
-def fetch_espn_roster(team_id):
+def fetch_espn_roster(sport_path, team_id):
     """Fetch ESPN roster for a team. Returns list of {espn_id, name}."""
-    url = ESPN_ROSTER_URL.format(team_id=team_id)
+    url = ESPN_ROSTER_URL.format(sport_path=sport_path, team_id=team_id)
     try:
         resp = requests.get(url, headers=ESPN_HEADERS, timeout=10)
         resp.raise_for_status()
@@ -197,11 +207,11 @@ def fetch_espn_roster(team_id):
     return players
 
 
-def fetch_all_supabase_players(sb, skip_existing):
+def fetch_all_supabase_players(sb, table, skip_existing):
     players = []
     page, page_size = 0, 1000
     while True:
-        q = sb.table("players").select("id, name, current_team, espn_id") \
+        q = sb.table(table).select("id, name, current_team, espn_id") \
               .range(page * page_size, (page + 1) * page_size - 1)
         if skip_existing:
             q = q.is_("espn_id", "null")
@@ -221,9 +231,11 @@ def main():
         sys.exit("Set SUPABASE_URL and SUPABASE_SERVICE_KEY environment variables.")
 
     sb = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+    sport_path = ESPN_SPORT_PATH[args.sport]
+    table      = "players" if args.sport == "mens" else "w_players"
 
-    print("Loading team map from ESPN…")
-    team_map = load_team_map()
+    print(f"Loading team map from ESPN ({args.sport})…")
+    team_map = load_team_map(sport_path)
     print(f"  {len(team_map)} teams loaded from ESPN")
 
     if args.debug_teams:
@@ -232,8 +244,8 @@ def main():
             print(f"  {tid:>6}  {name}")
         return
 
-    print("Fetching players from Supabase…")
-    players = fetch_all_supabase_players(sb, skip_existing=args.skip_existing)
+    print(f"Fetching players from Supabase ({table})…")
+    players = fetch_all_supabase_players(sb, table, skip_existing=args.skip_existing)
     print(f"  {len(players)} players to process")
 
     # Group players by team so we only fetch each ESPN roster once
@@ -274,7 +286,7 @@ def main():
             continue
 
         print(f"\n  Fetching ESPN roster for {team_name} (id={espn_team_id})…")
-        roster = fetch_espn_roster(espn_team_id)
+        roster = fetch_espn_roster(sport_path, espn_team_id)
         time.sleep(REQUEST_DELAY)
 
         # Build normalised lookup: name → espn_id
@@ -297,7 +309,7 @@ def main():
             if espn_id:
                 print(f"    ✓ {raw_name} → espn_id={espn_id}")
                 if not args.dry_run:
-                    sb.table("players").update({"espn_id": espn_id}).eq("id", p["id"]).execute()
+                    sb.table(table).update({"espn_id": espn_id}).eq("id", p["id"]).execute()
                 matched += 1
             else:
                 print(f"    ✗ {raw_name} — not found in ESPN roster")
