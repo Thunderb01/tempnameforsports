@@ -473,6 +473,12 @@ def scrape_player(url, team_name, year):
     # stats row (for `player_stats` table) — all numeric, pct as float
     stats_row = {
         "year":    yr,
+        # calendar_year is the season-year int the frontend's "Season" display
+        # (and torvik_metrics.py's later upsert lookup) actually key off —
+        # distinct from "year" above, which holds the class label (Fr/So/Jr/Sr).
+        # Without this, a player whose stats row is created here (rather than
+        # by torvik_metrics.py) shows a blank Season in the player modal.
+        "calendar_year": year,
         "name":    name,
         # per-game
         "ppg":     round(ppg,  1),
