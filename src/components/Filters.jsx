@@ -1,6 +1,21 @@
 import { useState, useRef, useEffect } from "react";
 
 // ─────────────────────────────────────────────────────────────────────────────
+// FilterField — small uppercase label above a control, so a row of filters
+// reads as an aligned grid instead of a loose flex-wrap row.
+// ─────────────────────────────────────────────────────────────────────────────
+export function FilterField({ label, children }) {
+  return (
+    <div style={{ minWidth: 0 }}>
+      <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".06em", opacity: .5, marginBottom: 6 }}>
+        {label}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // MultiSelectFilter
 // Dropdown with checkboxes. value is an array; empty array means "all".
 // ─────────────────────────────────────────────────────────────────────────────

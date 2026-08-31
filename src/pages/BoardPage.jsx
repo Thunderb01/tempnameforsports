@@ -11,7 +11,7 @@ import { getTeamConference } from "@/lib/teamLookup";
 import { useTeamLogos } from "@/hooks/useTeamLogos";
 import { money, nilValue, nilRange, heightToInches, tierColor, projectedTier, overallFor, overallColor } from "@/lib/display";
 import { useNilVisible } from "@/hooks/useNilVisible";
-import { MultiSelectFilter, RangeFilter, FilterChips, parseHeight, formatHeight, playerHeightInches } from "@/components/Filters";
+import { MultiSelectFilter, RangeFilter, FilterChips, FilterField, parseHeight, formatHeight, playerHeightInches } from "@/components/Filters";
 // The Full Board presents the coarse Guard/Wing/Big grouping; the five-position
 // detail (PG/SG/SF/PF/C) shows in the player modal.
 import { LEGACY_BUCKETS, legacyBucketFor } from "@/lib/positions";
@@ -380,36 +380,71 @@ export function BoardPage({ sport = "men" }) {
           </div>
 
           {/* Filters */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 }}>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-              <input className="input" type="search" placeholder="Search players…"
-                style={{ flex: 1, minWidth: 160 }}
-                value={searchInput} onChange={e => setSearchInput(e.target.value)} />
-              <input className="input" type="search" placeholder="Transferring to…"
-                style={{ flex: 1, minWidth: 160 }}
-                value={toTeamFilter} onChange={e => setToTeamFilter(e.target.value)} />
+          <div style={{
+            background: "var(--panel)", border: "1px solid var(--border)",
+            borderRadius: 10, padding: "16px 20px", marginBottom: 14,
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+              <span style={{ fontWeight: 700, fontSize: 13, textTransform: "uppercase", letterSpacing: ".06em", opacity: .7 }}>
+                Filters
+              </span>
+              <button className="btn btn-ghost" style={{ fontSize: 12, padding: "3px 10px" }}
+                onClick={() => {
+                  setSearchInput(""); setToTeamFilter("");
+                  setPosFilter([]); setYearFilter([]); setConfFilter([]);
+                  setHeightMin(null); setHeightMax(null); setStateFilter("all");
+                  setArchetypeFilter("");
+                }}>
+                ↺ Reset
+              </button>
             </div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
-              <MultiSelectFilter label="positions" options={LEGACY_BUCKETS} value={posFilter}  onChange={setPosFilter}  width={130} />
-              <MultiSelectFilter label="years"     options={YEAR_OPTIONS}             value={yearFilter} onChange={setYearFilter} width={120} />
-              <MultiSelectFilter label="confs"     options={conferences}              value={confFilter} onChange={setConfFilter} width={140} />
-              <RangeFilter
-                label="Ht"
-                min={heightMin} max={heightMax}
-                onChange={(lo, hi) => { setHeightMin(lo); setHeightMax(hi); }}
-                parse={parseHeight} format={formatHeight}
-                placeholder={[`min`, `max`]} width={60}
-              />
-              <select className="input" style={{ width: 160 }} value={stateFilter} onChange={e => setStateFilter(e.target.value)}>
-                <option value="all">All locations</option>
-                {STATE_OPTIONS.map(o => <option key={o.label} value={o.label}>{o.label}</option>)}
-              </select>
-              {!isWomens && (
-                <select className="input" style={{ width: 180 }} value={archetypeFilter} onChange={e => setArchetypeFilter(e.target.value)}>
-                  <option value="">All archetypes</option>
-                  {archetypeOptions.map(a => <option key={a} value={a}>{a}</option>)}
+
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: "14px 16px", marginBottom: 14 }}>
+              <FilterField label="Search">
+                <input className="input" type="search" placeholder="Name or team…" style={{ width: "100%" }}
+                  value={searchInput} onChange={e => setSearchInput(e.target.value)} />
+              </FilterField>
+              <FilterField label="Transferring to">
+                <input className="input" type="search" placeholder="Team…" style={{ width: "100%" }}
+                  value={toTeamFilter} onChange={e => setToTeamFilter(e.target.value)} />
+              </FilterField>
+              <FilterField label="Position">
+                <MultiSelectFilter label="positions" options={LEGACY_BUCKETS} value={posFilter} onChange={setPosFilter} width="100%" />
+              </FilterField>
+              <FilterField label="Year">
+                <MultiSelectFilter label="years" options={YEAR_OPTIONS} value={yearFilter} onChange={setYearFilter} width="100%" />
+              </FilterField>
+              <FilterField label="Conference">
+                <MultiSelectFilter label="confs" options={conferences} value={confFilter} onChange={setConfFilter} width="100%" />
+              </FilterField>
+              <FilterField label="Height">
+                <RangeFilter
+                  min={heightMin} max={heightMax}
+                  onChange={(lo, hi) => { setHeightMin(lo); setHeightMax(hi); }}
+                  parse={parseHeight} format={formatHeight}
+                  placeholder={[`min`, `max`]} width={64}
+                />
+              </FilterField>
+              <FilterField label="Location">
+                <select className="input" style={{ width: "100%" }} value={stateFilter} onChange={e => setStateFilter(e.target.value)}>
+                  <option value="all">All locations</option>
+                  {STATE_OPTIONS.map(o => <option key={o.label} value={o.label}>{o.label}</option>)}
                 </select>
+              </FilterField>
+              {!isWomens && (
+                <FilterField label="Archetype">
+                  <select className="input" style={{ width: "100%" }} value={archetypeFilter} onChange={e => setArchetypeFilter(e.target.value)}>
+                    <option value="">All archetypes</option>
+                    {archetypeOptions.map(a => <option key={a} value={a}>{a}</option>)}
+                  </select>
+                </FilterField>
               )}
+            </div>
+
+            <div style={{
+              display: "flex", flexWrap: "wrap", gap: "10px 24px", alignItems: "center",
+              paddingTop: 12, borderTop: "1px solid rgba(255,255,255,.06)",
+            }}>
               <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, opacity: .7, cursor: "pointer", userSelect: "none" }}>
                 <input type="checkbox" checked={portalOnly} onChange={e => setPortalOnly(e.target.checked)} />
                 Available in portal
@@ -448,22 +483,30 @@ export function BoardPage({ sport = "men" }) {
               background: "var(--panel)", border: "1px solid var(--border)",
               borderRadius: 10, padding: "16px 20px", marginBottom: 14,
             }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                <span style={{ fontWeight: 600, fontSize: 14 }}>Advanced Filters</span>
-                <button className="btn btn-ghost" style={{ fontSize: 12, padding: "2px 10px" }}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+                <span style={{ fontWeight: 700, fontSize: 13, textTransform: "uppercase", letterSpacing: ".06em", opacity: .7 }}>
+                  Advanced Filters
+                </span>
+                <button className="btn btn-ghost" style={{ fontSize: 12, padding: "3px 10px" }}
                   onClick={() => setAdvcFilters(emptyAdvc())}>
-                  Clear all
+                  ↺ Reset
                 </button>
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px 32px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: "14px 16px" }}>
                 {ADVC_FIELDS.map(f => (
-                  <div key={f.key}>
-                    <div style={{ fontSize: 12, opacity: .6, marginBottom: 4 }}>{f.label}</div>
-                    <input className="input" type="number" placeholder="Min"
-                      style={{ width: "100%", fontSize: 13 }}
-                      value={advcFilters[f.key].min}
-                      onChange={e => setAdvc(f.key, "min", e.target.value)} />
-                  </div>
+                  <FilterField key={f.key} label={f.label}>
+                    <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                      <input className="input" type="number" placeholder="Min"
+                        style={{ width: "100%", minWidth: 0, fontSize: 13 }}
+                        value={advcFilters[f.key].min}
+                        onChange={e => setAdvc(f.key, "min", e.target.value)} />
+                      <span style={{ opacity: .35 }}>–</span>
+                      <input className="input" type="number" placeholder="Max"
+                        style={{ width: "100%", minWidth: 0, fontSize: 13 }}
+                        value={advcFilters[f.key].max}
+                        onChange={e => setAdvc(f.key, "max", e.target.value)} />
+                    </div>
+                  </FilterField>
                 ))}
               </div>
             </div>
