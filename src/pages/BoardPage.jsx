@@ -92,20 +92,34 @@ export function BoardPage({ sport = "men" }) {
     "WAC", "WCC",
   ];
 
+  // lo/hi are typical-range suggestions shown as input placeholders (not
+  // enforced bounds) — a starting point for players unfamiliar with the
+  // metric's scale, same idea as showing a default in a dropdown.
   const ADVC_FIELDS = [
-    { key: "sei",        label: "Scoring Efficiency", src: "metric" },
-    { key: "ath",        label: "Athleticism",        src: "metric" },
-    { key: "ris",        label: "Rim Impact",         src: "metric" },
-    { key: "dds",        label: "Defending",          src: "metric" },
-    { key: "cdi",        label: "Playmaking",         src: "metric" },
-    { key: "usg",        label: "USG%",                     src: "stat"   },
-    { key: "ppg",        label: "PPG",                      src: "stat"   },
-    { key: "rpg",        label: "RPG",                      src: "stat"   },
-    { key: "apg",        label: "APG",                      src: "stat"   },
-    { key: "marketLow",  label: "NIL Market Low ($)",       src: "player" },
-    { key: "marketHigh", label: "NIL Market High ($)",      src: "player" },
+    { key: "sei",        label: "Scoring Efficiency", src: "metric", lo: 0,  hi: 100 },
+    { key: "ath",        label: "Athleticism",        src: "metric", lo: 0,  hi: 100 },
+    { key: "ris",        label: "Rim Impact",         src: "metric", lo: 0,  hi: 100 },
+    { key: "dds",        label: "Defending",          src: "metric", lo: 0,  hi: 100 },
+    { key: "cdi",        label: "Playmaking",         src: "metric", lo: 0,  hi: 100 },
+    { key: "usg",        label: "USG%",                     src: "stat",   lo: 10,  hi: 35      },
+    { key: "ppg",        label: "PPG",                      src: "stat",   lo: 0,   hi: 30      },
+    { key: "rpg",        label: "RPG",                      src: "stat",   lo: 0,   hi: 15      },
+    { key: "apg",        label: "APG",                      src: "stat",   lo: 0,   hi: 10      },
+    { key: "ast_tov",    label: "AST/TOV",                  src: "stat",   lo: 0,   hi: 4       },
+    { key: "fg_pct",     label: "FG%",                      src: "stat",   lo: 30,  hi: 65      },
+    { key: "3p_pct",     label: "3P%",                      src: "stat",   lo: 20,  hi: 50      },
+    { key: "ft_pct",     label: "FT%",                      src: "stat",   lo: 40,  hi: 100     },
+    { key: "marketLow",  label: "NIL Market Low ($)",       src: "player", lo: 0,   hi: 500000  },
+    { key: "marketHigh", label: "NIL Market High ($)",      src: "player", lo: 0,   hi: 2000000 },
   ];
   const emptyAdvc = () => Object.fromEntries(ADVC_FIELDS.map(f => [f.key, { min: "", max: "" }]));
+  // Short suggestion text for the Min/Max placeholders — the narrow NIL
+  // columns can't fit "500000" without clipping, so abbreviate.
+  function suggestPlaceholder(n) {
+    if (n >= 1_000_000) return `${n / 1_000_000}M`;
+    if (n >= 1_000) return `${n / 1_000}k`;
+    return String(n);
+  }
   const [advcFilters, setAdvcFilters] = useState(emptyAdvc);
 
   function setAdvc(key, side, val) {
@@ -422,7 +436,7 @@ export function BoardPage({ sport = "men" }) {
                   min={heightMin} max={heightMax}
                   onChange={(lo, hi) => { setHeightMin(lo); setHeightMax(hi); }}
                   parse={parseHeight} format={formatHeight}
-                  placeholder={[`min`, `max`]} width={64}
+                  placeholder={["5'6", "7'5"]} width={64}
                 />
               </FilterField>
               <FilterField label="Location">
@@ -496,12 +510,12 @@ export function BoardPage({ sport = "men" }) {
                 {ADVC_FIELDS.map(f => (
                   <FilterField key={f.key} label={f.label}>
                     <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-                      <input className="input" type="number" placeholder="Min"
+                      <input className="input" type="number" placeholder={suggestPlaceholder(f.lo)}
                         style={{ width: "100%", minWidth: 0, fontSize: 13 }}
                         value={advcFilters[f.key].min}
                         onChange={e => setAdvc(f.key, "min", e.target.value)} />
                       <span style={{ opacity: .35 }}>–</span>
-                      <input className="input" type="number" placeholder="Max"
+                      <input className="input" type="number" placeholder={suggestPlaceholder(f.hi)}
                         style={{ width: "100%", minWidth: 0, fontSize: 13 }}
                         value={advcFilters[f.key].max}
                         onChange={e => setAdvc(f.key, "max", e.target.value)} />
