@@ -12,6 +12,7 @@ import { useTeamLogos } from "@/hooks/useTeamLogos";
 import { money, nilValue, nilRange, heightToInches, tierColor, projectedTier, overallFor, overallColor } from "@/lib/display";
 import { useNilVisible } from "@/hooks/useNilVisible";
 import { MultiSelectFilter, RangeFilter, FilterChips, parseHeight, formatHeight, playerHeightInches } from "@/components/Filters";
+import { NLSearch } from "@/components/NLSearch";
 // The Full Board presents the coarse Guard/Wing/Big grouping; the five-position
 // detail (PG/SG/SF/PF/C) shows in the player modal.
 import { LEGACY_BUCKETS, legacyBucketFor } from "@/lib/positions";
@@ -351,6 +352,36 @@ export function BoardPage({ sport = "men" }) {
     setSortKey(label);
   }
 
+  // Applies the nl-search edge function's parsed output onto the existing
+  // filter state — never trust the LLM's strings blindly, intersect against
+  // the real option lists before setting anything.
+  function applyAiFilters(f) {
+    if (Array.isArray(f.positions)) {
+      setPosFilter(f.positions.filter(p => LEGACY_BUCKETS.includes(p)));
+    }
+    if (Array.isArray(f.years)) {
+      setYearFilter(f.years.filter(y => YEAR_OPTIONS.includes(y)));
+    }
+    if (Array.isArray(f.conferences)) {
+      setConfFilter(f.conferences.filter(c => conferences.includes(c)));
+    }
+    if (f.heightMinInches != null) setHeightMin(f.heightMinInches);
+    if (f.heightMaxInches != null) setHeightMax(f.heightMaxInches);
+    if (f.portalOnly != null) setPortalOnly(f.portalOnly);
+    if (f.stats) {
+      setAdvcFilters(prev => {
+        const next = { ...prev };
+        for (const field of ADVC_FIELDS) {
+          const r = f.stats[field.key];
+          if (r && (r.min != null || r.max != null)) {
+            next[field.key] = { min: r.min ?? "", max: r.max ?? "" };
+          }
+        }
+        return next;
+      });
+    }
+  }
+
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <>
@@ -378,6 +409,9 @@ export function BoardPage({ sport = "men" }) {
               </button>
             </div>
           </div>
+
+          {/* AI-powered natural-language search — translates into the filters below */}
+          <NLSearch onApply={applyAiFilters} />
 
           {/* Filters */}
           <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 }}>

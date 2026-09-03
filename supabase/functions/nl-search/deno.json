@@ -1,0 +1,10 @@
+{
+  "compilerOptions": {
+    "lib": ["deno.window"]
+  },
+  "imports": {
+    "@anthropic-ai/sdk": "npm:@anthropic-ai/sdk@0.123.0",
+    "@anthropic-ai/sdk/helpers/zod": "npm:@anthropic-ai/sdk@0.123.0/helpers/zod",
+    "zod": "npm:zod@4.5.4"
+  }
+}
