@@ -47,7 +47,13 @@ ESPN_SPORT_PATH = {
 }
 ESPN_TEAMS_URL  = "https://site.api.espn.com/apis/site/v2/sports/basketball/{sport_path}/teams"
 ESPN_ROSTER_URL = "https://site.api.espn.com/apis/site/v2/sports/basketball/{sport_path}/teams/{team_id}/roster"
-ESPN_HEADERS    = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36"}
+ESPN_HEADERS    = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36",
+    # womens-college-basketball's teams/roster endpoints 403 without this even
+    # though mens-college-basketball doesn't need it — ESPN's site API appears
+    # to apply stricter bot-checks on the less-trafficked women's path.
+    "Referer": "https://www.espn.com/",
+}
 REQUEST_DELAY   = 0.4
 
 # DB team name → ESPN display name (only needed when they differ)
