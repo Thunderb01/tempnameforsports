@@ -263,17 +263,22 @@ def main():
             player_id = res.data[0]["id"]
             written_players += 1
 
-            # 2. Stats: manual SELECT → UPDATE-or-INSERT.
-            # We don't rely on ON CONFLICT here because the men's `player_stats`
-            # table's UNIQUE on (player_id, year) — if it exists — wasn't always
-            # carried over by `LIKE INCLUDING ALL`. The select-then-write path
-            # works regardless of the constraint state.
+            # 2. Stats: manual SELECT → UPDATE-or-INSERT, keyed on calendar_year —
+            # that's the column the live unique constraint
+            # (w_player_stats_player_id_calendar_year_key) actually enforces, and
+            # what torvik_metrics_w.py's own lookup uses. Checking `year` instead
+            # (as this used to) breaks on any player whose `year` field has since
+            # been overwritten with a class label ("Junior") by a later metrics
+            # pass — the existence check then misses the row and the INSERT
+            # collides with the real constraint. See PR history: this is exactly
+            # what happened on the second real seed run — 4683/4683 stats writes
+            # failed this way even though every row already existed.
             stats_with_pid = {**stats_payload, "player_id": player_id}
             existing = (
                 db.table("w_player_stats")
                   .select("id")
                   .eq("player_id", player_id)
-                  .eq("year", args.year)
+                  .eq("calendar_year", args.year)
                   .limit(1)
                   .execute()
             )
