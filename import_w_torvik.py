@@ -135,9 +135,15 @@ def build_stats_row(row, year):
     TPM   = safe_float(row.get("TPM"))
     GP    = safe_float(row.get("GP")) or 0
     if twoPA is not None and TPA is not None and (twoPA + TPA) > 0:
-        fg_pct = ((twoPM or 0) + (TPM or 0)) / (twoPA + TPA)
+        fg_pct = ((twoPM or 0) + (TPM or 0)) / (twoPA + TPA) * 100
     # Torvik CSV stores TPA/TPM as season totals; the frontend's "3pg" is per-game.
     threes_per_game = (TPA / GP) if (TPA is not None and GP > 0) else None
+    # FT_per/TP_per are 0-1 fractions in the CSV; the frontend (PlayerModal's
+    # fmt, and this Advanced Filters panel) reads fg_pct/3p_pct/ft_pct as
+    # already-scaled 0-100 — matches what scraper_to_supabase.py's pct() helper
+    # and torvik_metrics_w.py's own upsert both write for these same columns.
+    ft_per = safe_float(row.get("FT_per"))
+    tp_per = safe_float(row.get("TP_per"))
 
     return {
         "year":            year,
@@ -156,8 +162,8 @@ def build_stats_row(row, year):
         "usg":             safe_float(row.get("usg")),
         "ast_tov":         safe_float(row.get("ast/tov")),
         "fg_pct":          fg_pct,
-        "ft_pct":          safe_float(row.get("FT_per")),
-        "3p_pct":          safe_float(row.get("TP_per")),
+        "ft_pct":          ft_per * 100 if ft_per is not None else None,
+        "3p_pct":          tp_per * 100 if tp_per is not None else None,
         # raw Torvik composite columns (drive any later metric pass)
         "torvik_ortg":     safe_float(row.get("ORtg")),
         "torvik_usg":      safe_float(row.get("usg")),
