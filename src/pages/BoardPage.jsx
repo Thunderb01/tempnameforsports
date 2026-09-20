@@ -12,6 +12,7 @@ import { useTeamLogos } from "@/hooks/useTeamLogos";
 import { money, nilValue, nilRange, heightToInches, tierColor, projectedTier, overallFor, overallColor } from "@/lib/display";
 import { useNilVisible } from "@/hooks/useNilVisible";
 import { MultiSelectFilter, RangeFilter, FilterChips, FilterField, parseHeight, formatHeight, playerHeightInches } from "@/components/Filters";
+import { NLSearch } from "@/components/NLSearch";
 // The Full Board presents the coarse Guard/Wing/Big grouping; the five-position
 // detail (PG/SG/SF/PF/C) shows in the player modal.
 import { LEGACY_BUCKETS, legacyBucketFor } from "@/lib/positions";
