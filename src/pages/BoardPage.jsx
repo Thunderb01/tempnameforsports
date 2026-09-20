@@ -16,13 +16,14 @@ import { NLSearch } from "@/components/NLSearch";
 // The Full Board presents the coarse Guard/Wing/Big grouping; the five-position
 // detail (PG/SG/SF/PF/C) shows in the player modal.
 import { LEGACY_BUCKETS, legacyBucketFor } from "@/lib/positions";
+import { normalizeYear } from "@/lib/yearLookup";
 
 // label → getter(player)
 const COLS = [
   { label: "Player",    get: p => p.name },
   { label: "Team",      get: p => p.team },
   { label: "Pos",       get: p => legacyBucketFor(p) },
-  { label: "Yr",        get: p => p.year },
+  { label: "Yr",        get: p => normalizeYear(p.year) || "—" },
   { label: "Ht",        get: p => p.height   || "—" },
   { label: "Hometown",  get: p => p.hometown || "—" },
   { label: "PPG",       get: p => p.stats?.ppg    ?? "—" },
@@ -288,7 +289,7 @@ export function BoardPage({ sport = "men" }) {
                !(p.team||"").toLowerCase().includes(q) &&
                !(p.hometown||"").toLowerCase().includes(q)) return false;
       if (posFilter.length  && !posFilter.includes(legacyBucketFor(p))) return false;
-      if (yearFilter.length && !yearFilter.includes(p.year)) return false;
+      if (yearFilter.length && !yearFilter.includes(normalizeYear(p.year))) return false;
       if (heightMin != null || heightMax != null) {
         const inches = playerHeightInches(p.height);
         if (inches == null) return false;
@@ -580,7 +581,7 @@ export function BoardPage({ sport = "men" }) {
                       <div className="row-main">
                         <div className="row-title">{p.name}</div>
                         <div className="row-sub">
-                          {[p.team, legacyBucketFor(p), p.year, p.height, p.hometown].filter(Boolean).join(" · ")}
+                          {[p.team, legacyBucketFor(p), normalizeYear(p.year), p.height, p.hometown].filter(Boolean).join(" · ")}
                         </div>
                         {portalInfo[p.id] && (() => {
                           const { from_team, to_team } = portalInfo[p.id];
