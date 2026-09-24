@@ -13,21 +13,38 @@ export function useAuth() {
     console.log("useAuth: checking session on mount...");
 
     async function init() {
-      // 1. Get the current session first
-      const { data } = await supabase.auth.getSession();
-      const initialSession = data.session ?? null;
+      try {
+        // 1. Get the current session first
+        const { data } = await supabase.auth.getSession();
+        const initialSession = data.session ?? null;
 
-      if (!mounted) return;
-      setSession(initialSession);
+        if (!mounted) return;
+        setSession(initialSession);
 
-      // 2. If there's a session, fetch the profile before marking loading=false
-      if (initialSession) {
-        await fetchProfile(initialSession.user.id, mounted);
-      } else {
-        setLoading(false);
+        // 2. If there's a session, fetch the profile before marking loading=false
+        if (initialSession) {
+          await fetchProfile(initialSession.user.id, mounted);
+        } else {
+          setLoading(false);
+        }
+      } catch (err) {
+        // getSession() can reject with a browser-level error (e.g. "Acquiring
+        // an exclusive Navigator LockManager lock ... immediately failed",
+        // seen with multiple tabs open or a lock left over from a crashed
+        // tab). Left uncaught, this used to leave `loading` stuck true and
+        // `initDone` never set — the auth-state listener below bails out on
+        // every event forever (`if (!initDone.current) return`), so the
+        // whole app silently got stuck with no session/profile and every
+        // role-gated UI element (Admin link, M/W toggle) just disappeared
+        // with nothing but this one console error to explain it.
+        console.error("useAuth: getSession() failed, treating as signed out", err);
+        if (mounted) {
+          setSession(null);
+          setLoading(false);
+        }
+      } finally {
+        initDone.current = true;
       }
-
-      initDone.current = true;
     }
 
     init();
