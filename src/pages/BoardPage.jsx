@@ -425,8 +425,9 @@ export function BoardPage({ sport = "men" }) {
             </div>
           </div>
 
-          {/* AI-powered natural-language search — translates into the filters below */}
-          <NLSearch onApply={applyAiFilters} />
+          {/* AI-powered natural-language search — disabled for now until the
+              nl-search edge function is reliable; re-enable by uncommenting. */}
+          {/* <NLSearch onApply={applyAiFilters} /> */}
 
           {/* Filters */}
           <div style={{
