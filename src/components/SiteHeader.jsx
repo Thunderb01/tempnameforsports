@@ -35,8 +35,14 @@ export function SiteHeader() {
   const { pathname } = useLocation();
   const [nilVisible, toggleNil] = useNilVisible();
   const [bannerDismissed, setBannerDismissed] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const canToggleSport = isAdmin || isSuperAdmin;
   const sport = pathname.startsWith("/w/") ? "women" : "men";
+
+  // Collapse the mobile menu on route change (NavLink clicks) and on any other
+  // interaction inside it (NIL toggle, sign out, etc.) — nothing should leave
+  // the dropdown hanging open over the page it just navigated away from.
+  function closeMenu() { setMenuOpen(false); }
   function switchSport(next) {
     if (next === sport) return;
     const target = next === "women"
@@ -64,7 +70,17 @@ export function SiteHeader() {
           <span>Beyond the Portal{sport === "women" ? " · W" : ""}</span>
         </NavLink>
 
-        <nav className="nav">
+        <button
+          type="button"
+          className={"nav-toggle" + (menuOpen ? " open" : "")}
+          aria-label={menuOpen ? "Close menu" : "Open menu"}
+          aria-expanded={menuOpen}
+          onClick={() => setMenuOpen(o => !o)}
+        >
+          <span /><span /><span />
+        </button>
+
+        <nav className={"nav" + (menuOpen ? " nav-open" : "")} onClick={closeMenu}>
           <NavLink to={pathForSport("/app", sport)}   className={({ isActive }) => "nav-link" + (isActive ? " active" : "")}>
             Roster Builder
           </NavLink>
