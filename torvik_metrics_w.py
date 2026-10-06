@@ -819,7 +819,7 @@ def compute_nil_valuation(df):
         # High Major
         "ACC": 1.0, "B10": 1.0, "B12": 1.0, "SEC": 1.0, "BE": 1.0,
         # Mid Major
-        "MWC": 0.8, "A10": 0.8, "WCC": 0.8, "Amer": 0.8,
+        "MWC": 0.8, "A10": 0.8, "WCC": 0.8, "Amer": 0.8, "P12": 0.8,
         # Low Major
         "MVC": 0.6, "SC": 0.6, "MAC": 0.6, "CUSA": 0.6,
         "SB": 0.6, "MAAC": 0.6, "CAA": 0.6, "ASun": 0.6,
