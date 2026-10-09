@@ -27,7 +27,13 @@ function pathForSport(menPath, sport) {
   return menPath;
 }
 
-export function SiteHeader() {
+// `stickyExtra` lets a page add its own row inside the header's sticky
+// wrapper — e.g. a compact search/filter-count bar that only needs to show
+// once the page's own full filter panel has scrolled out of view. Rendering
+// it here (rather than as a separately-positioned sticky element on the
+// page) means it stacks naturally below the banner/nav with no pixel-offset
+// math, since it shares the same sticky box.
+export function SiteHeader({ stickyExtra = null }) {
   const { profile } = useAuth();
   const { isSuperAdmin, isAdmin } = useAdminTeam(profile);
   const teamLogos = useTeamLogos();
@@ -56,7 +62,16 @@ export function SiteHeader() {
     navigate("/login");
   }
 
+  // The nav dropdown lives inline under the header (not an overlay), so
+  // opening it from deep in a scrolled page would land out of view — scroll
+  // to top first so the person actually sees it.
+  function openMenuFromBottomBar() {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    setMenuOpen(true);
+  }
+
   return (
+    <>
     <div className="site-header-wrap">
       {!bannerDismissed && (
         <div style={{ background: "#1e3a5f", borderBottom: "1px solid rgba(91,156,246,.25)", padding: "6px 40px 6px 16px", textAlign: "center", fontSize: 12, color: "rgba(255,255,255,.75)", letterSpacing: ".01em", position: "relative" }}>
@@ -148,6 +163,23 @@ export function SiteHeader() {
           </button>
         </nav>
       </header>
+      {stickyExtra}
     </div>
+
+    {/* Mobile-only bottom tab bar — quick access to the two pages people
+        actually live in (Roster Builder, Board) without opening the
+        hamburger menu every time. "Menu" opens the same dropdown above. */}
+    <nav className="bottom-tab-bar">
+      <NavLink to={pathForSport("/app", sport)} className={({ isActive }) => "bottom-tab" + (isActive ? " active" : "")}>
+        Roster
+      </NavLink>
+      <NavLink to={pathForSport("/board", sport)} className={({ isActive }) => "bottom-tab" + (isActive ? " active" : "")}>
+        Board
+      </NavLink>
+      <button type="button" className="bottom-tab" onClick={openMenuFromBottomBar}>
+        Menu
+      </button>
+    </nav>
+    </>
   );
 }
