@@ -142,6 +142,15 @@ select.input { cursor: pointer; }
 @media (max-width: 1000px) { .app-grid { grid-template-columns: 1fr 1fr; } }
 @media (max-width:  640px) { .app-grid { grid-template-columns: 1fr; } }
 
+/* Roster Builder's Build tab wants exactly 2 columns on desktop, not the
+   3-column default above — but setting that inline (style={{gridTemplateColumns}})
+   beats the media queries above regardless of viewport, since inline styles
+   always win over stylesheet rules. That left Board/Roster squeezed into two
+   ~195px columns on a phone instead of stacking. A real class can be
+   overridden by its own narrower media query instead. */
+.app-grid-2col { grid-template-columns: 1fr 1fr; }
+@media (max-width: 640px) { .app-grid-2col { grid-template-columns: 1fr; } }
+
 /* ── Panel ──────────────────────────────────────────────────────────────────── */
 .panel {
   background: var(--panel);
