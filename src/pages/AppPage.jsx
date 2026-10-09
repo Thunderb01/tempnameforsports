@@ -1550,7 +1550,7 @@ export function AppPage() {
 
         {/* ── Build mode ──────────────────────────────────────────────────── */}
         {viewMode === "build" && (
-          <div className="app-grid" style={{ gridTemplateColumns: "1fr 1fr" }}>
+          <div className="app-grid app-grid-2col">
 
             {/* Board panel */}
             <div className="panel">

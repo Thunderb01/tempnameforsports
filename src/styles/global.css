@@ -142,6 +142,15 @@ select.input { cursor: pointer; }
 @media (max-width: 1000px) { .app-grid { grid-template-columns: 1fr 1fr; } }
 @media (max-width:  640px) { .app-grid { grid-template-columns: 1fr; } }
 
+/* Roster Builder's Build tab wants exactly 2 columns on desktop, not the
+   3-column default above — but setting that inline (style={{gridTemplateColumns}})
+   beats the media queries above regardless of viewport, since inline styles
+   always win over stylesheet rules. That left Board/Roster squeezed into two
+   ~195px columns on a phone instead of stacking. A real class can be
+   overridden by its own narrower media query instead. */
+.app-grid-2col { grid-template-columns: 1fr 1fr; }
+@media (max-width: 640px) { .app-grid-2col { grid-template-columns: 1fr; } }
+
 /* ── Panel ──────────────────────────────────────────────────────────────────── */
 .panel {
   background: var(--panel);
@@ -305,6 +314,47 @@ select.input { cursor: pointer; }
 .nav-link { font-size: 14px; opacity: .7; padding: 6px 10px; border-radius: 6px; transition: opacity .15s; }
 .nav-link:hover { opacity: 1; background: var(--panel); }
 .nav-link.active { opacity: 1; }
+
+/* ── Mobile nav (hamburger) ─────────────────────────────────────────────────── */
+/* .nav has no flex-wrap, so below ~900px (brand + 7 links + utility controls)
+   it forces the whole page to a ~920px minimum width — every page scrolls
+   horizontally on a phone. Collapse it into a toggleable dropdown instead. */
+.nav-toggle { display: none; }
+
+@media (max-width: 900px) {
+  .site-header { flex-wrap: wrap; }
+
+  .nav-toggle {
+    display: flex; flex-direction: column; justify-content: center; align-items: center;
+    gap: 4px; width: 40px; height: 40px; padding: 0;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+    cursor: pointer; flex-shrink: 0;
+  }
+  .nav-toggle span {
+    display: block; width: 18px; height: 2px; border-radius: 2px;
+    background: var(--text); transition: transform .18s ease, opacity .18s ease;
+  }
+  .nav-toggle.open span:nth-child(1) { transform: translateY(6px) rotate(45deg); }
+  .nav-toggle.open span:nth-child(2) { opacity: 0; }
+  .nav-toggle.open span:nth-child(3) { transform: translateY(-6px) rotate(-45deg); }
+
+  .nav {
+    display: none;
+    width: 100%;
+    flex-direction: column; align-items: stretch; gap: 2px;
+    margin-top: 12px; padding-top: 12px;
+    border-top: 1px solid var(--border);
+  }
+  .nav.nav-open { display: flex; }
+  .nav-link { padding: 12px 10px; font-size: 16px; border-radius: 8px; }
+  .nav-link:hover { background: transparent; } /* no hover state on touch */
+
+  /* Utility controls (NIL toggle, sign out) stretch full-width like the nav
+     links above them; the M/W switch and team badge are small discrete
+     controls, not list items, so they stay compact and centered instead. */
+  .nav > .btn { justify-content: center; }
+  .nav > div[title] { align-self: center; }
+}
 
 /* ── Landing page ───────────────────────────────────────────────────────────── */
 @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@400;500;700&display=swap');
