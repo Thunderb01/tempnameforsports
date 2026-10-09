@@ -89,6 +89,7 @@ export function BoardPage({ sport = "men" }) {
     "MAAC", "MAC", "MEAC", "MVC", "MWC",
     "NEC",
     "OVC",
+    "P12",
     "Pat",
     "SB", "SC", "SEC", "SWAC", "Slnd", "Sum",
     "WAC", "WCC",
