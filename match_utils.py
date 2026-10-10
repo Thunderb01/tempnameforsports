@@ -56,6 +56,61 @@ _SUFFIX_RE = re.compile(
 # Quoted/parenthetical nicknames: 'Hamed "Larry" Olayinka' → 'Hamed Olayinka'
 _NICKNAME_RE = re.compile(r'\s*["\(].*?["\)]\s*')
 
+# First-name nickname → canonical full name, applied to the first token only.
+# This is the gap fuzzy matching alone doesn't reliably cover: "Cam Smith" vs
+# "Cameron Smith" differ by enough characters (4 of 7) that token_sort_ratio
+# often lands below the match threshold, so two sources using different forms
+# of the same real name can silently create duplicate player rows instead of
+# matching. Deterministic beats fuzzy-and-hope for a list this well-known.
+#
+# Deliberately conservative: only unambiguous nickname→full-name pairs are
+# listed. Nicknames with two common full forms (Jack → Jacob or John, Al →
+# Albert, Alan, or Alexander) are left out — collapsing those risks merging
+# two actually-different players who share a surname and team, which is a
+# worse failure than an occasional missed match.
+#
+# Skews toward typically-male nicknames (this list grew out of men's-side
+# matching bugs). It's still safe to use from the women's scripts — at worst
+# an unmatched women's nickname (Alex/Alexandra, Sam/Samantha, Nicky/Nicole,
+# Danny/Danielle, Pat/Patricia, ...) just means no gain, not a wrong merge,
+# since nothing in w_players would coincidentally be named "Samuel" for a
+# "Sam" to collide with. But it means women's-specific nickname coverage is
+# still a real gap — add pairs here if that keeps coming up.
+FIRST_NAME_ALIASES: dict[str, str] = {
+    "cam":        "cameron",
+    "mike":       "michael",  "mikey":    "michael",
+    "will":       "william",  "bill":     "william",  "billy":   "william",
+    "nick":       "nicholas", "nicky":    "nicholas",
+    "matt":       "matthew",  "matty":    "matthew",
+    "chris":      "christopher",
+    "zach":       "zachary",  "zack":     "zachary",
+    "josh":       "joshua",
+    "sam":        "samuel",   "sammy":    "samuel",
+    "ben":        "benjamin", "benny":    "benjamin",
+    "danny":      "daniel",   "dan":      "daniel",
+    "tony":       "anthony",
+    "joey":       "joseph",   "joe":      "joseph",
+    "rob":        "robert",   "robby":    "robert",
+    "bobby":      "robert",   "bob":      "robert",
+    "jimmy":      "james",    "jim":      "james",
+    "dave":       "david",    "davey":    "david",
+    "steve":      "steven",   "stevie":   "steven", "stephen": "steven",
+    "pat":        "patrick",  "patty":    "patrick",
+    "tommy":      "thomas",   "tom":      "thomas",
+    "eddie":      "edward",   "ed":       "edward",
+    "charlie":    "charles",  "chuck":    "charles",
+    "greg":       "gregory",  "gregg":    "gregory",
+    "andy":       "andrew",   "drew":     "andrew",
+    "kenny":      "kenneth",  "ken":      "kenneth",
+    "ronnie":     "ronald",   "ron":      "ronald",
+    "richie":     "richard",  "rich":     "richard",
+    "jeff":       "jeffrey",  "geoff":    "jeffrey",
+    "timmy":      "timothy",  "tim":      "timothy",
+    "vinny":      "vincent",  "vince":    "vincent",
+    "alex":       "alexander",
+    "nate":       "nathaniel",
+}
+
 def _strip_accents(s: str) -> str:
     """Convert accented characters to ASCII equivalents: José→Jose, Dũng→Dung."""
     return "".join(
@@ -72,14 +127,25 @@ def norm_name(s: str) -> str:
       - Suffixes           (Jr., II, III, IV → removed)
       - Quoted nicknames   ("Larry" → removed)
       - Punctuation        (O'Brien → obrien, St. John → st john)
+      - First-name nicknames (Cam → cameron, Mike → michael — see
+        FIRST_NAME_ALIASES; applied to the first token only, after
+        everything else above, so "Cam Smith" and "Cameron Smith" land
+        on the identical normalised string instead of hoping fuzzy
+        matching's score clears the threshold)
       - Extra whitespace
     """
     s = _strip_accents(str(s or "").strip())
     s = _NICKNAME_RE.sub(" ", s)        # remove quoted nicknames
     s = _SUFFIX_RE.sub(" ", s)          # remove Jr./II/III etc.
-    s = re.sub(r"[.\'\`\-]", " ", s)   # punctuation → space  (O'Brien, St.-something)
+    s = re.sub(r"[\'\`]", "", s)        # apostrophes stripped, not spaced (O'Brien → obrien)
+    s = re.sub(r"[.\-]", " ", s)        # period/hyphen → space (St. John, Jean-Pierre)
     s = re.sub(r"[^a-z0-9 ]", "", s.lower())  # strip anything else
-    return re.sub(r"\s+", " ", s).strip()
+    s = re.sub(r"\s+", " ", s).strip()
+    if s:
+        parts = s.split(" ", 1)
+        parts[0] = FIRST_NAME_ALIASES.get(parts[0], parts[0])
+        s = " ".join(parts)
+    return s
 
 
 # ── Team name normalisation ───────────────────────────────────────────────────
@@ -369,6 +435,9 @@ if __name__ == "__main__":
         ("Dũng Nguyễn",        "dung nguyen"),
         ('Hamed "Larry" Sulaimon', "hamed sulaimon"),
         ("St. John Smith",     "st john smith"),
+        ("Cam Smith",          "cameron smith"),
+        ("Mike O'Brien",       "michael obrien"),
+        ("Zach Williams Jr.",  "zachary williams"),
     ]
     print("\nnorm_name tests:")
     for raw, expected in tests_name:
@@ -397,12 +466,14 @@ if __name__ == "__main__":
         {"id": 2, "name": "Jose Alvarado",        "current_team": "Georgia Tech"},
         {"id": 3, "name": "Scottie Barnes",       "current_team": "Florida State"},
         {"id": 4, "name": "Mike O'Connell",       "current_team": "Iowa"},
+        {"id": 5, "name": "Cameron Johnson",      "current_team": "Duke"},
     ])
     tests_match = [
         ("Kevin Porter Jr.",     "Houston",       1),
         ("José Alvarado",        "Georgia Tech",  2),
         ("Scottie Barnes III",   "Florida St.",   3),
         ("Mike OConnell",        "Iowa",          4),
+        ("Cam Johnson",          "Duke",          5),  # nickname, not fuzzy luck
     ]
     print("\nmatch_player tests:")
     for name, team, expected_id in tests_match:

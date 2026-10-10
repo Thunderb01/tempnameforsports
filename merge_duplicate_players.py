@@ -30,6 +30,8 @@ try:
 except ImportError:
     sys.exit("Run: pip install supabase")
 
+from match_utils import norm_name, norm_team
+
 SUPABASE_URL         = os.environ.get("SUPABASE_URL", "")
 SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")
 
@@ -69,12 +71,40 @@ def fetch_all_players(sb):
 
 
 def find_pairs(players):
-    """Return list of (portal_row, program_row) for each matched duplicate."""
-    portal  = {(p["name"], p["current_team"]): p for p in players if p["source"] == "portal"}
-    program = {(p["name"], p["current_team"]): p for p in players if p["source"] == "program"}
+    """Return list of (portal_row, program_row) for each matched duplicate.
+
+    Matched on normalised (name, team) — via match_utils' norm_name/norm_team
+    — rather than exact strings, so a portal row spelled "Cam Smith" and a
+    program row spelled "Cameron Smith" for the same real player still pair
+    up instead of silently staying two separate rows forever. If two rows on
+    the SAME side (both portal, or both program) collapse onto the same
+    normalised key, that pair is skipped rather than guessed at — could be
+    two different people who share a normalised name and team, and picking
+    wrong here means merging two different players into one.
+    """
+    def index_by(rows):
+        idx, dupes = {}, set()
+        for p in rows:
+            key = (norm_name(p["name"]), norm_team(p["current_team"]))
+            if key in idx:
+                dupes.add(key)
+            idx[key] = p
+        return idx, dupes
+
+    portal,  portal_dupes  = index_by([p for p in players if p["source"] == "portal"])
+    program, program_dupes = index_by([p for p in players if p["source"] == "program"])
+
+    ambiguous = portal_dupes | program_dupes
+    if ambiguous:
+        sample = ", ".join(f"{n} ({t})" for n, t in sorted(ambiguous)[:5])
+        print(f"  ⚠ Skipping {len(ambiguous)} normalised name/team pair(s) with more than "
+              f"one row on one side — ambiguous, needs a human look: {sample}"
+              f"{', ...' if len(ambiguous) > 5 else ''}")
 
     pairs = []
     for key in portal:
+        if key in ambiguous:
+            continue
         if key in program:
             pairs.append((portal[key], program[key]))
     return pairs
