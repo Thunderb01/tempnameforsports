@@ -16,10 +16,8 @@ Environment variables:
 import argparse
 import csv
 import os
-import re
 import sys
 import time
-import unicodedata
 
 try:
     import requests
@@ -31,6 +29,8 @@ try:
     from supabase import create_client
 except ImportError:
     sys.exit("Run: pip install supabase")
+
+from match_utils import norm_name as normalise
 
 SUPABASE_URL         = os.environ.get("SUPABASE_URL", "")
 SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")
@@ -47,12 +47,6 @@ HEADERS = {
 REQUEST_DELAY = 4  # seconds between requests
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
-
-def normalise(name):
-    """Lowercase, strip accents, remove punctuation — for fuzzy matching."""
-    name = unicodedata.normalize("NFD", name)
-    name = "".join(c for c in name if unicodedata.category(c) != "Mn")
-    return re.sub(r"[^a-z0-9 ]", "", name.lower()).strip()
 
 def fetch(url):
     resp = requests.get(url, headers=HEADERS, timeout=20)

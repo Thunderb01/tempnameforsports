@@ -16,6 +16,7 @@ that fails the build if a callsite skips the helper.
 |---|---|---|
 | Team → conference        | `getTeamConference(team)` from `@/lib/teamLookup`     | `data/team_conferences.csv` (single source of truth, imported via Vite `?raw`) |
 | Team name canonicalization | `getCanonicalTeamName(team)` from `@/lib/teamLookup` | Same CSV + `EXPLICIT_ALIASES` map in `teamLookup.js`                       |
+| Player name matching (Python pipeline) | `norm_name(name)` / `match_player(...)` from `match_utils` | `FIRST_NAME_ALIASES` dict + fuzzy fallback (rapidfuzz, else `difflib`) in `match_utils.py` |
 
 Why this matters: `vw_players.current_team` carries strings like
 `"Murray State"` while the JSON keys it as `"Murray St."`, and stale player
@@ -24,6 +25,19 @@ The helper normalizes (trailing parens, `Saint`/`St.`, `State`/`St.`, periods,
 case) and resolves an `EXPLICIT_ALIASES` map for cases regex can't handle
 (Loyola Chicago vs Loyola (IL), Miami FL vs Miami OH, UNC vs North Carolina,
 UConn vs Connecticut, BYU, etc.).
+
+Same story on the player-name side: `players`/`w_players` get fed from Bart
+Torvik, ESPN, Sports-Reference scrapes, and manual portal entry, and those
+sources spell the same person differently — nicknames (`"Cam Smith"` vs
+`"Cameron Smith"`), apostrophes (`"O'Brien"`), suffixes. Every script that
+matches or dedupes players by name must go through `match_utils.norm_name()` /
+`match_utils.match_player()` rather than comparing raw strings — it handles
+suffix-stripping, apostrophe-merging, and a conservative nickname table
+(`FIRST_NAME_ALIASES`) before falling back to fuzzy matching. Known exception:
+`scraper_to_supabase.py`'s nightly upsert still keys off a DB-level
+`UNIQUE (name, current_team, source)` constraint with no normalization —
+flagged, not yet fixed, since changing it means either a schema migration or
+rewriting the upsert as select-then-insert-or-update.
 
 **When you add a new feature that touches a name-keyed lookup:**
 
