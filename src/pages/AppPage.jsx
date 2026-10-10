@@ -299,6 +299,15 @@ function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], teamFreshmenA
   const [cmpScope, setCmpScope] = useState("conference");
   const POS_ORDER = POSITIONS;
 
+  // Collapsed by default on phones — each of these three is its own long
+  // scroll (a radar chart, a 5-wide depth chart, a 25-team ranked list), and
+  // stacking all three open is most of what makes this tab feel endless on
+  // mobile. The headline grade + position bars above them stay visible always.
+  const mobileDefault = () => typeof window === "undefined" || window.innerWidth > 640;
+  const [skillProfileOpen, setSkillProfileOpen] = useState(mobileDefault);
+  const [depthChartOpen,   setDepthChartOpen]   = useState(mobileDefault);
+  const [teamCompareOpen,  setTeamCompareOpen]  = useState(mobileDefault);
+
   // Convert a 1-indexed rank within a pool of N to a percentile (0-100).
   // Rank 1 → 100, rank N → 0. Smooth across the pool.
   function percentileFromRank(rank, total) {
@@ -586,8 +595,15 @@ function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], teamFreshmenA
 
       {/* Roster Skill Profile */}
       <div style={{ background: "rgba(255,255,255,.04)", border: "1px solid var(--border)", borderRadius: 10, padding: "16px 20px" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10, marginBottom: 12 }}>
-          <span style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".06em", opacity: .4 }}>Roster Skill Profile</span>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10, marginBottom: skillProfileOpen ? 12 : 0 }}>
+          <button type="button" onClick={() => setSkillProfileOpen(o => !o)} style={{
+            display: "flex", alignItems: "center", gap: 8, background: "none", border: "none",
+            padding: 0, cursor: "pointer", color: "inherit",
+          }}>
+            <span style={{ fontSize: 11, opacity: .5, transform: skillProfileOpen ? "rotate(90deg)" : "none", transition: "transform .15s" }}>▸</span>
+            <span style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".06em", opacity: .4 }}>Roster Skill Profile</span>
+          </button>
+          {skillProfileOpen && (
           <div style={{ display: "flex", gap: 6 }}>
             {[["intl", "Include international", includeIntl, setIncludeIntl, rosterIntl.length],
               ["fresh", "Include freshmen", includeFreshmen, setIncludeFreshmen, scoringPool.filter(isFreshmanP).length]
@@ -602,7 +618,9 @@ function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], teamFreshmenA
               </button>
             ))}
           </div>
+          )}
         </div>
+        {skillProfileOpen && (<>
         {rosterProfile
           ? <SkillProfile stats={rosterProfile} accent="#34d399" />
           : <div style={{ opacity: .4, fontSize: 13 }}>No metric'd players in the selected pool.</div>}
@@ -610,6 +628,7 @@ function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], teamFreshmenA
           Slot-weighted average across the rotation. International players use mapped BTP metrics;
           freshmen without metrics are estimated from their impact tier.
         </div>
+        </>)}
       </div>
 
       {/* Overall header */}
@@ -670,11 +689,20 @@ function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], teamFreshmenA
         )}
       </div>
 
-      {/* 3-column depth chart + settings sidebar */}
-      <div style={{ display: "flex", gap: 12, alignItems: "start" }}>
+      {/* Depth chart + settings sidebar */}
+      <div>
+        <button type="button" onClick={() => setDepthChartOpen(o => !o)} style={{
+          display: "flex", alignItems: "center", gap: 8, background: "none", border: "none",
+          padding: 0, marginBottom: depthChartOpen ? 10 : 0, cursor: "pointer", color: "inherit",
+        }}>
+          <span style={{ fontSize: 11, opacity: .5, transform: depthChartOpen ? "rotate(90deg)" : "none", transition: "transform .15s" }}>▸</span>
+          <span style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".06em", opacity: .4 }}>Depth Chart</span>
+        </button>
+        {depthChartOpen && (
+        <div className="depth-chart-row">
 
         {/* Depth chart columns */}
-        <div style={{ flex: 1, display: "grid", gridTemplateColumns: `repeat(${POS_ORDER.length}, 1fr)`, gap: 12, alignItems: "start" }}>
+        <div className="depth-chart-grid">
           {POS_ORDER.map(pos => {
             const players = chart[pos] || [];
             const pg      = posGrades[pos];
@@ -760,7 +788,7 @@ function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], teamFreshmenA
         </div>
 
         {/* Settings sidebar */}
-        <div style={{ width: 156, flexShrink: 0, background: "rgba(255,255,255,.03)", border: "1px solid var(--border)", borderRadius: 10, padding: "14px 16px" }}>
+        <div className="depth-chart-sidebar" style={{ background: "rgba(255,255,255,.03)", border: "1px solid var(--border)", borderRadius: 10, padding: "14px 16px" }}>
           <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".07em", textTransform: "uppercase", opacity: .4, marginBottom: 14 }}>Starter Slots</div>
           {POS_ORDER.map(pos => {
             const count   = starterCounts[pos] ?? 0;
@@ -819,6 +847,8 @@ function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], teamFreshmenA
             })()}
           </div>
         </div>
+        </div>
+        )}
       </div>
 
       {/* ── Conference / League comparison ─────────────────────────────────── */}
@@ -847,11 +877,18 @@ function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], teamFreshmenA
         return (
           <div style={{ background: "rgba(255,255,255,.03)", border: "1px solid var(--border)", borderRadius: 10, overflow: "hidden" }}>
             {/* Header */}
-            <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-              <span style={{ fontWeight: 700, fontSize: 14 }}>Team Comparison</span>
+            <div style={{ padding: "12px 16px", borderBottom: teamCompareOpen ? "1px solid var(--border)" : "none", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <button type="button" onClick={() => setTeamCompareOpen(o => !o)} style={{
+                display: "flex", alignItems: "center", gap: 8, background: "none", border: "none",
+                padding: 0, cursor: "pointer", color: "inherit",
+              }}>
+                <span style={{ fontSize: 11, opacity: .5, transform: teamCompareOpen ? "rotate(90deg)" : "none", transition: "transform .15s" }}>▸</span>
+                <span style={{ fontWeight: 700, fontSize: 14 }}>Team Comparison</span>
+              </button>
               {userConf && (
                 <span style={{ fontSize: 12, opacity: .4 }}>{userConf}</span>
               )}
+              {teamCompareOpen && (<>
               <div style={{ marginLeft: "auto", display: "flex", gap: 4 }}>
                 {[["conference", "Conference"], ["all", "Country"]].map(([val, lbl]) => (
                   <button key={val} onClick={() => setCmpScope(val)} style={{
@@ -868,9 +905,11 @@ function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], teamFreshmenA
                   ? `${confTeamScores.length} teams · static scores (transfer commits credited to destination)`
                   : `${teamScores.length} teams · static scores (transfer commits credited to destination)`}
               </div>
+              </>)}
             </div>
 
             {/* Ranked list */}
+            {teamCompareOpen && (
             <div style={{ padding: "10px 16px", display: "flex", flexDirection: "column", gap: 6 }}>
               {/* "Your build" row — uses the user's LIVE score so they can see
                   where their custom roster would slot in vs the static league. */}
@@ -949,6 +988,7 @@ function RosterStrengthPanel({ calc, onOpenModal, allPlayers = [], teamFreshmenA
                 );
               })}
             </div>
+            )}
           </div>
         );
       })()}
@@ -1118,6 +1158,12 @@ export function AppPage() {
   const [viewMode,      setViewMode]      = useState("build");
   const [settingsOpen,  setSettingsOpen]  = useState(false);
   const [shortlistOpen, setShortlistOpen] = useState(false);
+  // Collapsed by default on phones — stacked full-width, the Board panel's
+  // whole player list otherwise sits between you and the Roster panel below
+  // it. Both start open on desktop, where they're already side by side.
+  const mobileDefault = () => typeof window === "undefined" || window.innerWidth > 640;
+  const [boardPanelOpen,  setBoardPanelOpen]  = useState(mobileDefault);
+  const [rosterPanelOpen, setRosterPanelOpen] = useState(mobileDefault);
   const [search,        setSearch]        = useState("");
   const [posFilter,     setPosFilter]     = useState([]);
   const [yearFilter,    setYearFilter]    = useState([]);
@@ -1556,7 +1602,13 @@ export function AppPage() {
             <div className="panel">
               <div className="panel-head">
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <h2>Board</h2>
+                  <button type="button" onClick={() => setBoardPanelOpen(o => !o)} style={{
+                    display: "flex", alignItems: "center", gap: 8, background: "none", border: "none",
+                    padding: 0, cursor: "pointer", color: "inherit",
+                  }}>
+                    <span style={{ fontSize: 11, opacity: .5, transform: boardPanelOpen ? "rotate(90deg)" : "none", transition: "transform .15s" }}>▸</span>
+                    <h2 style={{ margin: 0 }}>Board</h2>
+                  </button>
                   <button className="btn btn-ghost" style={{ fontSize: 12 }} onClick={() => setShortlistOpen(true)}>
                     Shortlist{shortlistCount > 0 && (
                       <span style={{ marginLeft: 6, background: "var(--accent,#5b9cf6)", color: "#fff", borderRadius: 10, fontSize: 10, padding: "1px 6px", fontWeight: 600 }}>
@@ -1565,6 +1617,7 @@ export function AppPage() {
                     )}
                   </button>
                 </div>
+                {boardPanelOpen && (<>
                 <p className="muted">
                   {boardMode === "domestic" ? "Portal targets. Status subject to change." : "International prospects (RealGM-scraped)."}
                 </p>
@@ -1609,7 +1662,9 @@ export function AppPage() {
                   ]}
                   onClearAll={() => { setPosFilter([]); setYearFilter([]); setHeightMin(null); setHeightMax(null); }}
                 />
+                </>)}
               </div>
+              {boardPanelOpen && (
               <div className="list">
                 {boardMode === "domestic" ? (
                   filtered.length === 0
@@ -1652,14 +1707,22 @@ export function AppPage() {
                         })
                 )}
               </div>
+              )}
             </div>
 
             {/* Roster panel */}
             <div className="panel">
               <div className="panel-head">
-                <h2>Roster</h2>
-                <p className="muted">Returning players + incoming transfers + portal adds.</p>
+                <button type="button" onClick={() => setRosterPanelOpen(o => !o)} style={{
+                  display: "flex", alignItems: "center", gap: 8, background: "none", border: "none",
+                  padding: 0, cursor: "pointer", color: "inherit",
+                }}>
+                  <span style={{ fontSize: 11, opacity: .5, transform: rosterPanelOpen ? "rotate(90deg)" : "none", transition: "transform .15s" }}>▸</span>
+                  <h2 style={{ margin: 0 }}>Roster</h2>
+                </button>
+                {rosterPanelOpen && <p className="muted">Returning players + incoming transfers + portal adds.</p>}
               </div>
+              {rosterPanelOpen && (
               <div className="list">
                 {(() => {
                   const retById = board.state.retentionById || {};
@@ -1809,6 +1872,7 @@ export function AppPage() {
                   );
                 })()}
               </div>
+              )}
             </div>
           </div>
         )}

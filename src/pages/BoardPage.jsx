@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { SiteHeader }      from "@/components/SiteHeader";
 import { PlayerModal }     from "@/components/PlayerModal";
 import { TeamAutocomplete } from "@/components/TeamAutocomplete";
@@ -72,6 +72,28 @@ export function BoardPage({ sport = "men" }) {
   const [includeUnevaluated, setIncludeUnevaluated] = useState(false);
   const [toTeamFilter,      setToTeamFilter]      = useState("");
   const [showAdvanced, setShowAdvanced] = useState(false);
+  // Collapsed by default on phones (the full filter grid otherwise pushes
+  // every player below the fold before you've seen one result); expanded by
+  // default everywhere else. Only read on mount — doesn't track live resize.
+  const [filtersOpen, setFiltersOpen] = useState(() => typeof window === "undefined" || window.innerWidth > 640);
+  // Mobile-only (see .sticky-subbar's media query): once the Filters panel
+  // has scrolled out from under the sticky header, show a compact search +
+  // active-count bar there instead, so filtering doesn't mean scrolling all
+  // the way back to the top first.
+  const filtersPanelRef = useRef(null);
+  const [showStickyFilters, setShowStickyFilters] = useState(false);
+  useEffect(() => {
+    function onScroll() {
+      const el = filtersPanelRef.current;
+      if (!el) return;
+      // 60px ≈ the sticky header's own height — close enough without
+      // measuring it directly, since this only gates a convenience bar.
+      setShowStickyFilters(el.getBoundingClientRect().bottom < 60);
+    }
+    window.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
   const [confFilter,  setConfFilter]  = useState([]);
   const [archetypeFilter,  setArchetypeFilter]  = useState("");
   const [archetypeOptions, setArchetypeOptions] = useState([]);
@@ -398,10 +420,38 @@ export function BoardPage({ sport = "men" }) {
     }
   }
 
+  // Reused by both the FilterChips row and the collapsed-panel summary count.
+  const filterChips = [
+    ...posFilter.map(p => ({ label: `Pos: ${p}`,  onClear: () => setPosFilter(posFilter.filter(x => x !== p)) })),
+    ...yearFilter.map(y => ({ label: `Yr: ${y}`,  onClear: () => setYearFilter(yearFilter.filter(x => x !== y)) })),
+    ...confFilter.map(c => ({ label: `Conf: ${c}`, onClear: () => setConfFilter(confFilter.filter(x => x !== c)) })),
+    ...(heightMin != null ? [{ label: `Ht ≥ ${formatHeight(heightMin)}`, onClear: () => setHeightMin(null) }] : []),
+    ...(heightMax != null ? [{ label: `Ht ≤ ${formatHeight(heightMax)}`, onClear: () => setHeightMax(null) }] : []),
+    ...(stateFilter !== "all" ? [{ label: `Loc: ${stateFilter}`, onClear: () => setStateFilter("all") }] : []),
+    ...(!isWomens && archetypeFilter ? [{ label: `Archetype: ${archetypeFilter}`, onClear: () => setArchetypeFilter("") }] : []),
+  ];
+  // search/transferring-to/portal checkboxes don't have their own chip, but
+  // should still count toward "N active" so the collapsed summary is honest.
+  const activeFilterCount = filterChips.length
+    + (searchInput.trim() ? 1 : 0) + (toTeamFilter.trim() ? 1 : 0)
+    + (portalOnly ? 1 : 0) + (includeUnevaluated ? 1 : 0);
+
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <>
-      <SiteHeader />
+      <SiteHeader stickyExtra={showStickyFilters && (
+        <div className="sticky-subbar">
+          <input className="input" type="search" placeholder="Name or team…" style={{ flex: 1 }}
+            value={searchInput} onChange={e => setSearchInput(e.target.value)} />
+          <button type="button" className="btn btn-ghost" style={{ fontSize: 12, padding: "3px 10px", flexShrink: 0 }}
+            onClick={() => {
+              setFiltersOpen(true);
+              filtersPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+            }}>
+            Filters{activeFilterCount > 0 ? ` · ${activeFilterCount}` : ""}
+          </button>
+        </div>
+      )} />
       <div className="app-shell">
         <div className="app-top">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
@@ -431,25 +481,42 @@ export function BoardPage({ sport = "men" }) {
           {/* <NLSearch onApply={applyAiFilters} /> */}
 
           {/* Filters */}
-          <div style={{
+          <div ref={filtersPanelRef} style={{
             background: "var(--panel)", border: "1px solid var(--border)",
             borderRadius: 10, padding: "16px 20px", marginBottom: 14,
           }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-              <span style={{ fontWeight: 700, fontSize: 13, textTransform: "uppercase", letterSpacing: ".06em", opacity: .7 }}>
-                Filters
-              </span>
-              <button className="btn btn-ghost" style={{ fontSize: 12, padding: "3px 10px" }}
-                onClick={() => {
-                  setSearchInput(""); setToTeamFilter("");
-                  setPosFilter([]); setYearFilter([]); setConfFilter([]);
-                  setHeightMin(null); setHeightMax(null); setStateFilter("all");
-                  setArchetypeFilter("");
-                }}>
-                ↺ Reset
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: filtersOpen ? 14 : 0, gap: 10 }}>
+              <button type="button" onClick={() => setFiltersOpen(o => !o)} style={{
+                display: "flex", alignItems: "center", gap: 8, background: "none", border: "none",
+                padding: 0, cursor: "pointer", color: "inherit", flex: 1, minWidth: 0, textAlign: "left",
+              }}>
+                <span style={{ fontSize: 11, opacity: .5, transform: filtersOpen ? "rotate(90deg)" : "none", transition: "transform .15s", flexShrink: 0 }}>▸</span>
+                <span style={{ fontWeight: 700, fontSize: 13, textTransform: "uppercase", letterSpacing: ".06em", opacity: .7 }}>
+                  Filters
+                </span>
+                {activeFilterCount > 0 && (
+                  <span style={{
+                    fontSize: 11, fontWeight: 700, padding: "1px 7px", borderRadius: 10,
+                    background: "rgba(91,156,246,.18)", color: "#5b9cf6", flexShrink: 0,
+                  }}>
+                    {activeFilterCount} active
+                  </span>
+                )}
               </button>
+              {activeFilterCount > 0 && (
+                <button className="btn btn-ghost" style={{ fontSize: 12, padding: "3px 10px", flexShrink: 0 }}
+                  onClick={() => {
+                    setSearchInput(""); setToTeamFilter("");
+                    setPosFilter([]); setYearFilter([]); setConfFilter([]);
+                    setHeightMin(null); setHeightMax(null); setStateFilter("all");
+                    setArchetypeFilter(""); setPortalOnly(false); setIncludeUnevaluated(false);
+                  }}>
+                  ↺ Reset
+                </button>
+              )}
             </div>
 
+            {filtersOpen && (<>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: "14px 16px", marginBottom: 14 }}>
               <FilterField label="Search">
                 <input className="input" type="search" placeholder="Name or team…" style={{ width: "100%" }}
@@ -511,21 +578,14 @@ export function BoardPage({ sport = "men" }) {
             </div>
 
             <FilterChips
-              items={[
-                ...posFilter.map(p => ({ label: `Pos: ${p}`,  onClear: () => setPosFilter(posFilter.filter(x => x !== p)) })),
-                ...yearFilter.map(y => ({ label: `Yr: ${y}`,  onClear: () => setYearFilter(yearFilter.filter(x => x !== y)) })),
-                ...confFilter.map(c => ({ label: `Conf: ${c}`, onClear: () => setConfFilter(confFilter.filter(x => x !== c)) })),
-                ...(heightMin != null ? [{ label: `Ht ≥ ${formatHeight(heightMin)}`, onClear: () => setHeightMin(null) }] : []),
-                ...(heightMax != null ? [{ label: `Ht ≤ ${formatHeight(heightMax)}`, onClear: () => setHeightMax(null) }] : []),
-                ...(stateFilter !== "all" ? [{ label: `Loc: ${stateFilter}`, onClear: () => setStateFilter("all") }] : []),
-                ...(!isWomens && archetypeFilter ? [{ label: `Archetype: ${archetypeFilter}`, onClear: () => setArchetypeFilter("") }] : []),
-              ]}
+              items={filterChips}
               onClearAll={() => {
                 setPosFilter([]); setYearFilter([]); setConfFilter([]);
                 setHeightMin(null); setHeightMax(null); setStateFilter("all");
                 setArchetypeFilter("");
               }}
             />
+            </>)}
           </div>
 
           {/* Advanced filter panel */}

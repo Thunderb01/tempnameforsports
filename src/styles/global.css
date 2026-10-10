@@ -44,6 +44,46 @@ select {
   backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--border);
 }
+
+/* A page's optional sticky sub-bar (e.g. Board's quick search/filter-count
+   bar), passed via SiteHeader's `stickyExtra` prop. Lives inside the same
+   sticky wrapper as the header itself, so it stacks below the banner/nav
+   with no pixel-offset math. Desktop pages don't need it — the full panel
+   it summarizes is already always in view there. */
+.sticky-subbar {
+  display: none;
+  align-items: center; gap: 8px;
+  padding: 8px 18px;
+  border-top: 1px solid var(--border);
+}
+@media (max-width: 640px) {
+  .sticky-subbar { display: flex; }
+}
+
+/* ── Bottom tab bar (mobile) ──────────────────────────────────────────────── */
+/* Same breakpoint as the hamburger nav (.nav-toggle) — below that width the
+   top nav is a tap away behind the menu, so the two busiest destinations get
+   a persistent shortcut instead. */
+.bottom-tab-bar { display: none; }
+@media (max-width: 900px) {
+  body { padding-bottom: 54px; }
+  .bottom-tab-bar {
+    display: flex;
+    position: fixed; bottom: 0; left: 0; right: 0; z-index: 95;
+    background: rgba(11,16,32,.92);
+    backdrop-filter: blur(12px);
+    border-top: 1px solid var(--border);
+    padding: 6px 0 calc(6px + env(safe-area-inset-bottom));
+  }
+  .bottom-tab {
+    flex: 1;
+    display: flex; align-items: center; justify-content: center;
+    padding: 8px 4px;
+    font-size: 12px; font-weight: 600; opacity: .55;
+    background: none; border: none; color: inherit; cursor: pointer;
+  }
+  .bottom-tab.active { opacity: 1; color: #5b9cf6; }
+}
 .site-header {
   max-width: var(--max);
   margin: 0 auto;
@@ -150,6 +190,19 @@ select.input { cursor: pointer; }
    overridden by its own narrower media query instead. */
 .app-grid-2col { grid-template-columns: 1fr 1fr; }
 @media (max-width: 640px) { .app-grid-2col { grid-template-columns: 1fr; } }
+
+/* ── Roster Strength depth chart ───────────────────────────────────────────── */
+/* 5 position columns + a fixed-width settings sidebar, side by side on
+   desktop. On a phone the 5 columns were squeezed to ~30px each — player
+   names truncated to a single letter. Stack everything to one column instead. */
+.depth-chart-row    { display: flex; gap: 12px; align-items: start; }
+.depth-chart-grid   { flex: 1; display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; align-items: start; }
+.depth-chart-sidebar { width: 156px; flex-shrink: 0; }
+@media (max-width: 640px) {
+  .depth-chart-row     { flex-direction: column; }
+  .depth-chart-grid    { grid-template-columns: 1fr; }
+  .depth-chart-sidebar { width: 100%; }
+}
 
 /* ── Panel ──────────────────────────────────────────────────────────────────── */
 .panel {
