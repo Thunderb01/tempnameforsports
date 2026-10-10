@@ -454,9 +454,9 @@ export function BoardPage({ sport = "men" }) {
       )} />
       <div className="app-shell">
         <div className="app-top">
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12, marginBottom: 16 }}>
             <h1 style={{ margin: 0 }}>Full Board</h1>
-            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
               {isAdmin && (
                 <TeamAutocomplete
                   value={selectedTeam}
