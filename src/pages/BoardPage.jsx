@@ -35,11 +35,68 @@ const COLS = [
   { label: "To Team",   get: p => p._toTeam || "—" },
 ];
 
+// A row from season_board_archive/w_season_board_archive, mapped into the
+// same shape loadPortalBoard() produces from vw_players/vw_w_players so the
+// rest of this file (filters, sort, cards, table) doesn't need to know
+// whether it's looking at the live board or an archived season.
+function mapArchiveRow(row) {
+  return {
+    id:                 row.player_id || row.id,
+    source:             "archive",
+    name:               row.name,
+    team:               row.team,
+    conf:               row.conference ?? null,
+    pos:                row.primary_position,
+    positions:          row.positions ?? null,
+    year:               row.year,
+    height:             row.height   ?? null,
+    hometown:           row.hometown ?? null,
+    espn_id:            row.espn_id  ?? null,
+    marketLow:          row.open_market_low ?? 0,
+    marketHigh:         row.open_market_high ?? 0,
+    nilValuation:       row.nil_valuation    ?? 0,
+    archetype:          row.archetype  ?? null,
+    archetypes:         row.archetypes ?? null,
+    player_status:      row.player_status      ?? null,
+    transfer_status:    row.transfer_status    ?? null,
+    transfer_from_team: row.transfer_from_team ?? null,
+    transfer_to_team:   row.transfer_to_team   ?? null,
+    stats: {
+      ppg: row.ppg, rpg: row.rpg, apg: row.apg, usg: row.usg, ast_tov: row.ast_tov,
+      fg_pct: row.fg_pct, "3p_pct": row["3p_pct"], ft_pct: row.ft_pct,
+      sei: row.sei, ath: row.ath, ris: row.ris, dds: row.dds, cdi: row.cdi,
+    },
+  };
+}
+
+async function loadArchiveBoard(table, season) {
+  const PAGE = 1000;
+  let from = 0, all = [];
+  for (;;) {
+    const { data, error } = await supabase
+      .from(table).select("*").eq("season_year", season)
+      .order("name").range(from, from + PAGE - 1);
+    if (error) { console.error(`${table} fetch:`, error); break; }
+    all = all.concat(data || []);
+    if (!data || data.length < PAGE) break;
+    from += PAGE;
+  }
+  return all.map(mapArchiveRow);
+}
+
 // The archetype filter/badge feature only exists on the men's side today —
 // women's archetype definitions/assignment aren't built out yet. Gated by
 // sport rather than silently extended or dropped; see CLAUDE.md fork notes.
-export function BoardPage({ sport = "men" }) {
+//
+// `season` switches the page into a read-only archive mode (Time Machine):
+// players load from season_board_archive instead of the live vw_players,
+// and every roster-builder affordance (Shortlist/Roster buttons, the admin
+// team-switcher, status editing in the modal) is hidden — there's no
+// roster being built against a past season. `title` lets a wrapper like
+// HistoricalPage rename the h1 without forking this file.
+export function BoardPage({ sport = "men", season = null, title = "Full Board", headerExtra = null }) {
   const isWomens = sport === "women";
+  const archiveMode = season != null;
   const useBoardHook = isWomens ? useWomensRosterBoard : useRosterBoard;
 
   const { profile, user } = useAuth();
@@ -48,6 +105,7 @@ export function BoardPage({ sport = "men" }) {
   const board = useBoardHook(activeTeam, userId);
   const teamLogos = useTeamLogos();
 
+  const [archiveRows,  setArchiveRows]  = useState([]);
   const [loading,      setLoading]     = useState(true);
   const [searchInput,  setSearchInput] = useState("");
   const [search,       setSearch]      = useState("");
@@ -154,7 +212,7 @@ export function BoardPage({ sport = "men" }) {
 
   const PAGE_SIZE = 50;
 
-  const players = board.state.board;
+  const players = archiveMode ? archiveRows : board.state.board;
 
   // Portal availability/destination now live inline on each board row
   // (transfer_status/transfer_from_team/transfer_to_team, added onto
@@ -180,10 +238,27 @@ export function BoardPage({ sport = "men" }) {
     return info;
   }, [players]);
 
-  // ── Load board via shared hook ───────────────────────────────────────────────
+  // ── Load board ────────────────────────────────────────────────────────────────
   useEffect(() => {
     setLoading(true);
-    board.loadPortalBoard().then(() => setLoading(false));
+
+    if (archiveMode) {
+      const table = isWomens ? "w_season_board_archive" : "season_board_archive";
+      loadArchiveBoard(table, season).then(rows => {
+        setArchiveRows(rows);
+        // Archive rows already carry each player's archetypes inline (unlike
+        // the live board, which needs a second players-table fetch below) —
+        // derive the same archetypesById shape from what we just loaded.
+        if (!isWomens) {
+          const map = {};
+          rows.forEach(r => { if (r.archetypes?.length) map[r.id] = r.archetypes; });
+          setArchetypesById(map);
+        }
+        setLoading(false);
+      });
+    } else {
+      board.loadPortalBoard().then(() => setLoading(false));
+    }
 
     if (!isWomens) {
       // Archetype filter: dropdown options are the definitions we've created;
@@ -195,7 +270,7 @@ export function BoardPage({ sport = "men" }) {
           setArchetypeColors(Object.fromEntries((data || []).map(d => [d.name, d.color || "#f5a623"])));
         });
 
-      (async () => {
+      if (!archiveMode) (async () => {
         const PAGE = 1000;
         let from = 0, map = {};
         for (;;) {
@@ -215,7 +290,7 @@ export function BoardPage({ sport = "men" }) {
         setArchetypesById(map);
       })();
     }
-  }, [isWomens]);
+  }, [isWomens, archiveMode, season]);
 
   // ── Tags ────────────────────────────────────────────────────────────────────
   // ── State/region → search terms ─────────────────────────────────────────────
@@ -455,9 +530,10 @@ export function BoardPage({ sport = "men" }) {
       <div className="app-shell">
         <div className="app-top">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12, marginBottom: 16 }}>
-            <h1 style={{ margin: 0 }}>Full Board</h1>
+            <h1 style={{ margin: 0 }}>{title}</h1>
             <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-              {isAdmin && (
+              {headerExtra}
+              {isAdmin && !archiveMode && (
                 <TeamAutocomplete
                   value={selectedTeam}
                   onChange={setSelectedTeam}
@@ -712,18 +788,20 @@ export function BoardPage({ sport = "men" }) {
                           );
                         })()}
                       </div>
-                      <div className="row-actions">
-                        <button className="btn btn-ghost"
-                          disabled={inShortlist(p.id) || inRoster(p.id)}
-                          onClick={e => { e.stopPropagation(); addToShortlist(p.id); }}>
-                          Shortlist
-                        </button>
-                        <button className="btn btn-primary"
-                          disabled={inRoster(p.id)}
-                          onClick={e => { e.stopPropagation(); addToRoster(p.id); }}>
-                          Roster
-                        </button>
-                      </div>
+                      {!archiveMode && (
+                        <div className="row-actions">
+                          <button className="btn btn-ghost"
+                            disabled={inShortlist(p.id) || inRoster(p.id)}
+                            onClick={e => { e.stopPropagation(); addToShortlist(p.id); }}>
+                            Shortlist
+                          </button>
+                          <button className="btn btn-primary"
+                            disabled={inRoster(p.id)}
+                            onClick={e => { e.stopPropagation(); addToRoster(p.id); }}>
+                            Roster
+                          </button>
+                        </div>
+                      )}
                     </div>
                   );
                 })
@@ -740,7 +818,7 @@ export function BoardPage({ sport = "men" }) {
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                   <thead>
                     <tr>
-                      <th style={thStyle}>Action</th>
+                      {!archiveMode && <th style={thStyle}>Action</th>}
                       {cols.map(col => (
                         <th key={col.label} style={{ ...thStyle, cursor: "pointer", userSelect: "none" }}
                           onClick={() => handleSort(col.label)}>
@@ -759,18 +837,20 @@ export function BoardPage({ sport = "men" }) {
                         <tr key={p.id} className="row-click"
                           onClick={e => { if (!e.target.closest("button,select")) setModal(p); }}
                           style={{ borderBottom: "1px solid var(--border)" }}>
-                          <td style={tdStyle}>
-                            <button className="btn btn-primary" style={{ fontSize: 11, padding: "3px 8px" }}
-                              disabled={inRoster(p.id)}
-                              onClick={e => { e.stopPropagation(); addToRoster(p.id); }}>
-                              Roster
-                            </button>{" "}
-                            <button className="btn btn-ghost" style={{ fontSize: 11, padding: "3px 8px" }}
-                              disabled={inShortlist(p.id) || inRoster(p.id)}
-                              onClick={e => { e.stopPropagation(); addToShortlist(p.id); }}>
-                              Shortlist
-                            </button>
-                          </td>
+                          {!archiveMode && (
+                            <td style={tdStyle}>
+                              <button className="btn btn-primary" style={{ fontSize: 11, padding: "3px 8px" }}
+                                disabled={inRoster(p.id)}
+                                onClick={e => { e.stopPropagation(); addToRoster(p.id); }}>
+                                Roster
+                              </button>{" "}
+                              <button className="btn btn-ghost" style={{ fontSize: 11, padding: "3px 8px" }}
+                                disabled={inShortlist(p.id) || inRoster(p.id)}
+                                onClick={e => { e.stopPropagation(); addToShortlist(p.id); }}>
+                                Shortlist
+                              </button>
+                            </td>
+                          )}
                           {cols.map(col => (
                             <td key={col.label} style={tdStyle}>{col.get(row)}</td>
                           ))}
@@ -809,8 +889,7 @@ export function BoardPage({ sport = "men" }) {
         <PlayerModal
           player={modal}
           {...(isWomens ? { sport: "womens" } : {})}
-          status={board.state.statusById?.[modal.id]}
-          onStatus={setStatus}
+          {...(archiveMode ? {} : { status: board.state.statusById?.[modal.id], onStatus: setStatus })}
           onClose={() => setModal(null)}
         />
       )}

@@ -151,3 +151,42 @@ Why forked and not toggle-driven:
 3. Swap any scoring imports to `WOMENS_SCORING_CONFIG`.
 4. Add a lazy route under `/w/<path>` in `src/main.jsx`.
 5. Add the path-pair to `M_TO_W` in `SiteHeader.jsx` so the toggle navigates.
+
+---
+
+## Season rollover: clearing the board vs. the Time Machine archive
+
+There's no season dimension on the live tables — `players`/`w_players` and
+`vw_players`/`vw_w_players` are just "current state," continuously
+overwritten by the nightly Torvik pipeline. The season-specific state that
+needs resetting at rollover is `player_status` (returning/graduating/
+transferring/declared/drafted) and `portal_transfers`/`w_portal_transfers`.
+
+`archive_season.py` snapshots the live board (stats, archetypes, tags,
+transfer status/destination, NIL — everything a board row shows, not just
+bare Torvik metrics) into `season_board_archive`/`w_season_board_archive`
+(see `supabase/season_board_archive.sql`) before anything gets cleared.
+Archiving is always safe to re-run (idempotent upsert). Actually clearing
+the live board (`--reset-live`) is separate, explicit, and requires typing
+the season year to confirm — it is not reversible from the script itself,
+the archive it just wrote is the only copy of what gets cleared.
+
+This is a different table from `historical_stats` (`supabase/historical.sql`)
+on purpose: `historical_stats` is a deliberately bare, stats-only archive
+with no portal/archetype/tag data, isolated from the live app by design, and
+pre-dates all of that being tracked. Don't try to unify them — `season_board_archive`
+covers 2026+ (when this mechanism was introduced); `historical_stats` covers
+2009–2025 and nothing more will ever be collected for those seasons.
+
+**Time Machine (`HistoricalPage.jsx`) is a thin wrapper, not a parallel
+implementation.** For an archived (2026+) season it renders `BoardPage` with
+a `season` prop, which switches `BoardPage` into a read-only mode: players
+load from the archive table instead of `vw_players`, and every
+roster-builder affordance (Shortlist/Roster buttons, the admin
+team-switcher, status editing) is hidden. This reuses the real filter/
+search/card/table engine instead of hand-duplicating it — don't build a
+second copy of that UI here or in any other read-only view; add another
+prop to `BoardPage` instead, the same way `season`/`title`/`headerExtra`
+were added. Pre-2026 years still render the original bare `historical_stats`
+table (`LegacyHistoricalBoard` in the same file) since there's no richer
+data to show for them.
