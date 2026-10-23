@@ -90,17 +90,50 @@ previously existed and had to be hand-synced.
 `scripts/test-positions.mjs` covers this module and runs as part of
 `npm run build`.
 
-### Metric peer groups are deliberately still 3-bucket
+### Metric peer groups: 4-bucket (Guard/Wing/Forward/Big), per the BTP Metrics Spec
 
-`torvik_metrics.py`'s `normalise_pos` / `percentrank_by_pos` group by
-Guard/Wing/Big, and every BTP metric (sei/ath/ris/dds/cdi) **and every NIL
-valuation** is a percentile computed *within* that group. This is intentionally
-untouched by the five-position migration — changing it revalues the entire
-database. Do not "tidy" it without meaning to.
+`torvik_metrics.py`/`torvik_metrics_w.py`'s `normalise_pos` / `percentrank_by_pos`
+group by Guard/Wing/Forward/Big, and every BTP metric (sei/ath/ris/dds/cdi)
+**and every NIL valuation** is a percentile computed *within* that group.
+**Do not change `normalise_pos` or `percentrank_by_pos` without intending to
+revalue the entire database** — every number in the app shifts.
 
-One known consequence: `Stretch 4` matches no branch in `normalise_pos` and
-falls through to Wing, so those players display as PF but are ranked against
-wings. Correcting it is a one-line change plus a `torvik_metrics.py` re-run.
+This used to be 3-bucket (Guard/Wing/Big), with `Stretch 4` falling through
+to Wing (so those players displayed as PF but were ranked against wings).
+The BTP Metrics Spec formalized that as its own 4th bucket — "Forward" is
+Barttorvik's `Wing F` and `Stretch 4` roles, checked in `normalise_pos`
+*before* the generic Wing branch (since `"wing f"` contains `"wing"` and
+would otherwise match it first).
+
+Adding a 4th bucket touches every `pos_bucket`-keyed structure in both
+files, not just `normalise_pos` — audit for these before changing the
+bucket set again:
+- `_BUCKET_TO_POSITIONS` (five-position fallback for role-less players)
+- `compute_cdi`'s `pos_mult` — a plain `.map()` with **no fallback**; an
+  unmapped bucket silently produces NaN (blank CDI) for every player in it.
+  This is the one that actually breaks, not just drifts, if you add a
+  bucket and forget it.
+- `compute_ath`'s four weight dicts (`EXPLOSION_W`/`MOBILITY_W`/`CONTACT_W`/
+  `COMPONENT_W`) — these use `.get(bucket, X["Wing"])`, so a forgotten
+  bucket degrades to Wing's weights rather than breaking. Forward's entries
+  today are the Wing/Big midpoint, a placeholder (ATH isn't covered by the
+  spec's Forward split yet).
+- NIL valuation's `pos_boost` — `.map()` with `.fillna(1.0)`, so a
+  forgotten bucket silently gets a neutral boost rather than breaking.
+
+The five-position model (`torvik_role_to_positions` / `src/lib/positions.js`)
+is unrelated to this and wasn't touched — `Wing F` still maps to `["SF", "PF"]`
+and `Stretch 4` to `["PF"]` for display/lineup purposes, same as always.
+
+**Minutes cutoff is now 20%** (`Min_per >= 20`, was 10%), also per the spec —
+players below it get basic stats written but no metrics or NIL, same as
+before, just a higher bar.
+
+**Not yet implemented**: Shot Difficulty, Adjusted SEI, and Shot Creation
+(also in the BTP Metrics Spec) are blocked on "assisted share of makes" per
+shot zone (rim/mid/three) — that data isn't in the Torvik CSV pipeline
+(checked all 67 columns) and isn't derivable from what's there. Don't
+attempt these without sourcing that data first.
 
 ---
 
