@@ -25,44 +25,59 @@ Usage:
     python torvik_metrics.py              # write to Supabase
 
 Prerequisites — run once in Supabase SQL Editor:
-    ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS torvik_ortg float;
-    ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS torvik_usg float;
-    ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS torvik_efg float;
-    ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS torvik_ts float;
-    ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS torvik_obpm float;
-    ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS torvik_dbpm float;
-    ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS torvik_bpm float;
-    ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS torvik_drtg float;
-    ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS torvik_stops float;
-    ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS torvik_ast_pct float;
-    ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS torvik_to_pct float;
-    ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS torvik_orb_pct float;
-    ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS torvik_drb_pct float;
-    ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS torvik_rim_pct float;
-    ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS torvik_mid_pct float;
-    ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS torvik_3p_pct float;
-    ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS torvik_porpag float;
-    ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS torvik_adjoe float;
-    ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS torvik_min_pct float;
-    ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS torvik_gp int;
-    ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS torvik_blk_pct float;
-    ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS torvik_stl_pct float;
-    ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS torvik_ftr float;
-    ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS torvik_pfr float;
-    ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS torvik_adrtg float;
-    ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS torvik_dporpag float;
-    ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS torvik_ogbpm float;
-    ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS torvik_dgbpm float;
-    ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS torvik_gbpm float;
-    ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS torvik_rec_rank float;
-    ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS cdi float;
-    ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS dds float;
-    ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS sei float;
-    ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS ath float;
-    ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS ris float;
-    ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS projected_tier text;
-    ALTER TABLE players ADD COLUMN IF NOT EXISTS nil_valuation float;
-    ALTER TABLE players ADD COLUMN IF NOT EXISTS birth_year int;
+    -- NOTE: these were previously written as "player_stats"/"players" in this
+    -- docstring, which is the men's-side table — a copy-paste leftover from
+    -- torvik_metrics.py. The actual writes in this script target w_player_stats
+    -- / w_players (see compute_* and main() below); corrected here to match.
+    ALTER TABLE w_player_stats ADD COLUMN IF NOT EXISTS torvik_ortg float;
+    ALTER TABLE w_player_stats ADD COLUMN IF NOT EXISTS torvik_usg float;
+    ALTER TABLE w_player_stats ADD COLUMN IF NOT EXISTS torvik_efg float;
+    ALTER TABLE w_player_stats ADD COLUMN IF NOT EXISTS torvik_ts float;
+    ALTER TABLE w_player_stats ADD COLUMN IF NOT EXISTS torvik_obpm float;
+    ALTER TABLE w_player_stats ADD COLUMN IF NOT EXISTS torvik_dbpm float;
+    ALTER TABLE w_player_stats ADD COLUMN IF NOT EXISTS torvik_bpm float;
+    ALTER TABLE w_player_stats ADD COLUMN IF NOT EXISTS torvik_drtg float;
+    ALTER TABLE w_player_stats ADD COLUMN IF NOT EXISTS torvik_stops float;
+    ALTER TABLE w_player_stats ADD COLUMN IF NOT EXISTS torvik_ast_pct float;
+    ALTER TABLE w_player_stats ADD COLUMN IF NOT EXISTS torvik_to_pct float;
+    ALTER TABLE w_player_stats ADD COLUMN IF NOT EXISTS torvik_orb_pct float;
+    ALTER TABLE w_player_stats ADD COLUMN IF NOT EXISTS torvik_drb_pct float;
+    ALTER TABLE w_player_stats ADD COLUMN IF NOT EXISTS torvik_rim_pct float;
+    ALTER TABLE w_player_stats ADD COLUMN IF NOT EXISTS torvik_mid_pct float;
+    ALTER TABLE w_player_stats ADD COLUMN IF NOT EXISTS torvik_3p_pct float;
+    ALTER TABLE w_player_stats ADD COLUMN IF NOT EXISTS torvik_porpag float;
+    ALTER TABLE w_player_stats ADD COLUMN IF NOT EXISTS torvik_adjoe float;
+    ALTER TABLE w_player_stats ADD COLUMN IF NOT EXISTS torvik_min_pct float;
+    ALTER TABLE w_player_stats ADD COLUMN IF NOT EXISTS torvik_gp int;
+    ALTER TABLE w_player_stats ADD COLUMN IF NOT EXISTS torvik_blk_pct float;
+    ALTER TABLE w_player_stats ADD COLUMN IF NOT EXISTS torvik_stl_pct float;
+    ALTER TABLE w_player_stats ADD COLUMN IF NOT EXISTS torvik_ftr float;
+    ALTER TABLE w_player_stats ADD COLUMN IF NOT EXISTS torvik_pfr float;
+    ALTER TABLE w_player_stats ADD COLUMN IF NOT EXISTS torvik_adrtg float;
+    ALTER TABLE w_player_stats ADD COLUMN IF NOT EXISTS torvik_dporpag float;
+    ALTER TABLE w_player_stats ADD COLUMN IF NOT EXISTS torvik_ogbpm float;
+    ALTER TABLE w_player_stats ADD COLUMN IF NOT EXISTS torvik_dgbpm float;
+    ALTER TABLE w_player_stats ADD COLUMN IF NOT EXISTS torvik_gbpm float;
+    ALTER TABLE w_player_stats ADD COLUMN IF NOT EXISTS torvik_rec_rank float;
+    ALTER TABLE w_player_stats ADD COLUMN IF NOT EXISTS cdi float;
+    ALTER TABLE w_player_stats ADD COLUMN IF NOT EXISTS dds float;
+    ALTER TABLE w_player_stats ADD COLUMN IF NOT EXISTS sei float;
+    ALTER TABLE w_player_stats ADD COLUMN IF NOT EXISTS ath float;
+    ALTER TABLE w_player_stats ADD COLUMN IF NOT EXISTS ris float;
+    ALTER TABLE w_player_stats ADD COLUMN IF NOT EXISTS projected_tier text;
+    ALTER TABLE w_players ADD COLUMN IF NOT EXISTS nil_valuation float;
+    ALTER TABLE w_players ADD COLUMN IF NOT EXISTS birth_year int;
+
+    -- BTP Metrics Spec — Shot Difficulty / Adjusted SEI / Shot Creation.
+    -- Schema only for now — see the matching note in torvik_metrics.py.
+    ALTER TABLE w_player_stats ADD COLUMN IF NOT EXISTS assisted_pct_three float;        -- 0-1, assisted share of made threes
+    ALTER TABLE w_player_stats ADD COLUMN IF NOT EXISTS assisted_pct_rim float;          -- 0-1, assisted share of made rim shots (incl. dunks)
+    ALTER TABLE w_player_stats ADD COLUMN IF NOT EXISTS assisted_pct_mid float;          -- 0-1, assisted share of made midrange shots
+    ALTER TABLE w_player_stats ADD COLUMN IF NOT EXISTS shot_difficulty float;           -- position percentile of raw shot difficulty
+    ALTER TABLE w_player_stats ADD COLUMN IF NOT EXISTS shot_difficulty_modifier float;  -- raw difficulty / position-avg difficulty, clamped [0.9, 1.1]
+    ALTER TABLE w_player_stats ADD COLUMN IF NOT EXISTS adjusted_sei float;              -- position percentile of (raw SEI * shot_difficulty_modifier)
+    ALTER TABLE w_player_stats ADD COLUMN IF NOT EXISTS sei_diff float;                  -- adjusted_sei - sei, for comparing the two
+    ALTER TABLE w_player_stats ADD COLUMN IF NOT EXISTS shot_creation float;             -- position percentile; spec marks this "optional, may be retired"
 
 Environment variables:
     $env:SUPABASE_URL="https://YOUR_PROJECT.supabase.co"
@@ -273,11 +288,18 @@ def display_school(team_str):
 #
 # DO NOT CHANGE normalise_pos OR percentrank_by_pos WITHOUT INTENDING TO
 # REVALUE THE ENTIRE DATABASE. See the matching note in torvik_metrics.py.
+#
+# Four buckets (Guard/Wing/Forward/Big) as of the BTP Metrics Spec — kept in
+# sync with torvik_metrics.py's normalise_pos.
 
 def normalise_pos(role):
     role = str(role).strip().lower()
     if any(x in role for x in ["guard", "combo g", "pure pg", "scoring pg"]):
         return "Guard"
+    # Checked before the generic "wing" branch below — "wing f" would
+    # otherwise match it first.
+    if any(x in role for x in ["wing f", "stretch 4"]):
+        return "Forward"
     if any(x in role for x in ["wing", "small f", "sf"]):
         return "Wing"
     if any(x in role for x in ["big", "pf", "center", "power"]) or role in ("c",) or role.startswith("c ") or role.endswith(" c"):
@@ -299,7 +321,7 @@ TORVIK_ROLE_TO_POSITIONS = {
     "c":          ["C"],
 }
 
-_BUCKET_TO_POSITIONS = {"Guard": ["PG", "SG"], "Wing": ["SF"], "Big": ["PF", "C"]}
+_BUCKET_TO_POSITIONS = {"Guard": ["PG", "SG"], "Wing": ["SF"], "Forward": ["SF", "PF"], "Big": ["PF", "C"]}
 
 
 def torvik_role_to_positions(role):
@@ -338,7 +360,11 @@ def percentrank_by_pos(df, col, pos_col="pos_bucket", scale=100):
 #   ast/tov
 
 def compute_cdi(df, use_torvik=False):
-    pos_mult = df["pos_bucket"].map({"Guard": 1.15, "Wing": 1.08, "Big": 1.0})
+    # Forward (Wing F / Stretch 4) is the Wing/Big midpoint — a placeholder
+    # like the rest of these multipliers, not a tuned value. Without an
+    # explicit entry this .map() produces NaN for every Forward row (no
+    # fallback), which would silently blank their CDI.
+    pos_mult = df["pos_bucket"].map({"Guard": 1.15, "Wing": 1.08, "Forward": 1.04, "Big": 1.0})
 
     # AST_per: Torvik's pace-adjusted assist %, available for everyone
     ast_score = df["AST_per"]
@@ -362,20 +388,36 @@ def compute_cdi(df, use_torvik=False):
 
 def compute_dds(df, use_torvik=False):
     """
-    DDS — Defensive Disruption Score
-    Measures defensive impact and disruption ability.
+    DDS — Defensive Disruption Score (BTP Metrics Spec)
+    See torvik_metrics.py's compute_dds for the full formula writeup — kept
+    identical here, just against w_player_stats-sourced columns.
     """
-    pfr = df["pfr"].fillna(0)
+    stops = df["stops"].fillna(0)
+    drtg  = df["drtg"]
+
     if use_torvik:
         stl = df["stl_per"].fillna(0)
         blk = df["blk_per"].fillna(0)
-        drb = df["DRB_per"].fillna(0)
-        df["_dds_raw"] = (stl + 0.75 * blk + 0.5 * drb - 0.5 * pfr).clip(lower=0)
+        pfr = df["pfr"].fillna(0)
     else:
-        stl = df["sb_stl_40"].fillna(0)
-        blk = df["sb_blk_40"].fillna(0)
-        drb = df["sb_drb_40"].fillna(0)
-        df["_dds_raw"] = (stl + 0.75 * blk + 0.5 * drb - 0.5 * pfr).clip(lower=0)
+        mp_40 = (df["sb_tot_mp"].replace(0, float("nan")) / 40) if "sb_tot_mp" in df.columns else None
+        if mp_40 is not None:
+            stl = (df["sb_tot_stl"] / mp_40).fillna(df["stl_per"].fillna(0)) if "sb_tot_stl" in df.columns else df["stl_per"].fillna(0)
+            blk = (df["sb_tot_blk"] / mp_40).fillna(df["blk_per"].fillna(0)) if "sb_tot_blk" in df.columns else df["blk_per"].fillna(0)
+            pfr = (df["sb_tot_pf"]  / mp_40).fillna(df["pfr"].fillna(0))     if "sb_tot_pf"  in df.columns else df["pfr"].fillna(0)
+        else:
+            stl = df["stl_per"].fillna(0)
+            blk = df["blk_per"].fillna(0)
+            pfr = df["pfr"].fillna(0)
+
+    pos_avg_drtg = df.groupby("pos_bucket")["drtg"].transform("mean")
+
+    df["_dds_raw"] = (
+        stops
+        + 1.0  * (stl + 0.75 * blk)
+        + 0.1  * (pos_avg_drtg - drtg)
+        - 0.25 * pfr
+    )
 
     return percentrank_by_pos(df, "_dds_raw").apply(clamp)
 
@@ -474,11 +516,15 @@ def compute_ath(df, use_torvik=False):
         df[_col] = df[_col].fillna(0)
 
     # ── Component scores ──────────────────────────────────────────────────────
+    # Forward (Wing F / Stretch 4) rows in every dict below are the Wing/Big
+    # midpoint — see the matching note in torvik_metrics.py's compute_ath.
+    #
     # EXPLOSION: finishing through/above defenders
     EXPLOSION_W = {
-        "Guard": (0.30, 0.20, 0.50),  # rim finish matters most for guards
-        "Wing":  (0.35, 0.30, 0.35),
-        "Big":   (0.40, 0.35, 0.25),  # dunks + rim finish dominate for bigs
+        "Guard":   (0.30,  0.20,  0.50),  # rim finish matters most for guards
+        "Wing":    (0.35,  0.30,  0.35),
+        "Forward": (0.375, 0.325, 0.30),
+        "Big":     (0.40,  0.35,  0.25),  # dunks + rim finish dominate for bigs
     }
     def explosion(row):
         w = EXPLOSION_W.get(row["pos_bucket"], EXPLOSION_W["Wing"])
@@ -488,9 +534,10 @@ def compute_ath(df, use_torvik=False):
 
     # MOBILITY: lateral quickness, shot-blocking, rebounding
     MOBILITY_W = {
-        "Guard": (0.55, 0.20, 0.25),  # steals dominate for guards
-        "Wing":  (0.40, 0.30, 0.30),
-        "Big":   (0.20, 0.45, 0.35),  # blocks + drb for bigs
+        "Guard":   (0.55,  0.20,  0.25),  # steals dominate for guards
+        "Wing":    (0.40,  0.30,  0.30),
+        "Forward": (0.30,  0.375, 0.325),
+        "Big":     (0.20,  0.45,  0.35),  # blocks + drb for bigs
     }
     def mobility(row):
         w = MOBILITY_W.get(row["pos_bucket"], MOBILITY_W["Wing"])
@@ -500,9 +547,10 @@ def compute_ath(df, use_torvik=False):
 
     # CONTACT: drawing fouls, offensive rebounding, winning 50/50s
     CONTACT_W = {
-        "Guard": (0.60, 0.40),
-        "Wing":  (0.50, 0.50),
-        "Big":   (0.40, 0.60),
+        "Guard":   (0.60,  0.40),
+        "Wing":    (0.50,  0.50),
+        "Forward": (0.45,  0.55),
+        "Big":     (0.40,  0.60),
     }
     def contact(row):
         w = CONTACT_W.get(row["pos_bucket"], CONTACT_W["Wing"])
@@ -511,9 +559,10 @@ def compute_ath(df, use_torvik=False):
 
     # ── Final ATH composite ───────────────────────────────────────────────────
     COMPONENT_W = {
-        "Guard": (0.30, 0.45, 0.25),  # mobility-heavy
-        "Wing":  (0.35, 0.35, 0.30),
-        "Big":   (0.40, 0.25, 0.35),  # explosion + contact
+        "Guard":   (0.30,  0.45,  0.25),  # mobility-heavy
+        "Wing":    (0.35,  0.35,  0.30),
+        "Forward": (0.375, 0.30,  0.325),
+        "Big":     (0.40,  0.25,  0.35),  # explosion + contact
     }
     def ath_raw(row):
         w = COMPONENT_W.get(row["pos_bucket"], COMPONENT_W["Wing"])
@@ -844,7 +893,9 @@ def compute_nil_valuation(df):
     base_nil = (conf_ceiling * W**3 * blend).clip(upper=conf_ceiling)
 
     # ── Position Boost ────────────────────────────────────────────────────────
-    pos_boost = df["pos_bucket"].map({"Big": 1.15, "Wing": 1.0, "Guard": 1.0}).fillna(1.0)
+    # Explicit Forward entry (same 1.0 the .fillna below already gave it) —
+    # written out so it's not relying on a silent fallback.
+    pos_boost = df["pos_bucket"].map({"Big": 1.15, "Wing": 1.0, "Forward": 1.0, "Guard": 1.0}).fillna(1.0)
 
     # ── Age/Year Boost ────────────────────────────────────────────────────────
     yr_col = df["yr"]  # issue 3 fix: always use Torvik yr column (Fr, So, Jr, Sr, Gr)
@@ -921,15 +972,16 @@ def main():
 
     print(f"  {len(df)} rows after dedup")
 
-    # Split into qualified (Min_per >= 10%) and low-minutes players.
-    # Metrics (CDI/DDS/SEI/ATH/RIS) are only computed on qualified players so
-    # small-sample outliers don't skew percentile ranks. Low-minutes players
-    # still get their basic stats written (ppg, rpg, fg_pct, etc.) but no metrics or NIL.
+    # Split into qualified (Min_per >= 20%, per BTP Metrics Spec) and
+    # low-minutes players. Metrics (CDI/DDS/SEI/ATH/RIS) are only computed on
+    # qualified players so small-sample outliers don't skew percentile ranks.
+    # Low-minutes players still get their basic stats written (ppg, rpg,
+    # fg_pct, etc.) but no metrics or NIL.
     if "Min_per" in df.columns:
         before = len(df)
-        df_low = df[df["Min_per"] < 10].copy()
-        df     = df[df["Min_per"] >= 10].reset_index(drop=True)
-        print(f"  {len(df)} rows after filtering Min_per < 10% ({before - len(df)} set aside for stats-only write)")
+        df_low = df[df["Min_per"] < 20].copy()
+        df     = df[df["Min_per"] >= 20].reset_index(drop=True)
+        print(f"  {len(df)} rows after filtering Min_per < 20% ({before - len(df)} set aside for stats-only write)")
     else:
         df_low = pd.DataFrame()
 

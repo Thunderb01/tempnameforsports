@@ -54,6 +54,22 @@ Prerequisites — run once in Supabase SQL Editor:
     ALTER TABLE players ADD COLUMN IF NOT EXISTS nil_valuation float;
     ALTER TABLE players ADD COLUMN IF NOT EXISTS birth_year int;
 
+    -- BTP Metrics Spec — Shot Difficulty / Adjusted SEI / Shot Creation.
+    -- Schema only for now: the Torvik CSV this script reads today has no
+    -- "assisted share of makes" data for any shot zone (checked all 67
+    -- columns — see CLAUDE.md's Metric peer groups section), so these
+    -- three raw inputs and their downstream outputs sit unused until the
+    -- new CSV pipeline that will carry assisted_pct_* actually lands.
+    -- Nothing in compute_* reads or writes these yet.
+    ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS assisted_pct_three float;        -- 0-1, assisted share of made threes
+    ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS assisted_pct_rim float;          -- 0-1, assisted share of made rim shots (incl. dunks)
+    ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS assisted_pct_mid float;          -- 0-1, assisted share of made midrange shots
+    ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS shot_difficulty float;           -- position percentile of raw shot difficulty
+    ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS shot_difficulty_modifier float;  -- raw difficulty / position-avg difficulty, clamped [0.9, 1.1]
+    ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS adjusted_sei float;              -- position percentile of (raw SEI * shot_difficulty_modifier)
+    ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS sei_diff float;                  -- adjusted_sei - sei, for comparing the two
+    ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS shot_creation float;             -- position percentile; spec marks this "optional, may be retired"
+
 Environment variables:
     $env:SUPABASE_URL="https://YOUR_PROJECT.supabase.co"
     $env:SUPABASE_SERVICE_KEY="your-service-role-key"
@@ -268,16 +284,24 @@ def display_school(team_str):
 # five-position model deliberately runs alongside this rather than replacing
 # it — see torvik_role_to_positions below.
 #
-# Known quirk, preserved intentionally: "Stretch 4" matches none of these
-# branches and falls through to Wing. It is a stretch *four*, so Big would be
-# more accurate, but correcting it re-ranks those players' peer group and
-# moves their metrics. Left as-is; the five-position mapping below reports
-# Stretch 4 correctly as PF for display/lineup purposes.
+# Four buckets as of the BTP Metrics Spec (Guard/Wing/Forward/Big): "Forward"
+# is Barttorvik's "Wing F" and "Stretch 4" roles, split out of what used to
+# be a 3-bucket Guard/Wing/Big system (where both fell through to Wing — see
+# git history for that prior version if you need it). This is a deliberate,
+# one-time revaluation: re-running the pipeline after this change moves
+# every Wing-F/Stretch-4 player's metrics (new peer group) and nudges
+# everyone else's percentiles slightly (the Wing pool shrank). The
+# five-position mapping below is unaffected either way — it already reported
+# Stretch 4 as PF / Wing F as SF-PF for display/lineup purposes.
 
 def normalise_pos(role):
     role = str(role).strip().lower()
     if any(x in role for x in ["guard", "combo g", "pure pg", "scoring pg"]):
         return "Guard"
+    # Checked before the generic "wing" branch below — "wing f" would
+    # otherwise match it first.
+    if any(x in role for x in ["wing f", "stretch 4"]):
+        return "Forward"
     if any(x in role for x in ["wing", "small f", "sf"]):
         return "Wing"
     if any(x in role for x in ["big", "pf", "center", "power"]) or role in ("c",) or role.startswith("c ") or role.endswith(" c"):
@@ -304,7 +328,7 @@ TORVIK_ROLE_TO_POSITIONS = {
 # Fallback when Torvik has no role for a player: expand the three-bucket
 # value so they still land somewhere plausible. Mirrors the same expansion in
 # src/lib/positions.js.
-_BUCKET_TO_POSITIONS = {"Guard": ["PG", "SG"], "Wing": ["SF"], "Big": ["PF", "C"]}
+_BUCKET_TO_POSITIONS = {"Guard": ["PG", "SG"], "Wing": ["SF"], "Forward": ["SF", "PF"], "Big": ["PF", "C"]}
 
 
 def torvik_role_to_positions(role):
@@ -347,7 +371,12 @@ def percentrank_by_pos(df, col, pos_col="pos_bucket", scale=100):
 #   ast/tov
 
 def compute_cdi(df):
-    pos_mult = df["pos_bucket"].map({"Guard": 1.15, "Wing": 1.08, "Big": 1.0})
+    # Forward (Wing F / Stretch 4) sits between Wing and Big in playmaking
+    # responsibility — 1.04 is the Wing/Big midpoint, a placeholder like the
+    # rest of these multipliers, not a tuned value. Without an explicit entry
+    # here this .map() produces NaN for every Forward row (no fallback),
+    # which would silently blank their CDI.
+    pos_mult = df["pos_bucket"].map({"Guard": 1.15, "Wing": 1.08, "Forward": 1.04, "Big": 1.0})
 
     # AST_per: Torvik's pace-adjusted assist %, available for everyone
     ast_score = df["AST_per"]
@@ -366,20 +395,54 @@ def compute_cdi(df):
 
 def compute_dds(df, use_torvik=False):
     """
-    DDS — Defensive Disruption Score
-    Measures defensive impact and disruption ability.
+    DDS — Defensive Disruption Score (BTP Metrics Spec)
+
+    raw = stops_per40
+        + 1.0  * (steals + 0.75 * blocks)
+        + 0.1  * (position-average DRTG - this player's DRTG)
+        - 0.25 * personal-foul rate
+
+    No floor at zero, and defensive rebounds aren't added separately —
+    Torvik's `stops` already includes them. Weights (1, 0.75, 0.1, 0.25) are
+    placeholders per the spec, not tuned.
+
+    `stops` and `drtg` are always read from Torvik's own columns — neither
+    has a meaningful totals-mode equivalent (they're Torvik-computed, not
+    derivable from raw box-score totals), unlike steals/blocks/fouls, which
+    the spec explicitly gives a totals-mode (per-40) definition for.
     """
-    pfr = df["pfr"].fillna(0)
+    stops = df["stops"].fillna(0)
+    drtg  = df["drtg"]
+
     if use_torvik:
         stl = df["stl_per"].fillna(0)
         blk = df["blk_per"].fillna(0)
-        drb = df["DRB_per"].fillna(0)
-        df["_dds_raw"] = (stl + 0.75 * blk + 0.5 * drb - 0.5 * pfr).clip(lower=0)
+        pfr = df["pfr"].fillna(0)
     else:
-        stl = df["sb_stl_40"].fillna(0)
-        blk = df["sb_blk_40"].fillna(0)
-        drb = df["sb_drb_40"].fillna(0)
-        df["_dds_raw"] = (stl + 0.75 * blk + 0.5 * drb - 0.5 * pfr).clip(lower=0)
+        # Per-40 from scraped box-score totals, falling back to Torvik's own
+        # rate stats wherever sb_tot_* totals aren't available for a player
+        # (mirrors the fallback pattern compute_cdi already uses for ast/tov).
+        mp_40 = (df["sb_tot_mp"].replace(0, float("nan")) / 40) if "sb_tot_mp" in df.columns else None
+        if mp_40 is not None:
+            stl = (df["sb_tot_stl"] / mp_40).fillna(df["stl_per"].fillna(0)) if "sb_tot_stl" in df.columns else df["stl_per"].fillna(0)
+            blk = (df["sb_tot_blk"] / mp_40).fillna(df["blk_per"].fillna(0)) if "sb_tot_blk" in df.columns else df["blk_per"].fillna(0)
+            pfr = (df["sb_tot_pf"]  / mp_40).fillna(df["pfr"].fillna(0))     if "sb_tot_pf"  in df.columns else df["pfr"].fillna(0)
+        else:
+            stl = df["stl_per"].fillna(0)
+            blk = df["blk_per"].fillna(0)
+            pfr = df["pfr"].fillna(0)
+
+    # Position-average DRTG — computed over whatever's already in df (the
+    # qualified, >= 20% minutes pool by the time this runs), grouped by the
+    # same four-bucket pos_bucket every other BTP metric uses.
+    pos_avg_drtg = df.groupby("pos_bucket")["drtg"].transform("mean")
+
+    df["_dds_raw"] = (
+        stops
+        + 1.0  * (stl + 0.75 * blk)
+        + 0.1  * (pos_avg_drtg - drtg)
+        - 0.25 * pfr
+    )
 
     return percentrank_by_pos(df, "_dds_raw").apply(clamp)
 
@@ -478,11 +541,19 @@ def compute_ath(df, use_torvik=False):
         df[_col] = df[_col].fillna(0)
 
     # ── Component scores ──────────────────────────────────────────────────────
+    # Forward (Wing F / Stretch 4) rows in every dict below are the Wing/Big
+    # midpoint — ATH isn't covered by the BTP Metrics Spec's Forward split,
+    # so there's no tuned value to use yet. Without an explicit entry each
+    # .get() would silently fall back to Wing's weights (same as today's
+    # pre-split behavior); an explicit midpoint is a better placeholder than
+    # quietly inheriting Wing. Revisit once ATH gets its own Forward pass.
+    #
     # EXPLOSION: finishing through/above defenders
     EXPLOSION_W = {
-        "Guard": (0.30, 0.20, 0.50),  # rim finish matters most for guards
-        "Wing":  (0.35, 0.30, 0.35),
-        "Big":   (0.40, 0.35, 0.25),  # dunks + rim finish dominate for bigs
+        "Guard":   (0.30,  0.20,  0.50),  # rim finish matters most for guards
+        "Wing":    (0.35,  0.30,  0.35),
+        "Forward": (0.375, 0.325, 0.30),
+        "Big":     (0.40,  0.35,  0.25),  # dunks + rim finish dominate for bigs
     }
     def explosion(row):
         w = EXPLOSION_W.get(row["pos_bucket"], EXPLOSION_W["Wing"])
@@ -492,9 +563,10 @@ def compute_ath(df, use_torvik=False):
 
     # MOBILITY: lateral quickness, shot-blocking, rebounding
     MOBILITY_W = {
-        "Guard": (0.55, 0.20, 0.25),  # steals dominate for guards
-        "Wing":  (0.40, 0.30, 0.30),
-        "Big":   (0.20, 0.45, 0.35),  # blocks + drb for bigs
+        "Guard":   (0.55,  0.20,  0.25),  # steals dominate for guards
+        "Wing":    (0.40,  0.30,  0.30),
+        "Forward": (0.30,  0.375, 0.325),
+        "Big":     (0.20,  0.45,  0.35),  # blocks + drb for bigs
     }
     def mobility(row):
         w = MOBILITY_W.get(row["pos_bucket"], MOBILITY_W["Wing"])
@@ -504,9 +576,10 @@ def compute_ath(df, use_torvik=False):
 
     # CONTACT: drawing fouls, offensive rebounding, winning 50/50s
     CONTACT_W = {
-        "Guard": (0.60, 0.40),
-        "Wing":  (0.50, 0.50),
-        "Big":   (0.40, 0.60),
+        "Guard":   (0.60,  0.40),
+        "Wing":    (0.50,  0.50),
+        "Forward": (0.45,  0.55),
+        "Big":     (0.40,  0.60),
     }
     def contact(row):
         w = CONTACT_W.get(row["pos_bucket"], CONTACT_W["Wing"])
@@ -515,9 +588,10 @@ def compute_ath(df, use_torvik=False):
 
     # ── Final ATH composite ───────────────────────────────────────────────────
     COMPONENT_W = {
-        "Guard": (0.30, 0.45, 0.25),  # mobility-heavy
-        "Wing":  (0.35, 0.35, 0.30),
-        "Big":   (0.40, 0.25, 0.35),  # explosion + contact
+        "Guard":   (0.30,  0.45,  0.25),  # mobility-heavy
+        "Wing":    (0.35,  0.35,  0.30),
+        "Forward": (0.375, 0.30,  0.325),
+        "Big":     (0.40,  0.25,  0.35),  # explosion + contact
     }
     def ath_raw(row):
         w = COMPONENT_W.get(row["pos_bucket"], COMPONENT_W["Wing"])
@@ -848,7 +922,9 @@ def compute_nil_valuation(df):
     base_nil = (conf_ceiling * W**3 * blend).clip(upper=conf_ceiling)
 
     # ── Position Boost ────────────────────────────────────────────────────────
-    pos_boost = df["pos_bucket"].map({"Big": 1.15, "Wing": 1.0, "Guard": 1.0}).fillna(1.0)
+    # Explicit Forward entry (same 1.0 the .fillna below already gave it) —
+    # written out so it's not relying on a silent fallback.
+    pos_boost = df["pos_bucket"].map({"Big": 1.15, "Wing": 1.0, "Forward": 1.0, "Guard": 1.0}).fillna(1.0)
 
     # ── Age/Year Boost ────────────────────────────────────────────────────────
     yr_col = df["yr"]  # issue 3 fix: always use Torvik yr column (Fr, So, Jr, Sr, Gr)
@@ -925,15 +1001,17 @@ def main():
 
     print(f"  {len(df)} rows after dedup")
 
-    # Split into qualified (Min_per >= 10%) and low-minutes players.
-    # Metrics (CDI/DDS/SEI/ATH/RIS) are only computed on qualified players so
-    # small-sample outliers don't skew percentile ranks. Low-minutes players
-    # still get their basic stats written (ppg, rpg, fg_pct, etc.) but no metrics or NIL.
+    # Split into qualified (Min_per >= 20%, per BTP Metrics Spec) and
+    # low-minutes players. Metrics (CDI/DDS/SEI/ATH/RIS) are only computed on
+    # qualified players so small-sample outliers don't skew percentile ranks —
+    # this is also the pool percentrank_by_pos and position-average DRTG (DDS)
+    # draw from. Low-minutes players still get their basic stats written
+    # (ppg, rpg, fg_pct, etc.) but no metrics or NIL.
     if "Min_per" in df.columns:
         before = len(df)
-        df_low = df[df["Min_per"] < 10].copy()
-        df     = df[df["Min_per"] >= 10].reset_index(drop=True)
-        print(f"  {len(df)} rows after filtering Min_per < 10% ({before - len(df)} set aside for stats-only write)")
+        df_low = df[df["Min_per"] < 20].copy()
+        df     = df[df["Min_per"] >= 20].reset_index(drop=True)
+        print(f"  {len(df)} rows after filtering Min_per < 20% ({before - len(df)} set aside for stats-only write)")
     else:
         df_low = pd.DataFrame()
 
