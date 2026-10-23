@@ -1208,7 +1208,11 @@ def main():
 
         # ── Update players table (skip in historical mode) ────────────────────
         if not args.historical:
-            player_patch = {}
+            # Matching this row in the current season's Torvik CSV confirms
+            # the player belongs on the live board — flip it back on
+            # regardless of whether anything else below changed. See
+            # archive_season.py / CLAUDE.md's season rollover section.
+            player_patch = {"on_board": True}
             if torvik_pid_val is not None:
                 player_patch["torvik_pid"] = torvik_pid_val
             if birth_year:

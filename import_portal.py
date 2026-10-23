@@ -108,7 +108,10 @@ def main():
             current_status = status_by_id.get(player_id)
             new_player_status = "transferring" if current_status in (None, "transferring") else current_status
 
-            update = {"player_status": new_player_status}
+            # A portal match confirms this player is active this season —
+            # flip on_board back on regardless of which status wins below
+            # (see archive_season.py / CLAUDE.md's season rollover section).
+            update = {"player_status": new_player_status, "on_board": True}
             # Only write transfer detail when the player is actually ending up
             # "transferring" — writing it regardless (even when an existing
             # status like "declared" or "graduating" wins) leaves stale
@@ -136,6 +139,7 @@ def main():
                 "transfer_to_team":     to_team,
                 "transfer_season_year": 2026,
                 "transfer_api_id":      entry["id"],
+                "on_board":             True,
             })
 
     print(f"Matched: {matched} / {len(portal)}  |  Unmatched: {len(unmatched_names)}")

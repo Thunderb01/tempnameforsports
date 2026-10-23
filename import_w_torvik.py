@@ -118,6 +118,9 @@ def build_player_row(row, year):
         # DROP/recreate the check to add "torvik" and switch this back.
         "source":           "program",
         "torvik_pid":       safe_int(row.get("pid")),
+        # Confirms this player belongs on the live board for this season —
+        # see archive_season.py / CLAUDE.md's season rollover section.
+        "on_board":         True,
     }
 
 

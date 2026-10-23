@@ -468,6 +468,12 @@ def scrape_player(url, team_name, year):
         "shooting_tags":    auto_shooting_tags(tp_v, ppg, fg_v, usg or 0),
         "height":           height,
         "weight":           weight,
+        # Confirms this player belongs on the live board for whatever season
+        # this scrape is for — archive_season.py's --reset-live sets this
+        # false for everyone at season rollover; a fresh roster scrape is
+        # exactly the signal that flips it back on. See CLAUDE.md's season
+        # rollover section.
+        "on_board":         True,
     }
 
     # stats row (for `player_stats` table) — all numeric, pct as float
