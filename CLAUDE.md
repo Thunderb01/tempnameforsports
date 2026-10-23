@@ -160,16 +160,37 @@ There's no season dimension on the live tables — `players`/`w_players` and
 `vw_players`/`vw_w_players` are just "current state," continuously
 overwritten by the nightly Torvik pipeline. The season-specific state that
 needs resetting at rollover is `player_status` (returning/graduating/
-transferring/declared/drafted) and `portal_transfers`/`w_portal_transfers`.
+transferring/declared/drafted), `portal_transfers`/`w_portal_transfers`, and
+`on_board` — a boolean on `players`/`w_players` (`supabase/add_on_board_column.sql`)
+that `vw_players`/`vw_w_players` filter on (`supabase/add_on_board_to_views.sql`).
+`on_board` is what actually empties the board — clearing `player_status` alone
+only resets admin/portal metadata, the row (and everything it shows) still
+renders everywhere else that reads the view.
+
+Deliberately a flag, not a delete and not a separate join table: deleting the
+row would break `torvik_metrics.py`'s (name, team) matching next season and
+lose espn_id/archetype work; a join table (e.g. `season_rosters(player_id,
+season_year, on_board)`) would just duplicate what `season_board_archive`
+already tracks — two places that can answer "was this player on the board in
+season X" is worse than one. A player is on the board or not, right now,
+singular — that's a 1:1 attribute of the row, which is what a column is for.
+Every write path that creates or updates a `players`/`w_players` row for a
+new season (`scraper_to_supabase.py`, `import_portal.py`, `torvik_metrics.py`
+/ `torvik_metrics_w.py`, `import_w_torvik.py`) sets `on_board = true` — a
+player reappears exactly when the new season's pipeline actually confirms
+them, not before. Anyone it never touches (graduated, drafted, left) just
+stays off the board, no cleanup step needed.
 
 `archive_season.py` snapshots the live board (stats, archetypes, tags,
 transfer status/destination, NIL — everything a board row shows, not just
 bare Torvik metrics) into `season_board_archive`/`w_season_board_archive`
 (see `supabase/season_board_archive.sql`) before anything gets cleared.
 Archiving is always safe to re-run (idempotent upsert). Actually clearing
-the live board (`--reset-live`) is separate, explicit, and requires typing
-the season year to confirm — it is not reversible from the script itself,
-the archive it just wrote is the only copy of what gets cleared.
+the live board (`--reset-live`: sets `on_board = false` for everyone, clears
+`player_status`, deletes that season's `portal_transfers`) is separate,
+explicit, and requires typing the season year to confirm — it is not
+reversible from the script itself, the archive it just wrote is the only
+copy of what gets cleared.
 
 This is a different table from `historical_stats` (`supabase/historical.sql`)
 on purpose: `historical_stats` is a deliberately bare, stats-only archive

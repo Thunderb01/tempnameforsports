@@ -18,12 +18,21 @@ Two separate, deliberately gated steps:
 
   2. Reset live board (--reset-live, requires --season and a successful
      archive first in the same run — or --skip-archive if you already
-     archived and just want to reset). Clears player_status back to NULL on
-     every players/w_players row and deletes portal_transfers/
-     w_portal_transfers rows for that season_year. This is the actual
-     "clear the board" step and is NOT reversible from this script — the
-     archive you just wrote is the only copy of what you're clearing.
+     archived and just want to reset). Clears player_status back to NULL,
+     deletes portal_transfers/w_portal_transfers rows for that season_year,
+     and — the step that actually empties the board — sets on_board=false
+     on every players/w_players row (vw_players/vw_w_players filter on
+     this, see supabase/add_on_board_to_views.sql, so every page reading
+     the view goes blank for that row, not just Full Board). This is the
+     actual "clear the board" step and is NOT reversible from this script —
+     the archive you just wrote is the only copy of what you're clearing.
      Requires typing a confirmation phrase unless --yes is also passed.
+
+     Players reappear automatically once the new season's pipeline
+     (scraper_to_supabase.py, import_portal.py, torvik_metrics.py /
+     torvik_metrics_w.py, import_w_torvik.py) creates or updates their row
+     — every one of those sets on_board=true. Anyone the new pipeline never
+     touches (graduated, drafted, left) just stays off the board.
 
 Usage:
     python archive_season.py --season 2026 --dry-run          # preview counts only
@@ -189,6 +198,9 @@ def reset_live_sport(sb, sport, season, dry_run):
     status_rows = fetch_all(sb, cfg["players_table"], "id", [lambda q: q.not_.is_("player_status", "null")])
     print(f"  {len(status_rows)} {cfg['players_table']} row(s) with a non-null player_status to clear")
 
+    on_board_rows = fetch_all(sb, cfg["players_table"], "id", [lambda q: q.eq("on_board", True)])
+    print(f"  {len(on_board_rows)} {cfg['players_table']} row(s) currently on_board — this is what empties the board")
+
     if dry_run:
         print("  (dry-run — nothing reset)")
         return
@@ -201,6 +213,11 @@ def reset_live_sport(sb, sport, season, dry_run):
         sb.table(cfg["players_table"]).update({"player_status": None}).in_("id", chunk).execute()
     if status_rows:
         print(f"  Cleared player_status on {len(status_rows)} {cfg['players_table']} row(s)")
+
+    for chunk in chunked([r["id"] for r in on_board_rows], CHUNK):
+        sb.table(cfg["players_table"]).update({"on_board": False}).in_("id", chunk).execute()
+    if on_board_rows:
+        print(f"  Set on_board=false on {len(on_board_rows)} {cfg['players_table']} row(s) — board is now empty until the new season's pipeline runs")
 
 
 def main():
@@ -225,8 +242,9 @@ def main():
             return
 
         if not args.yes:
-            print(f"\nThis permanently clears player_status on every {'/'.join(SPORTS[s]['players_table'] for s in sports)} "
-                  f"row and deletes every {'/'.join(SPORTS[s]['portal_table'] for s in sports)} row for season {args.season}.")
+            print(f"\nThis sets on_board=false on every {'/'.join(SPORTS[s]['players_table'] for s in sports)} row "
+                  f"(emptying the live board), clears player_status, and deletes every "
+                  f"{'/'.join(SPORTS[s]['portal_table'] for s in sports)} row for season {args.season}.")
             print("The archive written above (or already on file, with --skip-archive) is the only copy of this data afterward.")
             confirm = input(f"Type the season year ({args.season}) to confirm: ")
             if confirm.strip() != str(args.season):
