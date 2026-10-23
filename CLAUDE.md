@@ -132,8 +132,16 @@ before, just a higher bar.
 **Not yet implemented**: Shot Difficulty, Adjusted SEI, and Shot Creation
 (also in the BTP Metrics Spec) are blocked on "assisted share of makes" per
 shot zone (rim/mid/three) — that data isn't in the Torvik CSV pipeline
-(checked all 67 columns) and isn't derivable from what's there. Don't
-attempt these without sourcing that data first.
+(checked all 67 columns) and isn't derivable from what's there. Schema is
+prepped ahead of it (`assisted_pct_three`/`_rim`/`_mid`, `shot_difficulty`,
+`shot_difficulty_modifier`, `adjusted_sei`, `sei_diff`, `shot_creation` —
+`player_stats`/`w_player_stats`, see the Prerequisites block atop
+`torvik_metrics.py`/`torvik_metrics_w.py`), but no `compute_*` function
+reads or writes them yet — that's waiting on a new Torvik CSV pipeline that
+actually carries assisted-share data. Once that CSV's real column names are
+known, wire the raw `assisted_pct_*` columns up from it and implement the
+three formulas per the spec (section 3-5) — don't invent placeholder CSV
+column names in the meantime.
 
 ---
 

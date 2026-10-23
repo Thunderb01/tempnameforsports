@@ -54,6 +54,22 @@ Prerequisites — run once in Supabase SQL Editor:
     ALTER TABLE players ADD COLUMN IF NOT EXISTS nil_valuation float;
     ALTER TABLE players ADD COLUMN IF NOT EXISTS birth_year int;
 
+    -- BTP Metrics Spec — Shot Difficulty / Adjusted SEI / Shot Creation.
+    -- Schema only for now: the Torvik CSV this script reads today has no
+    -- "assisted share of makes" data for any shot zone (checked all 67
+    -- columns — see CLAUDE.md's Metric peer groups section), so these
+    -- three raw inputs and their downstream outputs sit unused until the
+    -- new CSV pipeline that will carry assisted_pct_* actually lands.
+    -- Nothing in compute_* reads or writes these yet.
+    ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS assisted_pct_three float;        -- 0-1, assisted share of made threes
+    ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS assisted_pct_rim float;          -- 0-1, assisted share of made rim shots (incl. dunks)
+    ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS assisted_pct_mid float;          -- 0-1, assisted share of made midrange shots
+    ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS shot_difficulty float;           -- position percentile of raw shot difficulty
+    ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS shot_difficulty_modifier float;  -- raw difficulty / position-avg difficulty, clamped [0.9, 1.1]
+    ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS adjusted_sei float;              -- position percentile of (raw SEI * shot_difficulty_modifier)
+    ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS sei_diff float;                  -- adjusted_sei - sei, for comparing the two
+    ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS shot_creation float;             -- position percentile; spec marks this "optional, may be retired"
+
 Environment variables:
     $env:SUPABASE_URL="https://YOUR_PROJECT.supabase.co"
     $env:SUPABASE_SERVICE_KEY="your-service-role-key"
