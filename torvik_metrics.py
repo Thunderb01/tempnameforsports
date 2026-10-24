@@ -1236,32 +1236,47 @@ def main():
     # column as "no data", same as the spec's "missing counts as 0" rule.
     if not args.dry_run:
         print("Fetching assisted_pct_rim/mid/three for this season …")
-        _assist_rows = []
-        _page = 0
-        while True:
-            _res = db.table("player_stats") \
-                      .select("player_id, assisted_pct_rim, assisted_pct_mid, assisted_pct_three") \
-                      .eq("calendar_year", args.year) \
-                      .range(_page * 1000, (_page + 1) * 1000 - 1).execute()
-            _assist_rows.extend(_res.data or [])
-            if len(_res.data or []) < 1000:
-                break
-            _page += 1
+        try:
+            _assist_rows = []
+            _page = 0
+            while True:
+                _res = db.table("player_stats") \
+                          .select("player_id, assisted_pct_rim, assisted_pct_mid, assisted_pct_three") \
+                          .eq("calendar_year", args.year) \
+                          .range(_page * 1000, (_page + 1) * 1000 - 1).execute()
+                _assist_rows.extend(_res.data or [])
+                if len(_res.data or []) < 1000:
+                    break
+                _page += 1
 
-        if _assist_rows:
-            _pl_torvik = {p["id"]: p.get("torvik_pid") for p in _pl_rows}
-            _assist_df = pd.DataFrame([
-                {"pid": _pl_torvik.get(r["player_id"]),
-                 "assisted_pct_rim": r.get("assisted_pct_rim"),
-                 "assisted_pct_mid": r.get("assisted_pct_mid"),
-                 "assisted_pct_three": r.get("assisted_pct_three")}
-                for r in _assist_rows if _pl_torvik.get(r["player_id"]) is not None
-            ]).drop_duplicates(subset=["pid"])
-            df = df.merge(_assist_df, on="pid", how="left")
-            _n_with_data = df[["assisted_pct_rim", "assisted_pct_mid", "assisted_pct_three"]].notna().any(axis=1).sum()
-            print(f"  {_n_with_data}/{len(df)} qualified players have at least one assisted-share bucket")
-        else:
-            print("  No assisted_pct_* rows found for this season — run import_pbp_shot_assists.py first if you want Shot Difficulty/Adjusted SEI/Shot Creation populated")
+            if _assist_rows:
+                _pl_torvik = {p["id"]: p.get("torvik_pid") for p in _pl_rows}
+                _assist_df = pd.DataFrame([
+                    {"pid": _pl_torvik.get(r["player_id"]),
+                     "assisted_pct_rim": r.get("assisted_pct_rim"),
+                     "assisted_pct_mid": r.get("assisted_pct_mid"),
+                     "assisted_pct_three": r.get("assisted_pct_three")}
+                    for r in _assist_rows if _pl_torvik.get(r["player_id"]) is not None
+                ]).drop_duplicates(subset=["pid"])
+                df = df.merge(_assist_df, on="pid", how="left")
+                _n_with_data = df[["assisted_pct_rim", "assisted_pct_mid", "assisted_pct_three"]].notna().any(axis=1).sum()
+                print(f"  {_n_with_data}/{len(df)} qualified players have at least one assisted-share bucket")
+            else:
+                print("  No assisted_pct_* rows found for this season — run import_pbp_shot_assists.py first if you want Shot Difficulty/Adjusted SEI/Shot Creation populated")
+        except Exception as e:
+            # Most likely cause: the assisted_pct_* columns don't exist yet —
+            # see the ALTER TABLE statements in this file's own docstring
+            # Prerequisites block, meant to be run once in the Supabase SQL
+            # Editor. This is an optional enrichment on top of everything
+            # else this script does, so a failure here (missing columns, a
+            # transient network hiccup, whatever) degrades to "no
+            # assisted-share data" rather than losing the whole run — Shot
+            # Difficulty/Adjusted SEI/Shot Creation just come out null this
+            # time, same as if import_pbp_shot_assists.py hadn't run yet.
+            print(f"  ⚠ Could not fetch assisted_pct_* ({e}) — continuing without it. "
+                  f"If this is a missing-column error, run the assisted_pct_*/shot_difficulty/"
+                  f"adjusted_sei/sei_diff/shot_creation ALTER TABLE statements from this file's "
+                  f"Prerequisites block in the Supabase SQL Editor, then re-run.")
 
     # ── Position buckets + pre-compute metrics over full df ───────────────────
     df = df.reset_index(drop=True)
