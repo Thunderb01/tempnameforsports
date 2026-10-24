@@ -129,19 +129,44 @@ and `Stretch 4` to `["PF"]` for display/lineup purposes, same as always.
 players below it get basic stats written but no metrics or NIL, same as
 before, just a higher bar.
 
-**Not yet implemented**: Shot Difficulty, Adjusted SEI, and Shot Creation
-(also in the BTP Metrics Spec) are blocked on "assisted share of makes" per
-shot zone (rim/mid/three) — that data isn't in the Torvik CSV pipeline
-(checked all 67 columns) and isn't derivable from what's there. Schema is
-prepped ahead of it (`assisted_pct_three`/`_rim`/`_mid`, `shot_difficulty`,
-`shot_difficulty_modifier`, `adjusted_sei`, `sei_diff`, `shot_creation` —
-`player_stats`/`w_player_stats`, see the Prerequisites block atop
-`torvik_metrics.py`/`torvik_metrics_w.py`), but no `compute_*` function
-reads or writes them yet — that's waiting on a new Torvik CSV pipeline that
-actually carries assisted-share data. Once that CSV's real column names are
-known, wire the raw `assisted_pct_*` columns up from it and implement the
-three formulas per the spec (section 3-5) — don't invent placeholder CSV
-column names in the meantime.
+### Shot Difficulty, Adjusted SEI, Shot Creation — the assisted-share data source
+
+The missing input was "assisted share of makes" per shot zone (rim/mid/
+three) — not in the standard Torvik CSV, confirmed by checking all 67
+columns. It comes from a *separate* Barttorvik endpoint:
+`https://barttorvik.com/{year}_pbp_playerstat_array.json?csv=1` — an array
+of 15-element arrays, no field names:
+`[torvik_pid, name, school, rim_made, rim_missed, rim_assisted, mid_made,
+mid_missed, mid_assisted, three_made, three_missed, three_assisted,
+dunk_made, dunk_missed, dunk_assisted]`. The leading integer is confirmed
+(cross-referenced against a real CSV) to be the same `torvik_pid` already
+stored on `players`/`w_players` — match directly on it, no fuzzy name/team
+matching needed.
+
+Barttorvik tracks dunks as a category **separate** from rim (confirmed:
+dunk/rim counts don't overlap in this data), but the spec's "rim" bucket is
+explicitly "includes dunks" — `import_pbp_shot_assists.py` sums
+`dunk_made/missed/assisted` into the rim numbers before computing
+`assisted_pct_rim`; `torvik_metrics.py`'s `_shot_bucket_attempts()` sums the
+CSV's `rimmade+rimmiss` and `dunksmiss+dunksmade` the same way, so both
+sides agree on what "rim" means.
+
+**Pipeline order matters**: `import_pbp_shot_assists.py --season <year>`
+must run *before* `torvik_metrics.py --year <year>` picks up
+`assisted_pct_rim/mid/three` — it reads them from `player_stats`/
+`w_player_stats` (scoped to that `calendar_year`) and merges them onto the
+working dataframe by `pid` alongside the usual CSV load. Missing data
+(importer hasn't run, or a player had 0 makes in a bucket) is treated as
+`0` — "fully unassisted" — per the spec's own edge-case rule, not an error.
+
+All three formulas (`compute_shot_difficulty`, `compute_adjusted_sei`,
+`compute_shot_creation` in both `torvik_metrics.py` and `torvik_metrics_w.py`)
+are implemented per spec sections 3-5, verified against real 2025-26 data
+(CSV + PBP JSON for that season). Shot Difficulty's clamp bounds (0.9/1.1)
+print a diagnostic count of players hitting each limit when the pipeline
+runs — spec note: "a large number means the range needs widening." The
+spec's "ignore rim for Bigs" Shot Creation variant is explicitly a *test*
+variant, not implemented as default behavior.
 
 ---
 

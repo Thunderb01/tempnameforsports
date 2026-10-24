@@ -502,6 +502,144 @@ def compute_sei(df, use_torvik=False):
     return percentrank_by_pos(df, "_sei_raw").apply(clamp)
 
 
+# ── Shot Difficulty / Adjusted SEI / Shot Creation (BTP Metrics Spec 3-5) ───────
+# Needs assisted_pct_rim/mid/three on df (merged in main() from player_stats,
+# written there by import_pbp_shot_assists.py) and attempts per bucket from
+# the Torvik CSV. "Rim" already includes dunks by the time assisted_pct_rim
+# reaches this file — the importer sums them — so attempts must be summed the
+# same way here (rimmade+rimmiss + dunksmiss+dunksmade) to match.
+#
+# Do NOT use usage rate anywhere in here — SEI already rewards shot volume
+# (explicit spec rule, section 6).
+
+SHOT_BUCKET_WEIGHT = {"three": 1.0, "rim": 0.8, "mid": 0.6}
+
+# Unassisted-to-assisted conversion ratio r, by position and bucket — how
+# often unassisted shots go in compared to assisted ones. Spec's own table;
+# not tuned by us.
+SHOT_R_RATIO = {
+    "three": {"Guard": 0.75, "Wing": 0.80, "Forward": 0.78, "Big": 0.85},
+    "rim":   {"Guard": 0.80, "Wing": 0.85, "Forward": 0.85, "Big": 0.95},
+    "mid":   {"Guard": 0.80, "Wing": 0.85, "Forward": 0.85, "Big": 0.90},
+}
+
+SHOT_DIFFICULTY_CREATION_DISCOUNT = 0.6
+SHOT_DIFFICULTY_CLAMP = (0.9, 1.1)
+
+
+def _shot_bucket_attempts(df):
+    """attempts/makes per bucket from the Torvik CSV, rim combined with dunks."""
+    rim_attempts   = df["rimmade+rimmiss"].fillna(0) + df["dunksmiss+dunksmade"].fillna(0)
+    rim_makes      = df["rimmade"].fillna(0) + df["dunksmade"].fillna(0)
+    mid_attempts   = df["midmade+midmiss"].fillna(0)
+    mid_makes      = df["midmade"].fillna(0)
+    three_attempts = df["TPA"].fillna(0)
+    three_makes    = df["TPM"].fillna(0)
+    return {
+        "rim":   {"attempts": rim_attempts,   "makes": rim_makes},
+        "mid":   {"attempts": mid_attempts,   "makes": mid_makes},
+        "three": {"attempts": three_attempts, "makes": three_makes},
+    }
+
+
+def compute_shot_difficulty(df):
+    """
+    Shot Difficulty (BTP Metrics Spec section 3)
+
+    Per bucket: estimate the assisted share of ATTEMPTS from the assisted
+    share of MAKES (via the position/bucket r-ratio), apply the creation
+    discount, weight by bucket, sum into a single "weighted attempts" figure
+    — a lower value means a harder, more self-created shot profile.
+
+    Returns (percentile, difficulty_modifier) — the modifier is what
+    compute_adjusted_sei multiplies raw SEI by.
+    """
+    buckets = _shot_bucket_attempts(df)
+    # Missing assisted share counts as 0 (spec section 6) — fully unassisted.
+    asm = {
+        "rim":   df["assisted_pct_rim"].fillna(0)   if "assisted_pct_rim"   in df.columns else pd.Series(0.0, index=df.index),
+        "mid":   df["assisted_pct_mid"].fillna(0)   if "assisted_pct_mid"   in df.columns else pd.Series(0.0, index=df.index),
+        "three": df["assisted_pct_three"].fillna(0) if "assisted_pct_three" in df.columns else pd.Series(0.0, index=df.index),
+    }
+
+    weighted_total = pd.Series(0.0, index=df.index)
+    attempts_total = pd.Series(0.0, index=df.index)
+
+    for bucket, data in buckets.items():
+        r = df["pos_bucket"].map(SHOT_R_RATIO[bucket])
+        a = asm[bucket]
+        # (r * ASM) / ((1 - ASM) + r * ASM) — denominator never hits 0 for
+        # r in (0, 1] and ASM in [0, 1], see compute_shot_difficulty's own
+        # derivation notes in CLAUDE.md.
+        estimated_assisted_attempts_share = (r * a) / ((1 - a) + r * a)
+        creation_factor = 1 - SHOT_DIFFICULTY_CREATION_DISCOUNT * estimated_assisted_attempts_share
+        weighted_total += data["attempts"] * SHOT_BUCKET_WEIGHT[bucket] * creation_factor
+        attempts_total += data["attempts"]
+
+    df["_shot_difficulty_raw"] = (weighted_total / attempts_total.replace(0, float("nan")))
+
+    # Position-average difficulty is POOLED (sum of weighted / sum of total
+    # across the group), not a mean of per-player ratios — spec section 3.
+    _tmp = pd.DataFrame({"pos_bucket": df["pos_bucket"], "weighted": weighted_total, "total": attempts_total})
+    pos_sums = _tmp.groupby("pos_bucket")[["weighted", "total"]].transform("sum")
+    pos_avg_difficulty = pos_sums["weighted"] / pos_sums["total"].replace(0, float("nan"))
+
+    modifier = (df["_shot_difficulty_raw"] / pos_avg_difficulty).clip(*SHOT_DIFFICULTY_CLAMP)
+    df["_shot_difficulty_modifier"] = modifier
+
+    n_low_clamp  = (modifier == SHOT_DIFFICULTY_CLAMP[0]).sum()
+    n_high_clamp = (modifier == SHOT_DIFFICULTY_CLAMP[1]).sum()
+    if n_low_clamp or n_high_clamp:
+        print(f"  Shot Difficulty modifier clamp hits: {n_low_clamp} at {SHOT_DIFFICULTY_CLAMP[0]}, {n_high_clamp} at {SHOT_DIFFICULTY_CLAMP[1]} "
+              f"(spec section 6: a large number here means the range needs widening)")
+
+    return percentrank_by_pos(df, "_shot_difficulty_raw").apply(clamp), modifier
+
+
+def compute_adjusted_sei(df):
+    """
+    Adjusted SEI (BTP Metrics Spec section 4) — raw SEI (compute_sei's
+    _sei_raw side-effect column) times the Shot Difficulty modifier. Must be
+    called after both compute_sei and compute_shot_difficulty have run on df.
+    Returns (adjusted_sei_percentile, sei_diff) — sei_diff is
+    adjusted_sei_percentile - the basic sei percentile, so the two are easy
+    to compare (spec: "ideally with a column showing the difference").
+    """
+    df["_adjusted_sei_raw"] = df["_sei_raw"] * df["_shot_difficulty_modifier"]
+    adjusted_pct = percentrank_by_pos(df, "_adjusted_sei_raw").apply(clamp)
+    sei_diff = adjusted_pct - df["_sei"]
+    return adjusted_pct, sei_diff
+
+
+def compute_shot_creation(df):
+    """
+    Shot Creation (BTP Metrics Spec section 5) — "optional, may be retired."
+    weighted_unassisted_makes = makes * (1 - ASM) * bucket_weight, summed
+    across buckets; raw = that / (makes * bucket_weight, summed). A higher
+    value means more of a player's own makes were unassisted (self-created).
+
+    The spec also describes a test variant that drops the rim bucket
+    entirely for Bigs — not implemented here, it's explicitly experimental.
+    """
+    buckets = _shot_bucket_attempts(df)
+    asm = {
+        "rim":   df["assisted_pct_rim"].fillna(0)   if "assisted_pct_rim"   in df.columns else pd.Series(0.0, index=df.index),
+        "mid":   df["assisted_pct_mid"].fillna(0)   if "assisted_pct_mid"   in df.columns else pd.Series(0.0, index=df.index),
+        "three": df["assisted_pct_three"].fillna(0) if "assisted_pct_three" in df.columns else pd.Series(0.0, index=df.index),
+    }
+
+    weighted_makes            = pd.Series(0.0, index=df.index)
+    weighted_unassisted_makes = pd.Series(0.0, index=df.index)
+
+    for bucket, data in buckets.items():
+        w = SHOT_BUCKET_WEIGHT[bucket]
+        weighted_makes            += data["makes"] * w
+        weighted_unassisted_makes += data["makes"] * (1 - asm[bucket]) * w
+
+    df["_shot_creation_raw"] = weighted_unassisted_makes / weighted_makes.replace(0, float("nan"))
+    return percentrank_by_pos(df, "_shot_creation_raw").apply(clamp)
+
+
 def compute_ath(df, use_torvik=False):
     """
     ATH — Athleticism Index
@@ -1037,10 +1175,11 @@ def main():
                 break
             _page += 1
 
-        # Also need player name+team to join
+        # Also need player name+team to join (torvik_pid is used further down
+        # to merge assisted_pct_rim/mid/three by pid rather than name/team)
         _pl_rows, _page = [], 0
         while True:
-            _res = _db_tmp.table("players").select("id, name, current_team, height, weight") \
+            _res = _db_tmp.table("players").select("id, name, current_team, height, weight, torvik_pid") \
                           .range(_page * _ps, (_page + 1) * _ps - 1).execute()
             _pl_rows.extend(_res.data or [])
             if len(_res.data or []) < _ps:
@@ -1087,6 +1226,43 @@ def main():
 
     # print(df.columns.tolist())
 
+    # ── Merge assisted_pct_rim/mid/three (written by import_pbp_shot_assists.py) ──
+    # Keyed directly on df["pid"], which IS players.torvik_pid (confirmed by
+    # cross-referencing trank_data_2026.csv's pid column against the live DB) —
+    # no name/team normalisation needed, unlike the sb_* merge above. Scoped to
+    # this run's --year since player_stats can hold multiple seasons per player
+    # and assisted share is season-specific. Missing entirely (import hasn't
+    # run yet, or dry-run) is fine — compute_shot_difficulty treats a missing
+    # column as "no data", same as the spec's "missing counts as 0" rule.
+    if not args.dry_run:
+        print("Fetching assisted_pct_rim/mid/three for this season …")
+        _assist_rows = []
+        _page = 0
+        while True:
+            _res = db.table("player_stats") \
+                      .select("player_id, assisted_pct_rim, assisted_pct_mid, assisted_pct_three") \
+                      .eq("calendar_year", args.year) \
+                      .range(_page * 1000, (_page + 1) * 1000 - 1).execute()
+            _assist_rows.extend(_res.data or [])
+            if len(_res.data or []) < 1000:
+                break
+            _page += 1
+
+        if _assist_rows:
+            _pl_torvik = {p["id"]: p.get("torvik_pid") for p in _pl_rows}
+            _assist_df = pd.DataFrame([
+                {"pid": _pl_torvik.get(r["player_id"]),
+                 "assisted_pct_rim": r.get("assisted_pct_rim"),
+                 "assisted_pct_mid": r.get("assisted_pct_mid"),
+                 "assisted_pct_three": r.get("assisted_pct_three")}
+                for r in _assist_rows if _pl_torvik.get(r["player_id"]) is not None
+            ]).drop_duplicates(subset=["pid"])
+            df = df.merge(_assist_df, on="pid", how="left")
+            _n_with_data = df[["assisted_pct_rim", "assisted_pct_mid", "assisted_pct_three"]].notna().any(axis=1).sum()
+            print(f"  {_n_with_data}/{len(df)} qualified players have at least one assisted-share bucket")
+        else:
+            print("  No assisted_pct_* rows found for this season — run import_pbp_shot_assists.py first if you want Shot Difficulty/Adjusted SEI/Shot Creation populated")
+
     # ── Position buckets + pre-compute metrics over full df ───────────────────
     df = df.reset_index(drop=True)
     df["pos_bucket"] = df["role"].apply(normalise_pos) if "role" in df.columns else "Wing"
@@ -1101,6 +1277,11 @@ def main():
     df["_cdi"] = compute_cdi(df)
     df["_dds"] = compute_dds(df, use_torvik=use_torvik)
     df["_sei"] = compute_sei(df, use_torvik=use_torvik)
+    # Shot Difficulty / Adjusted SEI — must run after compute_sei (reads its
+    # _sei_raw/_sei side-effect columns). See each function's docstring.
+    df["_shot_difficulty"], _shot_difficulty_modifier = compute_shot_difficulty(df)
+    df["_adjusted_sei"], df["_sei_diff"] = compute_adjusted_sei(df)
+    df["_shot_creation"] = compute_shot_creation(df)
     df["_ath"] = compute_ath(df, use_torvik=use_torvik)
     df["_ris"] = compute_ris(df, use_torvik=use_torvik)
     df["_nil"], df["_nil_low"], df["_nil_high"], df["_projected_tier"], df["_nil_perf_score"] = compute_nil_valuation(df)
@@ -1249,6 +1430,11 @@ def main():
         sei      = safe(df.at[idx, "_sei"])
         ath      = safe(df.at[idx, "_ath"])
         ris      = safe(df.at[idx, "_ris"])
+        shot_difficulty          = safe(df.at[idx, "_shot_difficulty"])          if "_shot_difficulty"          in df.columns else None
+        shot_difficulty_modifier = safe(df.at[idx, "_shot_difficulty_modifier"]) if "_shot_difficulty_modifier" in df.columns else None
+        adjusted_sei             = safe(df.at[idx, "_adjusted_sei"])             if "_adjusted_sei"             in df.columns else None
+        sei_diff                 = safe(df.at[idx, "_sei_diff"])                 if "_sei_diff"                 in df.columns else None
+        shot_creation            = safe(df.at[idx, "_shot_creation"])            if "_shot_creation"            in df.columns else None
         nil           = safe(df.at[idx, "_nil"])
         nil_low       = safe(df.at[idx, "_nil_low"])
         nil_high      = safe(df.at[idx, "_nil_high"])
@@ -1266,7 +1452,9 @@ def main():
                 pass
 
         if args.dry_run:
-            print(f"  {name} ({team}) | cdi={cdi} dds={dds} sei={sei} ath={ath} ris={ris} | NIL={nil} | born={birth_year}")
+            print(f"  {name} ({team}) | cdi={cdi} dds={dds} sei={sei} ath={ath} ris={ris} | "
+                  f"shot_difficulty={shot_difficulty} adjusted_sei={adjusted_sei} sei_diff={sei_diff} shot_creation={shot_creation} | "
+                  f"NIL={nil} | born={birth_year}")
             matched += 1
             continue
 
@@ -1351,7 +1539,11 @@ def main():
         # gets calendar_year set/corrected, and the frontend's Season column
         # (which queries/sorts by calendar_year) shows blank for it.
         stats_patch = {**torvik, "name": name, "school": display_school(team), "year": YR_MAP.get(yr, yr), "calendar_year": args.year}
-        for key_m, val in [("cdi", cdi), ("dds", dds), ("sei", sei), ("ath", ath), ("ris", ris)]:
+        for key_m, val in [
+            ("cdi", cdi), ("dds", dds), ("sei", sei), ("ath", ath), ("ris", ris),
+            ("shot_difficulty", shot_difficulty), ("shot_difficulty_modifier", shot_difficulty_modifier),
+            ("adjusted_sei", adjusted_sei), ("sei_diff", sei_diff), ("shot_creation", shot_creation),
+        ]:
             if val is not None:
                 stats_patch[key_m] = val
         if tier and not args.skip_nil:
@@ -1449,6 +1641,8 @@ def main():
                 "usg":     safe(row.get("usg")),
                 "ast_tov": safe(row.get("ast/tov")),
                 "cdi": None, "dds": None, "sei": None, "ath": None, "ris": None,
+                "shot_difficulty": None, "shot_difficulty_modifier": None,
+                "adjusted_sei": None, "sei_diff": None, "shot_creation": None,
                 "name":   name,
                 "school": display_school(team),
                 "year":   {"Fr": "Freshman", "So": "Sophomore", "Jr": "Junior", "Sr": "Senior", "Gr": "Graduate"}.get(str(row.get("yr", "")).strip(), str(row.get("yr", "")).strip()),
