@@ -151,27 +151,26 @@ explicitly "includes dunks" — `import_pbp_shot_assists.py` sums
 CSV's `rimmade+rimmiss` and `dunksmiss+dunksmade` the same way, so both
 sides agree on what "rim" means.
 
-**Pipeline order matters — it's three steps, not two**:
-`import_pbp_shot_assists.py` only **updates** existing `player_stats`/
-`w_player_stats` rows; it never inserts (if a matched player has no row yet
-for that `calendar_year`, it's skipped and counted in the "no stats row"
-warning). So:
+**Pipeline order: `import_pbp_shot_assists.py` runs first, `torvik_metrics.py`
+second — one pass each, not a two-pass dance.** `import_pbp_shot_assists.py`
+matches by `torvik_pid` and either `UPDATE`s an existing `player_stats`/
+`w_player_stats` row (if one exists for that `calendar_year`) or `INSERT`s a
+sparse one (`player_id`, `calendar_year`, `name`, `school`, and the three
+`assisted_pct_*` columns — nothing else) when it doesn't. `torvik_metrics.py`
+then finds that row (sparse or full) via its own `(player_id, calendar_year)`
+lookup and `UPDATE`s it with cdi/dds/sei/etc — a Supabase `.update()` only
+touches the keys in its own patch, so the `assisted_pct_*` values already
+there are untouched, and this single `torvik_metrics.py` run picks them up
+and computes Shot Difficulty/Adjusted SEI/Shot Creation correctly:
 
-1. `torvik_metrics.py --csv <csv> --year <year>` (1st pass) — creates/
-   updates the `player_stats` rows. Shot Difficulty/Adjusted SEI/Shot
-   Creation come out null this run — no `assisted_pct_*` exists yet.
-2. `import_pbp_shot_assists.py --season <year> --json <pbp file>` — the
-   rows exist now, so it matches by `torvik_pid` and writes
-   `assisted_pct_rim/mid/three` onto them.
-3. `torvik_metrics.py --csv <csv> --year <year>` again (2nd pass, same
-   command) — now it merges the populated `assisted_pct_*` columns in and
-   actually computes/writes Shot Difficulty, Adjusted SEI, Shot Creation.
-   Everything else gets safely recomputed too (idempotent).
+```bash
+python import_pbp_shot_assists.py --season <year> --json <pbp file>
+python torvik_metrics.py --csv <csv> --year <year>
+```
 
-Missing `assisted_pct_*` data (importer hasn't run yet, or a player had 0
-makes in a bucket) is treated as `0` — "fully unassisted" — per the spec's
-own edge-case rule, not an error; it's what the 1st pass's null output
-actually reflects.
+Missing `assisted_pct_*` data (a player the PBP importer never saw, or one
+with 0 makes in a bucket) is treated as `0` — "fully unassisted" — per the
+spec's own edge-case rule, not an error.
 
 All three formulas (`compute_shot_difficulty`, `compute_adjusted_sei`,
 `compute_shot_creation` in both `torvik_metrics.py` and `torvik_metrics_w.py`)

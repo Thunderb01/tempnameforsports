@@ -25,6 +25,16 @@ leaves "no data yet" (null) distinct from "confirmed zero assisted share"
 (0.0). torvik_metrics.py's compute_shot_difficulty applies the spec's
 "missing counts as 0" rule when it reads these columns, not this importer.
 
+Run this BEFORE torvik_metrics.py, not after. If a matched player has no
+player_stats/w_player_stats row yet for --season, this script INSERTS a
+sparse one (player_id, calendar_year, name, school, assisted_pct_rim/mid/
+three — nothing else) rather than skipping. torvik_metrics.py's own
+upsert finds that row by (player_id, calendar_year) and UPDATEs it,
+filling in cdi/dds/sei/etc. without touching the assisted_pct_* columns
+(a Supabase .update() only sets the keys in its own patch) — so a single
+torvik_metrics.py run after this one produces a complete row, Shot
+Difficulty/Adjusted SEI/Shot Creation included. No second pass needed.
+
 Usage:
     python import_pbp_shot_assists.py --season 2027 --dry-run
     python import_pbp_shot_assists.py --season 2027
@@ -160,6 +170,11 @@ def main():
     with_any_data = sum(1 for v in by_pid.values() if any(x is not None for x in v.values()))
     print(f"  {with_any_data}/{len(by_pid)} have at least one bucket with makes (the rest had 0 makes everywhere — no assisted share to compute)")
 
+    # name/school per pid, for the sparse-row insert path below — the PBP
+    # source's own values, not a DB lookup (there's no players row to read
+    # them from yet for a brand-new player).
+    pid_to_name_school = {r[IDX["pid"]]: (r[IDX["name"]], r[IDX["school"]]) for r in pbp if len(r) >= 15}
+
     if not SUPABASE_URL or not SUPABASE_SERVICE_KEY:
         sys.exit("Set SUPABASE_URL and SUPABASE_SERVICE_KEY.")
     sb = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
@@ -177,30 +192,38 @@ def main():
     print(f"  {len(player_id_to_stats_id)} {cfg['stats_table']} row(s) for season {args.season}")
 
     updates = []
-    matched = 0
-    no_stats_row = []
+    inserts = []
+    no_player_match = 0
     for pid, vals in by_pid.items():
+        if all(v is None for v in vals.values()):
+            continue  # nothing to write either way
         player_id = pid_to_player_id.get(pid)
         if not player_id:
+            no_player_match += 1
             continue
         stats_id = player_id_to_stats_id.get(player_id)
-        if not stats_id:
-            no_stats_row.append(pid)
-            continue
-        if all(v is None for v in vals.values()):
-            continue
-        matched += 1
-        updates.append((stats_id, vals))
+        if stats_id:
+            updates.append((stats_id, vals))
+        else:
+            name, school = pid_to_name_school.get(pid, (None, None))
+            inserts.append({
+                "player_id": player_id,
+                "calendar_year": args.season,
+                "name": name,
+                "school": school,
+                **vals,
+            })
 
-    print(f"\nMatched {matched} player(s) with data to write.")
-    if no_stats_row:
-        print(f"  ⚠ {len(no_stats_row)} player(s) matched by torvik_pid but have no {cfg['stats_table']} row for season {args.season} yet "
-              f"— run torvik_metrics.py for this season first, then re-run this importer.")
+    print(f"\n{len(updates)} existing {cfg['stats_table']} row(s) to update, {len(inserts)} new sparse row(s) to insert.")
+    if no_player_match:
+        print(f"  ⚠ {no_player_match} PBP player(s) with a torvik_pid not found in {cfg['players_table']} at all — not on this team's/sport's roster, skipped.")
 
     if args.dry_run:
         print("\n(dry-run — nothing written)")
-        for stats_id, vals in updates[:5]:
-            print(f"  sample: stats_id={stats_id} -> {vals}")
+        for stats_id, vals in updates[:3]:
+            print(f"  sample update: stats_id={stats_id} -> {vals}")
+        for row in inserts[:3]:
+            print(f"  sample insert: {row}")
         return
 
     written = 0
@@ -208,9 +231,17 @@ def main():
         sb.table(cfg["stats_table"]).update(vals).eq("id", stats_id).execute()
         written += 1
         if written % 500 == 0:
-            print(f"  ... {written}/{len(updates)} written")
+            print(f"  ... {written}/{len(updates)} updated")
 
-    print(f"\nDone. Wrote assisted_pct_rim/mid/three on {written} {cfg['stats_table']} row(s).")
+    created = 0
+    for chunk in chunked(inserts, CHUNK):
+        sb.table(cfg["stats_table"]).insert(chunk).execute()
+        created += len(chunk)
+        if created % 500 == 0:
+            print(f"  ... {created}/{len(inserts)} inserted")
+
+    print(f"\nDone. Updated {written} existing row(s), inserted {created} new sparse row(s). "
+          f"Run torvik_metrics.py for season {args.season} next to fill the rest of each row in.")
 
 
 if __name__ == "__main__":
