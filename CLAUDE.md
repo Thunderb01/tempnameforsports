@@ -90,6 +90,16 @@ previously existed and had to be hand-synced.
 `scripts/test-positions.mjs` covers this module and runs as part of
 `npm run build`.
 
+**Full Board display bucket is also 4-bucket now** (`LEGACY_BUCKETS` /
+`legacyBucketFor()` in this same file): Guard/Wing/Forward/Big, mirroring the
+metric peer groups below rather than the old Guard/Wing/Big. `BoardPage.jsx`
+(shared men's/women's) is the only consumer. Wing F (primary SF, no other
+role produces a standalone SF primary) and Stretch 4 (primary PF, not
+eligible at C) both bucket as Forward; PF/C (primary PF, eligible at C) still
+buckets as Big. This is a THIRD, independent bucket system from the five-
+position eligibility model above and the backend metric peer groups below —
+don't conflate the three when changing one.
+
 ### Metric peer groups: 4-bucket (Guard/Wing/Forward/Big), per the BTP Metrics Spec
 
 `torvik_metrics.py`/`torvik_metrics_w.py`'s `normalise_pos` / `percentrank_by_pos`
