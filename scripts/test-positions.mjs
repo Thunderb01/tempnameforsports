@@ -36,17 +36,19 @@ check("unknown falls back to SF", positionsFor({ primary_position: "???" }), ["S
 check("nothing at all falls back to SF", positionsFor({}), ["SF"]);
 check("label", positionLabel({ positions: ["PG", "SG"] }), "PG/SG");
 
-console.log("\n── legacyBucketFor (Full Board still shows Guard/Wing/Big) ──");
+console.log("\n── legacyBucketFor (Full Board shows Guard/Wing/Forward/Big) ──");
 check("PG -> Guard", legacyBucketFor({ positions: ["PG"] }), "Guard");
 check("SG -> Guard", legacyBucketFor({ positions: ["SG"] }), "Guard");
-check("SF -> Wing",  legacyBucketFor({ positions: ["SF"] }), "Wing");
-check("PF -> Big",   legacyBucketFor({ positions: ["PF"] }), "Big");
+check("SF alone -> Forward (Wing F signature)", legacyBucketFor({ positions: ["SF"] }), "Forward");
+check("PF alone -> Forward (Stretch 4 signature)", legacyBucketFor({ positions: ["PF"] }), "Forward");
+check("PF/C -> Big", legacyBucketFor({ positions: ["PF", "C"] }), "Big");
 check("C  -> Big",   legacyBucketFor({ positions: ["C"] }),  "Big");
 check("dual uses primary (PG/SG -> Guard)", legacyBucketFor({ positions: ["PG", "SG"] }), "Guard");
-check("dual uses primary (SF/PF -> Wing)",  legacyBucketFor({ positions: ["SF", "PF"] }), "Wing");
+check("SF/PF (Wing F) -> Forward",  legacyBucketFor({ positions: ["SF", "PF"] }), "Forward");
+check("SG/SF (Wing G) -> Guard", legacyBucketFor({ positions: ["SG", "SF"] }), "Guard");
 check("legacy row passes through", legacyBucketFor({ primary_position: "Big" }), "Big");
-check("unknown -> Wing", legacyBucketFor({}), "Wing");
-check("bucket list", LEGACY_BUCKETS, ["Guard", "Wing", "Big"]);
+check("unknown -> Forward (SF fallback)", legacyBucketFor({}), "Forward");
+check("bucket list", LEGACY_BUCKETS, ["Guard", "Wing", "Forward", "Big"]);
 
 console.log("\n── slotWeight ──");
 check("starter", slotWeight(0, 2), 1.0);
