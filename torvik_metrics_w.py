@@ -126,6 +126,10 @@ def parse_args():
                    help="Only process players from these teams (exact Torvik team name)")
     p.add_argument("--players", nargs="+", metavar="PLAYER",
                    help="Only process these players by name (exact Torvik player_name)")
+    p.add_argument("--repair-positions-from", type=str, metavar="CSV", default=None,
+                   help="One-time repair mode: fix w_players rows stuck at positions=[\"SF\"]/null "
+                        "(from the blank-role overwrite bug) by re-deriving positions from this CSV's "
+                        "real role data, matched by torvik_pid. Runs instead of the normal pipeline.")
     return p.parse_args()
 
 
@@ -328,6 +332,105 @@ def torvik_role_to_positions(role):
     """Map a Torvik role to its five-position eligibility set. [] if unknown."""
     key = str(role).strip().lower()
     return list(TORVIK_ROLE_TO_POSITIONS.get(key, []))
+
+
+def _is_corrupted_positions(positions):
+    """True for the one shape the blank-role overwrite bug (and the
+    pre-existing UNKNOWN_POSITION_FALLBACK / legacy "Wing"-bucket-expansion
+    paths) can produce: null, or exactly the single-element ["SF"]. No real
+    TORVIK_ROLE_TO_POSITIONS entry resolving to SF ever omits PF (that's
+    Wing F), so this signature is unambiguous -- never a legitimate value."""
+    if positions is None:
+        return True
+    return isinstance(positions, list) and len(positions) == 1 and positions[0] == "SF"
+
+
+def repair_positions_from_prior_role(db, csv_path, dry_run):
+    """One-time repair for rows stuck at positions=["SF"]/null from the
+    blank-role overwrite bug (see CLAUDE.md's positions section) -- that fix
+    only stops FUTURE runs from reclobbering the column, it does nothing for
+    rows already written. Matches each corrupted w_players row by
+    torvik_pid against `csv_path` (a CSV with real role data, e.g. last
+    season's) and rewrites ONLY positions/primary_position via the same
+    torvik_role_to_positions/normalise_pos this file's main pipeline uses --
+    never stats, NIL, or year/class, so it can't drag stale data onto the
+    current board the way re-running the full pipeline against an old CSV
+    would. A row with no match in csv_path (no prior-season history) is left
+    alone and reported, not guessed at."""
+    if not os.path.exists(csv_path):
+        sys.exit(f"Role CSV not found: {csv_path}")
+    print(f"Reading real role data from {csv_path} …")
+    role_df = pd.read_csv(csv_path)
+    if "pid" not in role_df.columns or "role" not in role_df.columns:
+        sys.exit(f"{csv_path} is missing a pid or role column")
+    if "year" in role_df.columns:
+        role_df = role_df.sort_values("year", ascending=False).drop_duplicates(subset=["pid"], keep="first")
+
+    pid_to_role = {}
+    for _, row in role_df.iterrows():
+        pid = row.get("pid")
+        role_str = str(row.get("role", "")).strip().lower()
+        if pd.notna(pid) and role_str and role_str != "nan":
+            pid_to_role[int(pid)] = row.get("role")
+    print(f"  {len(pid_to_role)} pid(s) with a usable (non-blank) role in this file")
+
+    print("\nFetching w_players (id, torvik_pid, positions, name, current_team) …")
+    rows, page, page_size = [], 0, 1000
+    while True:
+        res = db.table("w_players").select("id, torvik_pid, positions, name, current_team") \
+                .range(page * page_size, (page + 1) * page_size - 1).execute()
+        rows.extend(res.data or [])
+        if len(res.data or []) < page_size:
+            break
+        page += 1
+    print(f"  {len(rows)} total rows")
+
+    corrupted = [p for p in rows if _is_corrupted_positions(p.get("positions"))]
+    print(f"  {len(corrupted)} row(s) currently stuck at positions=[\"SF\"] or null")
+
+    updates, no_pid, no_role_match, unresolvable = [], 0, 0, 0
+    for p in corrupted:
+        pid = p.get("torvik_pid")
+        if pid is None:
+            no_pid += 1
+            continue
+        role_raw = pid_to_role.get(pid)
+        if role_raw is None:
+            no_role_match += 1
+            continue
+        positions = torvik_role_to_positions(role_raw)
+        if not positions:
+            positions = list(_BUCKET_TO_POSITIONS.get(normalise_pos(role_raw), []))
+        if not positions:
+            unresolvable += 1
+            continue
+        updates.append((p["id"], p.get("name"), p.get("current_team"), positions))
+
+    print(f"\n{len(updates)} row(s) can be repaired from {csv_path}.")
+    if no_pid:
+        print(f"  ⚠ {no_pid} corrupted row(s) have no torvik_pid at all — can't match, skipped.")
+    if no_role_match:
+        print(f"  ⚠ {no_role_match} corrupted row(s) have a torvik_pid not found in {csv_path} "
+              f"(no history there — e.g. a true new addition) — left as-is, skipped.")
+    if unresolvable:
+        print(f"  ⚠ {unresolvable} corrupted row(s) matched a pid but its role still didn't resolve — skipped.")
+
+    if dry_run:
+        print("\n(dry-run — nothing written)")
+        for id_, name, team, positions in updates[:10]:
+            print(f"  {name} ({team}): -> positions={positions}, primary_position={positions[0]}")
+        return
+
+    written = 0
+    for id_, name, team, positions in updates:
+        db.table("w_players").update({
+            "positions": positions,
+            "primary_position": positions[0],
+        }).eq("id", id_).execute()
+        written += 1
+        if written % 500 == 0:
+            print(f"  ... {written}/{len(updates)} repaired")
+    print(f"\nDone. Repaired {written} row(s).")
 
 
 def percentrank_by_pos(df, col, pos_col="pos_bucket", scale=100):
@@ -1043,6 +1146,19 @@ def compute_nil_valuation(df):
 
 def main():
     args = parse_args()
+
+    if args.repair_positions_from:
+        # Repair mode needs to read current w_players rows even on
+        # --dry-run, unlike the normal pipeline below (which only previews
+        # CSV-derived computations without touching the DB on --dry-run).
+        if not SUPABASE_URL or not SUPABASE_SERVICE_KEY:
+            sys.exit("Set SUPABASE_URL and SUPABASE_SERVICE_KEY env vars.")
+        repair_positions_from_prior_role(
+            create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY),
+            args.repair_positions_from,
+            args.dry_run,
+        )
+        return
 
     if not args.dry_run:
         if not SUPABASE_URL or not SUPABASE_SERVICE_KEY:
