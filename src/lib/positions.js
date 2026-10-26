@@ -91,22 +91,32 @@ export function positionLabel(player) {
   return list.length > 0 ? list.join("/") : "—";
 }
 
-// ── Coarse three-bucket view ────────────────────────────────────────────────
-// The Full Board deliberately still presents Guard/Wing/Big: scanning hundreds
-// of rows is easier against three groups than five, and it matches the
-// percentile peer groups the metrics on that page are computed against. The
-// five-position detail surfaces in player modals, the roster builder, and
-// portal rankings.
-export const LEGACY_BUCKETS = ["Guard", "Wing", "Big"];
+// ── Coarse four-bucket view ─────────────────────────────────────────────────
+// The Full Board deliberately still presents a coarse grouping rather than
+// all five positions: scanning hundreds of rows is easier against a handful
+// of groups. Guard/Wing/Forward/Big mirrors the four metric peer groups
+// torvik_metrics.py/torvik_metrics_w.py compute percentiles within (see
+// CLAUDE.md's "Metric peer groups" section) — was Guard/Wing/Big until that
+// backend split "Forward" (Barttorvik's Wing F / Stretch 4 roles) out of
+// Wing. The five-position detail surfaces in player modals, the roster
+// builder, and portal rankings.
+export const LEGACY_BUCKETS = ["Guard", "Wing", "Forward", "Big"];
 
-/** Guard | Wing | Big for a player, derived from their primary position. */
+/**
+ * Guard | Wing | Forward | Big for a player, derived from their position
+ * eligibility set. Primary position alone distinguishes Wing F (primary SF —
+ * no other role produces a standalone SF primary) and Stretch 4 (primary PF,
+ * eligible at PF only); PF/C players also have primary PF but are eligible
+ * at C too, which is what separates them from Stretch 4 here.
+ */
 export function legacyBucketFor(player) {
-  switch (positionsFor(player)[0]) {
+  const list = positionsFor(player);
+  switch (list[0]) {
     case "PG":
     case "SG": return "Guard";
-    case "PF":
+    case "SF": return "Forward";                               // Wing F
+    case "PF": return list.includes("C") ? "Big" : "Forward";  // PF/C vs Stretch 4
     case "C":  return "Big";
-    default:   return "Wing";   // SF
   }
 }
 
