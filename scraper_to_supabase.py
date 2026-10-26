@@ -552,16 +552,78 @@ def get_player_urls(team_name, slug, year):
 
 # ── Main ───────────────────────────────────────────────────────────────────────
 
+def sync_team_players_from_db(db, dry_run):
+    """Rebuild team_players from players.current_team instead of re-scraping
+    Sports-Reference. current_team is kept in sync with Barttorvik every
+    pipeline run (torvik_metrics.py), but team_players never was -- it's
+    only ever written by this file's own scrape loop below, so a season
+    with no fresh scrape (e.g. relying on the Torvik precursor CSV instead)
+    leaves team_players showing last season's rosters untouched, including
+    players who have since transferred away from a team they still show up
+    under here.
+
+    A full delete-then-reinsert, not an upsert: a transferred player's row
+    under their OLD team has to actually disappear, not just gain a second
+    row under the new one."""
+    print("Fetching on_board players (id, name, current_team, year) …")
+    players, page, page_size = [], 0, 1000
+    while True:
+        res = db.table("players").select("id, name, current_team, year") \
+                .eq("on_board", True).range(page * page_size, (page + 1) * page_size - 1).execute()
+        players.extend(res.data or [])
+        if len(res.data or []) < page_size:
+            break
+        page += 1
+    rows = [
+        {"team": p["current_team"], "player_id": p["id"], "name": p["name"], "year": p.get("year")}
+        for p in players if p.get("current_team")
+    ]
+    no_team = len(players) - len(rows)
+    print(f"  {len(players)} on_board players, {len(rows)} with a current_team to sync"
+          f"{f' ({no_team} skipped, no current_team)' if no_team else ''}")
+
+    if dry_run:
+        print("\n(dry-run — nothing written)")
+        for r in rows[:10]:
+            print(f"  {r}")
+        return
+
+    print("Deleting existing team_players rows …")
+    db.table("team_players").delete().not_.is_("id", "null").execute()
+
+    print("Inserting fresh team_players rows …")
+    written = 0
+    for i in range(0, len(rows), 500):
+        chunk = rows[i:i + 500]
+        db.table("team_players").insert(chunk).execute()
+        written += len(chunk)
+        if written % 2000 == 0:
+            print(f"  ... {written}/{len(rows)} inserted")
+    print(f"\nDone. team_players now has {written} row(s), rebuilt from current_team.")
+
+
 def parse_args():
     p = argparse.ArgumentParser()
     p.add_argument("--teams",   nargs="+", metavar="TEAM")
     p.add_argument("--year",    type=int, default=DEFAULT_YEAR)
     p.add_argument("--replace", action="store_true", help="Delete existing team_players rows before inserting")
     p.add_argument("--dry-run", action="store_true", help="Print rows instead of writing to Supabase")
+    p.add_argument("--sync-team-players-from-db", action="store_true",
+                    help="Skip scraping entirely; rebuild team_players from players.current_team "
+                         "(which torvik_metrics.py already keeps in sync with Barttorvik) instead. "
+                         "Use this for a season rollover instead of re-scraping every team.")
     return p.parse_args()
 
 def main():
     args = parse_args()
+
+    if args.sync_team_players_from_db:
+        # This mode reads from Supabase even on --dry-run (there's no CSV to
+        # preview against), unlike the normal scrape path below.
+        if not SUPABASE_URL or not SUPABASE_SERVICE_KEY:
+            sys.exit("Set SUPABASE_URL and SUPABASE_SERVICE_KEY env vars.")
+        sync_team_players_from_db(create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY), args.dry_run)
+        return
 
     if not args.dry_run:
         if not SUPABASE_URL or not SUPABASE_SERVICE_KEY:

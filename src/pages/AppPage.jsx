@@ -1727,24 +1727,24 @@ export function AppPage() {
                 {(() => {
                   const retById = board.state.retentionById || {};
                   const nilById = board.state.nilById || {};
-                  const LEAVING = new Set(["entering_portal", "entering_draft", "transferred", "graduating"]);
 
-                  const returningGroup = board.returningPlayers.filter(p => { const s = retById[p.id] || "returning"; return s === "returning"; });
-                  const undecidedGroup = board.returningPlayers.filter(p => retById[p.id] === "undecided");
-                  const leavingGroup   = board.returningPlayers.filter(p => LEAVING.has(retById[p.id]));
+                  // Flat list, not split into Returning/Undecided/Leaving --
+                  // that grouping only means anything once transfer season
+                  // is actually underway and players' retention status has
+                  // started to diverge. The RetentionBadge on each row still
+                  // lets it be set; it's just not used to sort players into
+                  // separate sections here.
+                  const returningGroup = board.returningPlayers;
 
-                  const makeReturningRow = (p, dimmed = false) => {
+                  const makeReturningRow = (p) => {
                     const status = retById[p.id] || "returning";
-                    const leaving = LEAVING.has(status);
                     return (
-                      <div key={p.id} className="row row-click" style={{ opacity: dimmed ? .45 : .9 }}
+                      <div key={p.id} className="row row-click"
                         onClick={e => { if (!e.target.closest("button,input")) handleOpenModal({ ...p, _typeKey: status }); }}>
                         <div className="row-main">
                           <div className="row-title" style={{ fontSize: 13 }}>{p.name}</div>
                           <div className="row-sub" style={{ fontSize: 11 }}>{p.primary_position || p.pos} · {p.year}</div>
-                          {!leaving && (
-                            <NilInput value={nilById[p.id] || 0} onCommit={val => board.updateReturningNil(p.id, val)} />
-                          )}
+                          <NilInput value={nilById[p.id] || 0} onCommit={val => board.updateReturningNil(p.id, val)} />
                         </div>
                         <RetentionBadge value={status} onChange={val => board.setRetention(p.id, val)} />
                       </div>
@@ -1813,15 +1813,7 @@ export function AppPage() {
                         </>
                       )}
 
-                      {/* 4. Undecided */}
-                      {undecidedGroup.length > 0 && (
-                        <>
-                          <div className="sub-label" style={{ color: "#f5a623" }}>Undecided ({undecidedGroup.length})</div>
-                          {undecidedGroup.map(p => makeReturningRow(p))}
-                        </>
-                      )}
-
-                      {/* 5. Shortlist */}
+                      {/* 4. Shortlist */}
                       {board.state.shortlistIds.length > 0 && (
                         <>
                           <div className="sub-label">Shortlist ({board.state.shortlistIds.length})</div>
@@ -1847,15 +1839,7 @@ export function AppPage() {
                         </>
                       )}
 
-                      {/* 6. Leaving */}
-                      {leavingGroup.length > 0 && (
-                        <>
-                          <div className="sub-label" style={{ opacity: .5 }}>Leaving ({leavingGroup.length})</div>
-                          {leavingGroup.map(p => makeReturningRow(p, true))}
-                        </>
-                      )}
-
-                      {/* 7. Freshmen / Redshirts */}
+                      {/* 5. Freshmen / Redshirts */}
                       <CustomPlayersSection
                         customPlayers={board.customPlayers}
                         freshmanTiers={board.freshmanTiers}
