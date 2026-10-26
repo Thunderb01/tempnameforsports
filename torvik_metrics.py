@@ -1616,6 +1616,16 @@ def main():
             player_patch = {"on_board": True}
             if torvik_pid_val is not None:
                 player_patch["torvik_pid"] = torvik_pid_val
+            # Matching by torvik_pid is team-independent, so a transferred
+            # player still matches their existing row even though their team
+            # changed -- but nothing used to write the new team back, so
+            # current_team stayed stuck at the player's OLD school forever.
+            # display_school() is the same mapping already used for
+            # player_stats.school, so players.current_team and
+            # player_stats.school agree on the same display spelling.
+            new_team = display_school(team)
+            if new_team and new_team not in ("nan", ""):
+                player_patch["current_team"] = new_team
             if birth_year:
                 player_patch["birth_year"] = birth_year
             if nil is not None and not args.skip_nil:
