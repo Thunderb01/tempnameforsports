@@ -10,7 +10,7 @@ const WOMENS_CONFIG = {
   storageKeyPrefix:           "bp_w_roster_builder",
   legacyKeys:                 [],
   sessionBoardKey:            "bp_w_board_cache",
-  sessionBoardVer:            11, // bumped from 10 — see useRosterBoard.js MENS_CONFIG comment
+  sessionBoardVer:            12, // bumped from 11 — see useRosterBoard.js MENS_CONFIG comment
 };
 
 const _womens = createRosterBoardHook(WOMENS_CONFIG);

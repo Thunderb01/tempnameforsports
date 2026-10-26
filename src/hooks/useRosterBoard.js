@@ -876,7 +876,7 @@ const MENS_CONFIG = {
   storageKeyPrefix:           "bp_roster_builder",
   legacyKeys:                 ["bp_roster_builder_v1", "bp_roster_builder"],
   sessionBoardKey:            "bp_board_cache",
-  sessionBoardVer:            10, // 7→8: board rows carry player_status/transfer_* inline instead of a second portal_transfers query. 8→9: added transfer_from_team (its absence blanked the from-team logo). 9→10: force one clean refetch so sessions cached before admin-write invalidation existed don't keep showing players whose status has since changed.
+  sessionBoardVer:            11, // 7→8: board rows carry player_status/transfer_* inline instead of a second portal_transfers query. 8→9: added transfer_from_team (its absence blanked the from-team logo). 9→10: force one clean refetch so sessions cached before admin-write invalidation existed don't keep showing players whose status has since changed. 10→11: repair_positions_from_prior_role ran against the live players table (fixing rows stuck at positions=["SF"]), a server-side write the cache has no other way to find out about -- force one more clean refetch so already-cached sessions pick up the corrected positions instead of waiting out the 4h TTL.
 };
 
 const _mens = createRosterBoardHook(MENS_CONFIG);
