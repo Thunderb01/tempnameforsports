@@ -1428,15 +1428,24 @@ def main():
             hometown = str(row.get("type", "")).strip()
             if hometown and hometown not in ("nan", ""):
                 player_patch["hometown"] = hometown
-            # Five-position eligibility set; falls back to expanding the
-            # three-bucket value so a blank role never wipes a position.
+            # Five-position eligibility set. A blank/NaN role (e.g. a
+            # precursor CSV seeded from last season's stats, before this
+            # season's role has been computed) must leave positions/
+            # primary_position OUT of the patch entirely so the existing DB
+            # value survives untouched — NOT fall back to a generic guess,
+            # which would overwrite every player with the same bucket
+            # regardless of what they actually play. normalise_pos's "Wing"
+            # default (-> ["SF"]) is for a one-time blank-row display
+            # purpose only, never for persisting to positions/primary_position.
             role_raw = row.get("role", "")
-            positions = torvik_role_to_positions(role_raw)
-            if not positions:
-                positions = list(_BUCKET_TO_POSITIONS.get(normalise_pos(role_raw), []))
-            if positions:
-                player_patch["positions"] = positions
-                player_patch["primary_position"] = positions[0]
+            role_str = str(role_raw).strip().lower()
+            if role_str and role_str != "nan":
+                positions = torvik_role_to_positions(role_raw)
+                if not positions:
+                    positions = list(_BUCKET_TO_POSITIONS.get(normalise_pos(role_raw), []))
+                if positions:
+                    player_patch["positions"] = positions
+                    player_patch["primary_position"] = positions[0]
             YR_MAP = {"Fr": "Freshman", "So": "Sophomore", "Jr": "Junior", "Sr": "Senior", "Gr": "Graduate"}
             yr_raw = str(row.get("yr", "")).strip()
             yr_mapped = YR_MAP.get(yr_raw)
