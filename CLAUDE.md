@@ -93,12 +93,28 @@ previously existed and had to be hand-synced.
 **Full Board display bucket is also 4-bucket now** (`LEGACY_BUCKETS` /
 `legacyBucketFor()` in this same file): Guard/Wing/Forward/Big, mirroring the
 metric peer groups below rather than the old Guard/Wing/Big. `BoardPage.jsx`
-(shared men's/women's) is the only consumer. Wing F (primary SF, no other
-role produces a standalone SF primary) and Stretch 4 (primary PF, not
-eligible at C) both bucket as Forward; PF/C (primary PF, eligible at C) still
-buckets as Big. This is a THIRD, independent bucket system from the five-
-position eligibility model above and the backend metric peer groups below —
-don't conflate the three when changing one.
+(shared men's/women's) is the only consumer. This is a THIRD, independent
+bucket system from the five-position eligibility model above and the
+backend metric peer groups below — don't conflate the three when changing
+one.
+
+Forward requires the **dual** SF+PF eligibility signature (Wing F, or a raw
+scraped `"F"` code) — not just a bare single-element SF or PF. An earlier
+version of this classified *any* bare SF as Forward (reasoning: "only Wing F
+produces a standalone SF primary") and any bare PF-without-C as Forward
+(reasoning: "that's the Stretch 4 signature"). Both assumptions were wrong
+in practice: a bare `["SF"]` is also exactly what the legacy `"Wing"` bucket
+expands to and what `UNKNOWN_POSITION_FALLBACK` produces, and a bare `["PF"]`
+(no C) is what most ordinary PF-only bigs carry too, not just Stretch 4 —
+Stretch 4 is genuinely indistinguishable from a generic PF-only big in this
+five-position data (`torvik_role_to_positions` collapses both the same way).
+Since those fallback/legacy/raw-code paths produce single-element lists by
+construction, treating bare SF/PF as Forward dumped nearly the entire board
+into Forward. Fixed by requiring the eligibility set to contain *both* SF
+and PF before calling it Forward; a bare SF falls back to Wing and a bare
+PF-without-C falls back to Big, same as the old 3-bucket behavior — Stretch
+4 stays coarsely bucketed as Big on the board (a known, accepted imprecision)
+rather than guessing.
 
 ### Metric peer groups: 4-bucket (Guard/Wing/Forward/Big), per the BTP Metrics Spec
 
