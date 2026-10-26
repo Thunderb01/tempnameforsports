@@ -104,18 +104,26 @@ export const LEGACY_BUCKETS = ["Guard", "Wing", "Forward", "Big"];
 
 /**
  * Guard | Wing | Forward | Big for a player, derived from their position
- * eligibility set. Primary position alone distinguishes Wing F (primary SF —
- * no other role produces a standalone SF primary) and Stretch 4 (primary PF,
- * eligible at PF only); PF/C players also have primary PF but are eligible
- * at C too, which is what separates them from Stretch 4 here.
+ * eligibility set.
+ *
+ * Forward requires the unambiguous dual SF+PF signature (Wing F, or a raw
+ * scraped "F" code) — NOT just a bare single-element SF or PF. A bare SF
+ * also comes from the legacy "Wing" bucket expansion and from
+ * UNKNOWN_POSITION_FALLBACK, and a bare PF (no C) is what most ordinary
+ * PF-only bigs carry, not just Stretch 4 — Stretch 4 is indistinguishable
+ * from a generic PF-only big in this five-position data (see
+ * torvik_role_to_positions in torvik_metrics.py), so it stays Big here
+ * rather than guessing. Treating either bare case as Forward previously
+ * dumped nearly every fallback/legacy/raw-coded row into Forward, since
+ * those paths produce single-element lists by construction.
  */
 export function legacyBucketFor(player) {
   const list = positionsFor(player);
   switch (list[0]) {
     case "PG":
     case "SG": return "Guard";
-    case "SF": return "Forward";                               // Wing F
-    case "PF": return list.includes("C") ? "Big" : "Forward";  // PF/C vs Stretch 4
+    case "SF": return list.includes("PF") ? "Forward" : "Wing";
+    case "PF": return list.includes("C") ? "Big" : (list.includes("SF") ? "Forward" : "Big");
     case "C":  return "Big";
   }
 }
