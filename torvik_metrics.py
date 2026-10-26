@@ -76,6 +76,7 @@ Environment variables:
 """
 
 import argparse
+import csv
 import os
 import sys
 
@@ -262,7 +263,9 @@ def normalise_team(team_str):
 
 
 # Maps Torvik display names → canonical display names for player_stats.school
-# Add entries here when Torvik and SR use different names for the same school.
+# Add entries here when Torvik and SR use different names for the same school
+# and normalise_team's alias (below) + team_conferences.csv's own casing
+# don't already resolve it (e.g. a school team_conferences.csv doesn't list).
 SCHOOL_DISPLAY_MAP = {
     "UConn": "Connecticut",
     # "Pitt":  "Pittsburgh",
@@ -272,9 +275,45 @@ SCHOOL_DISPLAY_MAP = {
     # "Miami FL": "Miami",
 }
 
+def _load_team_display_names():
+    """lowercase team name -> canonical display-cased name, read from
+    data/team_conferences.csv -- the same single source of truth
+    teamLookup.js's getCanonicalTeamName() reads on the frontend (see
+    CLAUDE.md's alias/lookup-table rules). Used to properly case
+    normalise_team's alias values (which are plain lowercase, meant only as
+    matching keys) instead of guessing at title-casing acronyms like "NC
+    State", "UAB", or "SIU Edwardsville" by hand."""
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "team_conferences.csv")
+    out = {}
+    try:
+        with open(path, newline="", encoding="utf-8") as f:
+            for row in csv.reader(f):
+                if not row or row[0] == "team":
+                    continue
+                name = row[0].strip()
+                if name:
+                    out[name.lower()] = name
+    except FileNotFoundError:
+        pass
+    return out
+
+_TEAM_DISPLAY_NAMES = _load_team_display_names()
+
 def display_school(team_str):
-    """Return the canonical display name for a school (used when writing player_stats.school)."""
-    return SCHOOL_DISPLAY_MAP.get(team_str, team_str)
+    """Return the canonical display name for a school -- used when writing
+    players.current_team and player_stats.school. Torvik's own spelling
+    (team_str) is frequently abbreviated ("Ohio St.") where the rest of the
+    app -- team_conferences.csv, team_players, the Roster Builder's team
+    list -- expects the canonical spelling ("Ohio State"). current_team in
+    particular is matched/joined against, not just displayed, so a mismatch
+    here silently breaks that matching rather than just looking off.
+    Resolves through normalise_team's alias map first, then looks up that
+    alias's properly-cased canonical form in team_conferences.csv; falls
+    back to team_str unchanged if team_conferences.csv has no entry for it."""
+    if team_str in SCHOOL_DISPLAY_MAP:
+        return SCHOOL_DISPLAY_MAP[team_str]
+    canonical = _TEAM_DISPLAY_NAMES.get(normalise_team(team_str))
+    return canonical or team_str
 
 
 # ── POSITION NORMALISATION ─────────────────────────────────────────────────────
