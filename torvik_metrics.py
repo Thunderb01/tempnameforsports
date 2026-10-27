@@ -112,6 +112,11 @@ def parse_args():
                    help="Use Torvik CSV columns for all metrics instead of scraped Supabase totals")
     p.add_argument("--skip-nil",        action="store_true",
                    help="Do not overwrite nil_valuation on the players table")
+    p.add_argument("--skip-team-sync",  action="store_true",
+                   help="Do not overwrite current_team on the players table. Use this when running "
+                        "an older/off-season CSV (e.g. last season's real-role data) purely to refresh "
+                        "scoring metrics -- otherwise current_team gets silently reverted to whatever "
+                        "team that CSV says, undoing any transfers tracked since.")
     p.add_argument("--historical",      action="store_true",
                    help="Historical mode: only write player_stats rows, skip updating players table (nil, position, etc.)")
     p.add_argument("--teams", nargs="+", metavar="TEAM",
@@ -1726,9 +1731,14 @@ def main():
             # display_school() is the same mapping already used for
             # player_stats.school, so players.current_team and
             # player_stats.school agree on the same display spelling.
-            new_team = display_school(team)
-            if new_team and new_team not in ("nan", ""):
-                player_patch["current_team"] = new_team
+            # --skip-team-sync opts out entirely -- e.g. running an older
+            # CSV purely to refresh scoring metrics from real role data
+            # would otherwise silently revert current_team to whatever team
+            # that CSV says, undoing any transfers tracked since.
+            if not args.skip_team_sync:
+                new_team = display_school(team)
+                if new_team and new_team not in ("nan", ""):
+                    player_patch["current_team"] = new_team
             if birth_year:
                 player_patch["birth_year"] = birth_year
             if nil is not None and not args.skip_nil:
