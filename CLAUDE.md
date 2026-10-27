@@ -147,6 +147,24 @@ bucket set again:
 - NIL valuation's `pos_boost` — `.map()` with `.fillna(1.0)`, so a
   forgotten bucket silently gets a neutral boost rather than breaking.
 
+**`pos_bucket` itself must never default straight to one bucket when the
+CSV's `role` column is blank.** `df["pos_bucket"] = df["role"].apply(normalise_pos)`
+used to do exactly that: `normalise_pos("")` falls through every keyword
+check to its own `"Wing"` default, so a precursor CSV with `role` blank for
+every row (e.g. `data/trank_data_2027.csv` — blank for all 3260 rows, since
+it's seeded from last season's stats before this season's role has been
+computed) put **every player in the same bucket**. Every percentile-based
+metric and NIL are computed *within* `pos_bucket`, so this wasn't a display
+bug — it silently compared guards against centers for every metric, on every
+pipeline run against that CSV, until caught. Fixed: `main()` now tries
+`_bucket_from_positions(positions)` first, keyed by `torvik_pid` against the
+player's already-known `positions` array (from a prior real-role run) —
+`normalise_pos`'s `"Wing"` default is only reached when a player has no role
+*and* no stored positions either (true last resort, not the common case).
+`_bucket_from_positions` mirrors `src/lib/positions.js`'s `legacyBucketFor()`
+exactly (same dual-SF+PF-required-for-Forward reasoning — see that file's
+docstring) and lives right next to `normalise_pos` in both files.
+
 The five-position model (`torvik_role_to_positions` / `src/lib/positions.js`)
 is unrelated to this and wasn't touched — `Wing F` still maps to `["SF", "PF"]`
 and `Stretch 4` to `["PF"]` for display/lineup purposes, same as always.

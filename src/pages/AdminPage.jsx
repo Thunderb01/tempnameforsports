@@ -10,6 +10,7 @@ import { renderArticleBody } from "@/lib/renderArticle";
 // so only the men's board cache can go stale from edits made here.
 import { clearBoardCache } from "@/hooks/useRosterBoard";
 import { POSITIONS, positionLabel } from "@/lib/positions";
+import { useAppSettings } from "@/hooks/useAppSettings";
 
 // Transfer detail is only meaningful while a player is actually in the portal.
 // Any write that moves player_status off "transferring" must clear these, or
@@ -144,6 +145,7 @@ const labelStyle = {
 // ── Main page ──────────────────────────────────────────────────────────────
 export function AdminPage() {
   const [activeTab, setActiveTab] = useState("transfers");
+  const { transferSeasonActive, setTransferSeasonActive } = useAppSettings();
 
   return (
     <>
@@ -155,6 +157,12 @@ export function AdminPage() {
               <h1 style={{ margin: 0 }}>Admin</h1>
               <p className="muted" style={{ margin: "4px 0 0" }}>Superadmin tools — portal data management</p>
             </div>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 12 }}
+              title="Shows the Roster Builder's 'Returning' status label once the transfer portal actually opens. Outside that window every on_board player defaults to returning anyway, so the label is left off by default.">
+              <input type="checkbox" checked={transferSeasonActive}
+                onChange={e => setTransferSeasonActive(e.target.checked)} />
+              Transfer Season Active
+            </label>
           </div>
 
           <div style={{ display: "flex", gap: 6, marginTop: 20 }}>

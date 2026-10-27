@@ -9,6 +9,7 @@ import { PlayerFinder }     from "@/components/PlayerFinder";
 import { useAuth }          from "@/hooks/useAuth";
 import { useRosterBoard }   from "@/hooks/useRosterBoard";
 import { useAdminTeam }     from "@/hooks/useAdminTeam";
+import { useAppSettings }   from "@/hooks/useAppSettings";
 import { TeamAutocomplete } from "@/components/TeamAutocomplete";
 import { supabase }         from "@/lib/supabase";
 import { exportRosterPDF }  from "@/lib/exportRoster";
@@ -1154,6 +1155,7 @@ export function AppPage() {
   const userId = user?.id || "";
   const { isAdmin, isNonAffiliate, activeTeam, selectedTeam, setSelectedTeam, allTeams } = useAdminTeam(profile);
   const board = useRosterBoard(activeTeam, userId);
+  const { transferSeasonActive } = useAppSettings();
 
   const [viewMode,      setViewMode]      = useState("build");
   const [settingsOpen,  setSettingsOpen]  = useState(false);
@@ -1805,10 +1807,17 @@ export function AppPage() {
                         </>
                       )}
 
-                      {/* 3. Returning */}
+                      {/* 3. Returning -- label itself only shows once a superadmin
+                          flips transfer_season_active on in /admin; outside the
+                          transfer window every on_board player defaults to
+                          "returning" so the label is pure noise. The rows
+                          themselves (and the ability to set retention status
+                          per row) are unaffected either way. */}
                       {returningGroup.length > 0 && (
                         <>
-                          <div className="sub-label" style={{ color: "#4ade80" }}>Returning ({returningGroup.length})</div>
+                          {transferSeasonActive && (
+                            <div className="sub-label" style={{ color: "#4ade80" }}>Returning ({returningGroup.length})</div>
+                          )}
                           {returningGroup.map(p => makeReturningRow(p))}
                         </>
                       )}

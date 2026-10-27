@@ -349,7 +349,46 @@ def normalise_pos(role):
         return "Wing"
     if any(x in role for x in ["big", "pf", "center", "power"]) or role in ("c",) or role.startswith("c ") or role.endswith(" c"):
         return "Big"
-    return "Wing"  # default
+    return "Wing"  # default -- ONLY a reasonable choice when there is truly no
+    # other signal at all (see _bucket_from_positions below, which main()
+    # tries FIRST whenever role is blank). Called directly by normalise_pos's
+    # other callers (_BUCKET_TO_POSITIONS lookups, the five-position
+    # fallback), which have no positions array to fall back to.
+
+
+def _bucket_from_positions(positions):
+    """Derive the Guard/Wing/Forward/Big metric peer group from a player's
+    already-known five-position eligibility set (players.positions) --
+    used as the pos_bucket fallback when this pass's Torvik role is blank
+    (e.g. trank_data_2027.csv, a precursor CSV seeded from last season's
+    stats before this season's role has been computed -- role is blank for
+    every row). Returns None if there's nothing usable to go on, so the
+    caller can fall back to normalise_pos's "Wing" default as the true last
+    resort rather than the first choice.
+
+    Mirrors src/lib/positions.js's legacyBucketFor() exactly: Forward
+    requires the unambiguous dual SF+PF signature (Wing F), not just a bare
+    SF or PF -- a bare SF is also what the legacy "Wing" bucket expansion
+    and the unknown-position fallback produce, and a bare PF (no C) is what
+    most ordinary PF-only bigs carry too, not just Stretch 4. Defaulting
+    those to Forward previously dumped the Full Board's display bucket into
+    Forward almost entirely (see CLAUDE.md) -- the same bug here would
+    corrupt the actual percentile math, not just a display label.
+    """
+    if not positions:
+        return None
+    first = positions[0]
+    if first in ("PG", "SG"):
+        return "Guard"
+    if first == "SF":
+        return "Forward" if "PF" in positions else "Wing"
+    if first == "PF":
+        if "C" in positions:
+            return "Big"
+        return "Forward" if "SF" in positions else "Big"
+    if first == "C":
+        return "Big"
+    return None
 
 
 # ── FIVE-POSITION MAPPING ──────────────────────────────────────────────────────
@@ -1310,6 +1349,7 @@ def main():
 
     # ── Merge Supabase player_stats into df ───────────────────────────────────
     # Gives access to ppg, apg, rpg, stl_40, blk_40, ast/40, etc. in formulas.
+    _pid_to_positions = {}  # populated below; stays empty on --dry-run (no DB read)
     if not args.dry_run:
         _db_tmp = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY) if not args.dry_run else None
         print("Fetching player_stats from Supabase for merge …")
@@ -1334,7 +1374,7 @@ def main():
         # to merge assisted_pct_rim/mid/three by pid rather than name/team)
         _pl_rows, _page = [], 0
         while True:
-            _res = _db_tmp.table("players").select("id, name, current_team, height, weight, torvik_pid") \
+            _res = _db_tmp.table("players").select("id, name, current_team, height, weight, torvik_pid, positions") \
                           .range(_page * _ps, (_page + 1) * _ps - 1).execute()
             _pl_rows.extend(_res.data or [])
             if len(_res.data or []) < _ps:
@@ -1342,6 +1382,13 @@ def main():
             _page += 1
 
         _pl_map = {p["id"]: p for p in _pl_rows}
+        # torvik_pid -> already-known five-position eligibility set, for the
+        # pos_bucket fallback below when this pass's role is blank.
+        _pid_to_positions = {
+            p["torvik_pid"]: p.get("positions")
+            for p in _pl_rows
+            if p.get("torvik_pid") is not None
+        }
         _sb_stats = []
         for r in _ps_rows:
             pl = _pl_map.get(r["player_id"], {})
@@ -1435,7 +1482,24 @@ def main():
 
     # ── Position buckets + pre-compute metrics over full df ───────────────────
     df = df.reset_index(drop=True)
-    df["pos_bucket"] = df["role"].apply(normalise_pos) if "role" in df.columns else "Wing"
+
+    def _pos_bucket_for_row(row):
+        role_raw = row.get("role", "") if "role" in df.columns else ""
+        role_str = str(role_raw).strip().lower()
+        if role_str and role_str != "nan":
+            return normalise_pos(role_raw)
+        # Blank/NaN role this pass -- fall back to the player's already-
+        # known five-position eligibility set (players.positions, from a
+        # prior real-role run) rather than defaulting straight to "Wing".
+        # Every percentile-based metric (sei/ath/ris/dds/cdi) and NIL are
+        # computed WITHIN this bucket, so dumping every player into one
+        # bucket here -- comparing guards against centers -- would corrupt
+        # every rating on the board, not just mislabel a display column.
+        pid = row.get("pid")
+        positions = _pid_to_positions.get(int(pid)) if pd.notna(pid) else None
+        return _bucket_from_positions(positions) or "Wing"
+
+    df["pos_bucket"] = df.apply(_pos_bucket_for_row, axis=1)
 
     # Physical percentiles (position-relative) — used inside compute_ath
     if "sb_height" in df.columns:
