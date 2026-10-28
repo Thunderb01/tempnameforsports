@@ -136,15 +136,12 @@ def parse_args():
                    help="One-time repair mode: fix w_players rows stuck at positions=[\"SF\"]/null "
                         "(from the blank-role overwrite bug) by re-deriving positions from this CSV's "
                         "real role data, matched by torvik_pid. Runs instead of the normal pipeline.")
-    p.add_argument("--repair-graduated-on-board", type=str, metavar="STALE_CSV", default=None,
-                   help="One-time repair mode: revert on_board to false for players wrongly "
-                        "resurrected by running STALE_CSV (e.g. last real season's data) before "
-                        "on_board was gated behind --skip-team-sync -- specifically, anyone marked "
-                        "Sr/Gr in STALE_CSV who is absent from --current-season-csv. Runs instead of "
-                        "the normal pipeline.")
-    p.add_argument("--current-season-csv", type=str, metavar="CSV", default=None,
-                   help="Required with --repair-graduated-on-board: the real, confirmed "
-                        "current-season roster CSV to check against.")
+    p.add_argument("--repair-departed-on-board", type=str, metavar="CURRENT_CSV", default=None,
+                   help="One-time repair mode: revert on_board to false for any on_board player "
+                        "(with a torvik_pid) absent from CURRENT_CSV (the real confirmed "
+                        "current-season roster) -- fixes players wrongly resurrected by running an "
+                        "older CSV before on_board was gated behind --skip-team-sync. Runs instead "
+                        "of the normal pipeline.")
     return p.parse_args()
 
 
@@ -515,38 +512,24 @@ def repair_positions_from_prior_role(db, csv_path, dry_run):
     print(f"\nDone. Repaired {written} row(s).")
 
 
-def repair_graduated_on_board(db, stale_csv_path, current_csv_path, dry_run):
+def repair_departed_on_board(db, current_csv_path, dry_run):
     """One-time repair for on_board=True wrongly set by running an older/
     off-season CSV before on_board was gated behind --skip-team-sync (see
     CLAUDE.md) -- that fix stops it happening again, but does nothing for
-    players already resurrected onto the board by a run against
-    stale_csv_path (e.g. data/trank_ncaaw_2026.csv).
+    players already resurrected onto the board that way.
 
-    Reverts on_board to False for any player who BOTH:
-      - appears in stale_csv_path with yr in {"Sr", "Gr"} (their last
-        known season was their final year of standard eligibility, so
-        they very likely graduated after it), AND
-      - does not appear at all (by torvik_pid) in current_csv_path (the
-        real, confirmed current-season roster).
+    Simple rule: for every on_board=true player who HAS a torvik_pid, if
+    that pid is absent from current_csv_path (the real, confirmed
+    current-season roster), they're not on this season's roster -- revert
+    on_board to False. No class-year filtering -- if they're not in the
+    real current CSV, they're off, whoever they are.
 
-    This is deliberately narrow: a player who transferred and IS in
-    current_csv_path is never touched, and a true incoming freshman (in
-    neither CSV, confirmed on_board some other way) is never touched
-    either, since they're not in stale_csv_path at all.
+    Players with NO torvik_pid are never touched -- they're not Torvik
+    data at all (manual portal entries, international signings, etc.),
+    so "are they in this CSV" isn't a meaningful question for them.
     """
-    for path in (stale_csv_path, current_csv_path):
-        if not os.path.exists(path):
-            sys.exit(f"CSV not found: {path}")
-
-    print(f"Reading {stale_csv_path} (the off-season CSV that may have wrongly confirmed graduates) …")
-    stale_df = pd.read_csv(stale_csv_path)
-    if "pid" not in stale_df.columns or "yr" not in stale_df.columns:
-        sys.exit(f"{stale_csv_path} is missing a pid or yr column")
-    graduated_pids = {
-        int(row["pid"]) for _, row in stale_df.iterrows()
-        if pd.notna(row.get("pid")) and str(row.get("yr", "")).strip() in ("Sr", "Gr")
-    }
-    print(f"  {len(graduated_pids)} pid(s) marked Sr/Gr in this file")
+    if not os.path.exists(current_csv_path):
+        sys.exit(f"CSV not found: {current_csv_path}")
 
     print(f"Reading {current_csv_path} (the real, confirmed current-season roster) …")
     current_df = pd.read_csv(current_csv_path)
@@ -554,9 +537,6 @@ def repair_graduated_on_board(db, stale_csv_path, current_csv_path, dry_run):
         sys.exit(f"{current_csv_path} is missing a pid column")
     current_pids = {int(p) for p in current_df["pid"].dropna()}
     print(f"  {len(current_pids)} pid(s) present in this file")
-
-    suspect_pids = graduated_pids - current_pids
-    print(f"  {len(suspect_pids)} pid(s) are Sr/Gr in {stale_csv_path} and absent from {current_csv_path}")
 
     print("\nFetching on_board players (id, torvik_pid, name, current_team) …")
     rows, page, page_size = [], 0, 1000
@@ -569,8 +549,11 @@ def repair_graduated_on_board(db, stale_csv_path, current_csv_path, dry_run):
         page += 1
     print(f"  {len(rows)} on_board=true row(s)")
 
-    updates = [r for r in rows if r.get("torvik_pid") in suspect_pids]
-    print(f"\n{len(updates)} row(s) will be reverted to on_board=false.")
+    updates = [r for r in rows if r.get("torvik_pid") is not None and r["torvik_pid"] not in current_pids]
+    no_pid = sum(1 for r in rows if r.get("torvik_pid") is None)
+    print(f"\n{len(updates)} row(s) have a torvik_pid absent from {current_csv_path} -- will be reverted to on_board=false.")
+    if no_pid:
+        print(f"  ({no_pid} on_board row(s) have no torvik_pid at all -- not Torvik data, left untouched.)")
 
     if dry_run:
         print("\n(dry-run — nothing written)")
@@ -1314,15 +1297,12 @@ def main():
         )
         return
 
-    if args.repair_graduated_on_board:
-        if not args.current_season_csv:
-            sys.exit("--repair-graduated-on-board requires --current-season-csv")
+    if args.repair_departed_on_board:
         if not SUPABASE_URL or not SUPABASE_SERVICE_KEY:
             sys.exit("Set SUPABASE_URL and SUPABASE_SERVICE_KEY env vars.")
-        repair_graduated_on_board(
+        repair_departed_on_board(
             create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY),
-            args.repair_graduated_on_board,
-            args.current_season_csv,
+            args.repair_departed_on_board,
             args.dry_run,
         )
         return
