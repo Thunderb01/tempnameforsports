@@ -127,6 +127,15 @@ def parse_args():
                    help="One-time repair mode: fix players rows stuck at positions=[\"SF\"]/null "
                         "(from the blank-role overwrite bug) by re-deriving positions from this CSV's "
                         "real role data, matched by torvik_pid. Runs instead of the normal pipeline.")
+    p.add_argument("--repair-graduated-on-board", type=str, metavar="STALE_CSV", default=None,
+                   help="One-time repair mode: revert on_board to false for players wrongly "
+                        "resurrected by running STALE_CSV (e.g. last real season's data) before "
+                        "on_board was gated behind --skip-team-sync -- specifically, anyone marked "
+                        "Sr/Gr in STALE_CSV who is absent from --current-season-csv. Runs instead of "
+                        "the normal pipeline.")
+    p.add_argument("--current-season-csv", type=str, metavar="CSV", default=None,
+                   help="Required with --repair-graduated-on-board: the real, confirmed "
+                        "current-season roster CSV (e.g. data/trank_data_2027.csv) to check against.")
     return p.parse_args()
 
 
@@ -525,6 +534,78 @@ def repair_positions_from_prior_role(db, csv_path, dry_run):
         if written % 500 == 0:
             print(f"  ... {written}/{len(updates)} repaired")
     print(f"\nDone. Repaired {written} row(s).")
+
+
+def repair_graduated_on_board(db, stale_csv_path, current_csv_path, dry_run):
+    """One-time repair for on_board=True wrongly set by running an older/
+    off-season CSV before on_board was gated behind --skip-team-sync (see
+    CLAUDE.md) -- that fix stops it happening again, but does nothing for
+    players already resurrected onto the board by a run against
+    stale_csv_path (e.g. data/trank_data_2026.csv).
+
+    Reverts on_board to False for any player who BOTH:
+      - appears in stale_csv_path with yr in {"Sr", "Gr"} (their last
+        known season was their final year of standard eligibility, so
+        they very likely graduated after it), AND
+      - does not appear at all (by torvik_pid) in current_csv_path (the
+        real, confirmed current-season roster -- e.g. data/trank_data_2027.csv).
+
+    This is deliberately narrow: a player who transferred and IS in
+    current_csv_path is never touched, and a true incoming freshman (in
+    neither CSV, confirmed on_board some other way, e.g. import_portal.py)
+    is never touched either, since they're not in stale_csv_path at all.
+    """
+    for path in (stale_csv_path, current_csv_path):
+        if not os.path.exists(path):
+            sys.exit(f"CSV not found: {path}")
+
+    print(f"Reading {stale_csv_path} (the off-season CSV that may have wrongly confirmed graduates) …")
+    stale_df = pd.read_csv(stale_csv_path)
+    if "pid" not in stale_df.columns or "yr" not in stale_df.columns:
+        sys.exit(f"{stale_csv_path} is missing a pid or yr column")
+    graduated_pids = {
+        int(row["pid"]) for _, row in stale_df.iterrows()
+        if pd.notna(row.get("pid")) and str(row.get("yr", "")).strip() in ("Sr", "Gr")
+    }
+    print(f"  {len(graduated_pids)} pid(s) marked Sr/Gr in this file")
+
+    print(f"Reading {current_csv_path} (the real, confirmed current-season roster) …")
+    current_df = pd.read_csv(current_csv_path)
+    if "pid" not in current_df.columns:
+        sys.exit(f"{current_csv_path} is missing a pid column")
+    current_pids = {int(p) for p in current_df["pid"].dropna()}
+    print(f"  {len(current_pids)} pid(s) present in this file")
+
+    suspect_pids = graduated_pids - current_pids
+    print(f"  {len(suspect_pids)} pid(s) are Sr/Gr in {stale_csv_path} and absent from {current_csv_path}")
+
+    print("\nFetching on_board players (id, torvik_pid, name, current_team) …")
+    rows, page, page_size = [], 0, 1000
+    while True:
+        res = db.table("players").select("id, torvik_pid, name, current_team") \
+                .eq("on_board", True).range(page * page_size, (page + 1) * page_size - 1).execute()
+        rows.extend(res.data or [])
+        if len(res.data or []) < page_size:
+            break
+        page += 1
+    print(f"  {len(rows)} on_board=true row(s)")
+
+    updates = [r for r in rows if r.get("torvik_pid") in suspect_pids]
+    print(f"\n{len(updates)} row(s) will be reverted to on_board=false.")
+
+    if dry_run:
+        print("\n(dry-run — nothing written)")
+        for r in updates[:10]:
+            print(f"  {r.get('name')} ({r.get('current_team')})")
+        return
+
+    written = 0
+    for r in updates:
+        db.table("players").update({"on_board": False}).eq("id", r["id"]).execute()
+        written += 1
+        if written % 500 == 0:
+            print(f"  ... {written}/{len(updates)} repaired")
+    print(f"\nDone. Reverted {written} row(s) to on_board=false.")
 
 
 def percentrank_by_pos(df, col, pos_col="pos_bucket", scale=100):
@@ -1316,6 +1397,19 @@ def main():
         )
         return
 
+    if args.repair_graduated_on_board:
+        if not args.current_season_csv:
+            sys.exit("--repair-graduated-on-board requires --current-season-csv")
+        if not SUPABASE_URL or not SUPABASE_SERVICE_KEY:
+            sys.exit("Set SUPABASE_URL and SUPABASE_SERVICE_KEY env vars.")
+        repair_graduated_on_board(
+            create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY),
+            args.repair_graduated_on_board,
+            args.current_season_csv,
+            args.dry_run,
+        )
+        return
+
     if not args.dry_run:
         if not SUPABASE_URL or not SUPABASE_SERVICE_KEY:
             sys.exit("Set SUPABASE_URL and SUPABASE_SERVICE_KEY env vars.")
@@ -1717,11 +1811,18 @@ def main():
 
         # ── Update players table (skip in historical mode) ────────────────────
         if not args.historical:
-            # Matching this row in the current season's Torvik CSV confirms
-            # the player belongs on the live board — flip it back on
-            # regardless of whether anything else below changed. See
-            # archive_season.py / CLAUDE.md's season rollover section.
-            player_patch = {"on_board": True}
+            player_patch = {}
+            # on_board=True is a roster-membership claim exactly like
+            # current_team -- "this CSV confirms this player is on the live
+            # board" (see archive_season.py / CLAUDE.md's season rollover
+            # section). Gated behind --skip-team-sync for the same reason:
+            # an older/off-season CSV (e.g. last real season's data, used
+            # only to refresh scoring metrics) is NOT a trustworthy source
+            # for "is this player actually on this season's roster" --
+            # every matched player in it would otherwise get silently
+            # resurrected onto the board, graduated seniors included.
+            if not args.skip_team_sync:
+                player_patch["on_board"] = True
             if torvik_pid_val is not None:
                 player_patch["torvik_pid"] = torvik_pid_val
             # Matching by torvik_pid is team-independent, so a transferred
