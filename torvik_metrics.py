@@ -1800,7 +1800,14 @@ def main():
         # literal below — otherwise a row matched via the update branch never
         # gets calendar_year set/corrected, and the frontend's Season column
         # (which queries/sorts by calendar_year) shows blank for it.
-        stats_patch = {**torvik, "name": name, "school": display_school(team), "year": YR_MAP.get(yr, yr), "calendar_year": args.year}
+        # This row's calendar_year is still the player's CURRENT season even
+        # when --skip-team-sync is borrowing an older CSV's raw stats to
+        # compute it -- its school should reflect where they actually are
+        # now (players.current_team, already fetched into _pl_map), not
+        # wherever the borrowed numbers came from. Falls back to the CSV's
+        # team if there's no current_team on file yet.
+        school = (_pl_map.get(player_id, {}).get("current_team") if args.skip_team_sync else None) or display_school(team)
+        stats_patch = {**torvik, "name": name, "school": school, "year": YR_MAP.get(yr, yr), "calendar_year": args.year}
         for key_m, val in [
             ("cdi", cdi), ("dds", dds), ("sei", sei), ("ath", ath), ("ris", ris),
             ("shot_difficulty", shot_difficulty), ("shot_difficulty_modifier", shot_difficulty_modifier),
@@ -1906,7 +1913,11 @@ def main():
                 "shot_difficulty": None, "shot_difficulty_modifier": None,
                 "adjusted_sei": None, "sei_diff": None, "shot_creation": None,
                 "name":   name,
-                "school": display_school(team),
+                # Same reasoning as the qualified-players loop above: this
+                # row's calendar_year is still the player's CURRENT season,
+                # so with --skip-team-sync its school should follow the
+                # live current_team, not the borrowed CSV's team.
+                "school": (_pl_map.get(player_id, {}).get("current_team") if args.skip_team_sync else None) or display_school(team),
                 "year":   {"Fr": "Freshman", "So": "Sophomore", "Jr": "Junior", "Sr": "Senior", "Gr": "Graduate"}.get(str(row.get("yr", "")).strip(), str(row.get("yr", "")).strip()),
                 "calendar_year": args.year,
             }
