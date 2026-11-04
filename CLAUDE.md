@@ -212,6 +212,29 @@ python import_pbp_shot_assists.py --season <year> --json <pbp file>
 python torvik_metrics.py --csv <csv> --year <year>
 ```
 
+**`run_season_pipeline.py` runs this full sequence (plus `--repair-departed-on-board`
+and `team_players` resync) in one command instead of by hand** — the actual
+recurring failure mode across several seasons of doing this manually wasn't
+any one script being wrong, it was a step skipped, run out of order, or the
+frontend `sessionBoardVer` bump forgotten (see "State that's local vs.
+shared" above). It wraps the existing scripts as subprocesses rather than
+reimplementing them, stops immediately on the first failing step, and
+auto-bumps `sessionBoardVer` as its last step so that's never the forgotten
+part again:
+
+```bash
+python run_season_pipeline.py --year <year> --csv <csv> --pbp-json <pbp file> --dry-run
+python run_season_pipeline.py --year <year> --csv <csv> --pbp-json <pbp file>
+```
+
+`--fetch` downloads the trank CSV live via `torvik_to_csv.py`
+(`barttorvik.com/advstats.php`) instead of requiring `--csv` — unverified
+from this repo's own sandboxed dev environment (outbound access to
+barttorvik.com is blocked there), so run `--fetch --dry-run` once and check
+the printed column list before trusting it for a real run. Women's has no
+`team_players`-equivalent sync script yet (a pre-existing gap — see the
+fork-model section), so that step is auto-skipped for `--sport women`.
+
 Missing `assisted_pct_*` data (a player the PBP importer never saw, or one
 with 0 makes in a bucket) is treated as `0` — "fully unassisted" — per the
 spec's own edge-case rule, not an error.
