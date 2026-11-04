@@ -1748,7 +1748,9 @@ export function AppPage() {
                           <div className="row-sub" style={{ fontSize: 11 }}>{p.primary_position || p.pos} · {p.year}</div>
                           <NilInput value={nilById[p.id] || 0} onCommit={val => board.updateReturningNil(p.id, val)} />
                         </div>
-                        <RetentionBadge value={status} onChange={val => board.setRetention(p.id, val)} />
+                        {transferSeasonActive && (
+                          <RetentionBadge value={status} onChange={val => board.setRetention(p.id, val)} />
+                        )}
                       </div>
                     );
                   };
@@ -1898,7 +1900,7 @@ export function AppPage() {
                             color: col.label === "Type" ? (TYPE_COLOR[p._type] || "inherit") : "inherit",
                             fontWeight: col.label === "Type" ? 500 : "inherit",
                           }}>
-                            {col.label === "Type" && p._typeKey !== "transfer" && p._typeKey !== "incoming" && p._typeKey !== "custom" && p._typeKey !== "intl" ? (
+                            {col.label === "Type" && transferSeasonActive && p._typeKey !== "transfer" && p._typeKey !== "incoming" && p._typeKey !== "custom" && p._typeKey !== "intl" ? (
                               <div onClick={e => e.stopPropagation()}>
                                 <RetentionBadge value={p._typeKey} onChange={val => board.setRetention(p.id, val)} />
                               </div>
