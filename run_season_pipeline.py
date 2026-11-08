@@ -31,7 +31,7 @@ skipping the cache-version bump, since there's nothing to invalidate yet.
 Review the dry-run output, then re-run without --dry-run.
 
 --fetch downloads the trank CSV live via torvik_to_csv.py (barttorvik.com's
-advstats.php) instead of requiring --csv, and lets import_pbp_shot_assists.py
+getadvstats.php) instead of requiring --csv, and lets import_pbp_shot_assists.py
 self-fetch the PBP JSON instead of requiring --pbp-json. This has NOT been
 verified against barttorvik.com's live response from this codebase's own
 sandboxed dev environment (outbound access to barttorvik.com is blocked

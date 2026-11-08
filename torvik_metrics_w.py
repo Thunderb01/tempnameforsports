@@ -149,6 +149,73 @@ def normalise(s):
     return str(s).strip().lower()
 
 
+# ── TRANK CSV READING ──────────────────────────────────────────────────────────
+# Confirmed against two separate real production incidents (2026-11-08):
+# 1. Barttorvik's raw trank CSV exports -- getadvstats.php, and any CSV
+#    downloaded directly from the site -- have NO header row. A headerless
+#    file read with plain pd.read_csv() gets its first player's data
+#    consumed as column names, and every df["player_name"]-style lookup
+#    KeyErrors.
+# 2. A header row CAN be present but still be the wrong length: one real
+#    file had a header naming only the base 67 columns while every data row
+#    actually had 78 fields. Reading that with plain pd.read_csv() hits an
+#    undocumented pandas footgun -- when a header is SHORTER than the data
+#    rows, pandas silently consumes the extra leading fields as an unnamed
+#    index instead of erroring, so "player_name" ends up reading whatever
+#    field actually sat 11 columns later. This is worse than the headerless
+#    case: it doesn't crash, it just silently scrambles every column.
+# read_trank_csv() never lets pandas infer column count from the header row
+# at all -- it always measures a DATA row's width and passes an explicit
+# `names=` list sized to that, whether or not a header is present and
+# whatever length that header happens to be. Mirrors torvik_metrics.py's
+# version exactly.
+TRANK_BASE_COLUMNS = [
+    "player_name", "team", "conf", "GP", "Min_per", "ORtg", "usg", "eFG", "TS_per",
+    "ORB_per", "DRB_per", "AST_per", "TO_per", "FTM", "FTA", "FT_per", "twoPM",
+    "twoPA", "twoP_per", "TPM", "TPA", "TP_per", "blk_per", "stl_per", "ftr", "yr",
+    "ht", "num", "porpag", "adjoe", "pfr", "year", "pid", "type", "Rec_Rank",
+    "ast/tov", "rimmade", "rimmade+rimmiss", "midmade", "midmade+midmiss",
+    "rimmade/(rimmade+rimmiss)", "midmade/(midmade+midmiss)", "dunksmade",
+    "dunksmiss+dunksmade", "dunksmade/(dunksmiss+dunksmade)", "pick", "drtg",
+    "adrtg", "dporpag", "stops", "bpm", "obpm", "dbpm", "gbpm", "mp", "ogbpm",
+    "dgbpm", "oreb", "dreb", "treb", "ast", "stl", "blk", "pts", "role",
+    "3p/100", "dob",
+]
+
+
+def read_trank_csv(path):
+    """Read a Barttorvik trank CSV whatever its header situation -- missing
+    entirely, present but shorter than the data rows, or a correct length.
+    Extra trailing columns beyond TRANK_BASE_COLUMNS are named unk_N rather
+    than guessed at -- Barttorvik has changed this count at least three
+    times observed so far (67, 68, 78 columns)."""
+    with open(path, newline="", encoding="utf-8-sig") as f:
+        reader = csv.reader(f)
+        first_row = next(reader)
+        has_header = first_row[:1] == ["player_name"]
+        data_row = next(reader, None) if has_header else first_row
+
+    if data_row is None:
+        sys.exit(f"{path} has a header row but no data rows.")
+
+    n_cols = len(data_row)
+    if n_cols < len(TRANK_BASE_COLUMNS):
+        sys.exit(f"{path} has only {n_cols} columns, expected at least "
+                  f"{len(TRANK_BASE_COLUMNS)} (base trank schema) -- this doesn't "
+                  f"look like a trank CSV at all.")
+    names = TRANK_BASE_COLUMNS + [f"unk_{i}" for i in range(len(TRANK_BASE_COLUMNS), n_cols)]
+
+    if has_header and len(first_row) != n_cols:
+        print(f"  ({path}'s header row only names {len(first_row)} of the {n_cols} columns its data "
+              f"rows actually have -- extending with unk_N placeholders for the {n_cols - len(first_row)} "
+              f"unnamed trailing column(s) instead of letting pandas misread them as an index)")
+    elif not has_header:
+        print(f"  (no header row detected in {path} -- applying the known {len(TRANK_BASE_COLUMNS)}-column "
+              f"trank schema{f' + {n_cols - len(TRANK_BASE_COLUMNS)} unnamed trailing column(s)' if n_cols > len(TRANK_BASE_COLUMNS) else ''})")
+
+    return pd.read_csv(path, header=None, skiprows=1 if has_header else 0, names=names, encoding="utf-8-sig")
+
+
 def safe(val, default=None):
     """Return float or default if missing/nan."""
     try:
@@ -439,7 +506,7 @@ def repair_positions_from_prior_role(db, csv_path, dry_run):
     if not os.path.exists(csv_path):
         sys.exit(f"Role CSV not found: {csv_path}")
     print(f"Reading real role data from {csv_path} …")
-    role_df = pd.read_csv(csv_path)
+    role_df = read_trank_csv(csv_path)
     if "pid" not in role_df.columns or "role" not in role_df.columns:
         sys.exit(f"{csv_path} is missing a pid or role column")
     if "year" in role_df.columns:
@@ -532,7 +599,7 @@ def repair_departed_on_board(db, current_csv_path, dry_run):
         sys.exit(f"CSV not found: {current_csv_path}")
 
     print(f"Reading {current_csv_path} (the real, confirmed current-season roster) …")
-    current_df = pd.read_csv(current_csv_path)
+    current_df = read_trank_csv(current_csv_path)
     if "pid" not in current_df.columns:
         sys.exit(f"{current_csv_path} is missing a pid column")
     current_pids = {int(p) for p in current_df["pid"].dropna()}
@@ -1314,7 +1381,7 @@ def main():
 
     # ── Load CSV ──────────────────────────────────────────────────────────────
     print(f"Reading {args.csv} …")
-    df = pd.read_csv(args.csv)
+    df = read_trank_csv(args.csv)
 
     # ── Optional filters (applied AFTER metrics so percentiles use full population) ──
     # Store filter sets here; actual slicing happens in the write loop below.
