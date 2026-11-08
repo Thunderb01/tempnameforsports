@@ -235,6 +235,27 @@ the printed column list before trusting it for a real run. Women's has no
 `team_players`-equivalent sync script yet (a pre-existing gap — see the
 fork-model section), so that step is auto-skipped for `--sport women`.
 
+**Barttorvik's trank CSV exports have NO header row — confirmed against a
+real production `KeyError: 'player_name'` crash (2026-11-08), not a guess.**
+Every trank CSV barttorvik.com hands out — `getadvstats.php?csv=1` fetched
+live, or the same file downloaded by hand — starts straight with row data,
+no `player_name,team,conf,...` line first. Plain `pd.read_csv()` silently
+promotes the first player's row to column names, so every
+`df["player_name"]`-style lookup downstream throws `KeyError`, right after
+the row count prints (easy to mistake for a late failure when it's actually
+read-time). `torvik_metrics.py`/`torvik_metrics_w.py` and `torvik_to_csv.py`
+guard against this: `TRANK_BASE_COLUMNS` holds the known 67-column schema,
+extended with `unk_N` placeholders for trailing columns past that (Barttorvik's
+column count has moved — 67/68/78 observed across different exports).
+`read_trank_csv(path)` (both metrics files, used at every CSV-from-disk read
+site) and `parse_trank_response(text)` (`torvik_to_csv.py`, used on the live
+HTTP body so `--fetch` always produces an already-headered file) check the
+first row/line for a literal `player_name` first column and only apply the
+schema when it's missing. Any new code path that reads a trank CSV — from
+disk or over HTTP — must go through one of these two functions, never a bare
+`pd.read_csv()`, the same way name/team lookups must go through their own
+canonical helpers (see the table at the top of this file).
+
 Missing `assisted_pct_*` data (a player the PBP importer never saw, or one
 with 0 makes in a bucket) is treated as `0` — "fully unassisted" — per the
 spec's own edge-case rule, not an error.
