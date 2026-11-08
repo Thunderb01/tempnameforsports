@@ -141,16 +141,27 @@ def normalise(s):
 
 
 # ── TRANK CSV READING ──────────────────────────────────────────────────────────
-# Confirmed against a real production run (2026-11-08): Barttorvik's raw trank
-# CSV exports -- getadvstats.php, and any CSV downloaded directly from the
-# site -- have NO header row. A CSV that's been through this repo's own
-# processing (e.g. data/trank_data_2026.csv) does have one. Reading either
-# kind with plain pd.read_csv() silently treats whichever kind it DOESN'T
-# expect wrong -- a headerless file gets its first player's data consumed as
-# column names (then every df["player_name"]-style lookup KeyErrors), and a
-# headered file would get its real header row treated as a data row if read
-# with header=None. read_trank_csv() detects which this file is and handles
-# both, so a fresh headerless download never needs manual re-heading again.
+# Confirmed against two separate real production incidents (2026-11-08):
+# 1. Barttorvik's raw trank CSV exports -- getadvstats.php, and any CSV
+#    downloaded directly from the site -- have NO header row. A headerless
+#    file read with plain pd.read_csv() gets its first player's data
+#    consumed as column names, and every df["player_name"]-style lookup
+#    KeyErrors.
+# 2. A header row CAN be present but still be the wrong length: one real
+#    file had a header naming only the base 67 columns while every data row
+#    actually had 78 fields (Barttorvik's trailing-column count varies and
+#    its header doesn't always grow to match). Reading that with plain
+#    pd.read_csv() hits an undocumented pandas footgun -- when a header is
+#    SHORTER than the data rows, pandas silently consumes the extra leading
+#    fields as an unnamed index instead of erroring, so "player_name" ends
+#    up reading whatever field actually sat 11 columns later. This is worse
+#    than the headerless case: it doesn't crash, it just silently scrambles
+#    every column (confirmed: this run flipped 2464 real on_board players to
+#    false because "pid" was reading garbage for 99%+ of rows).
+# read_trank_csv() never lets pandas infer column count from the header row
+# at all -- it always measures a DATA row's width and passes an explicit
+# `names=` list sized to that, whether or not a header is present and
+# whatever length that header happens to be.
 TRANK_BASE_COLUMNS = [
     "player_name", "team", "conf", "GP", "Min_per", "ORtg", "usg", "eFG", "TS_per",
     "ORB_per", "DRB_per", "AST_per", "TO_per", "FTM", "FTA", "FT_per", "twoPM",
@@ -166,25 +177,36 @@ TRANK_BASE_COLUMNS = [
 
 
 def read_trank_csv(path):
-    """Read a Barttorvik trank CSV whether or not it has a header row.
+    """Read a Barttorvik trank CSV whatever its header situation -- missing
+    entirely, present but shorter than the data rows, or a correct length.
     Extra trailing columns beyond TRANK_BASE_COLUMNS are named unk_N rather
     than guessed at -- Barttorvik has changed this count at least three
     times observed so far (67, 68, 78 columns)."""
     with open(path, newline="", encoding="utf-8-sig") as f:
-        first_row = next(csv.reader(f))
+        reader = csv.reader(f)
+        first_row = next(reader)
+        has_header = first_row[:1] == ["player_name"]
+        data_row = next(reader, None) if has_header else first_row
 
-    if first_row[:1] == ["player_name"]:
-        return pd.read_csv(path, encoding="utf-8-sig")
+    if data_row is None:
+        sys.exit(f"{path} has a header row but no data rows.")
 
-    n_cols = len(first_row)
+    n_cols = len(data_row)
     if n_cols < len(TRANK_BASE_COLUMNS):
         sys.exit(f"{path} has only {n_cols} columns, expected at least "
                   f"{len(TRANK_BASE_COLUMNS)} (base trank schema) -- this doesn't "
                   f"look like a trank CSV at all.")
     names = TRANK_BASE_COLUMNS + [f"unk_{i}" for i in range(len(TRANK_BASE_COLUMNS), n_cols)]
-    print(f"  (no header row detected in {path} -- applying the known {len(TRANK_BASE_COLUMNS)}-column "
-          f"trank schema{f' + {n_cols - len(TRANK_BASE_COLUMNS)} unnamed trailing column(s)' if n_cols > len(TRANK_BASE_COLUMNS) else ''})")
-    return pd.read_csv(path, header=None, names=names, encoding="utf-8-sig")
+
+    if has_header and len(first_row) != n_cols:
+        print(f"  ({path}'s header row only names {len(first_row)} of the {n_cols} columns its data "
+              f"rows actually have -- extending with unk_N placeholders for the {n_cols - len(first_row)} "
+              f"unnamed trailing column(s) instead of letting pandas misread them as an index)")
+    elif not has_header:
+        print(f"  (no header row detected in {path} -- applying the known {len(TRANK_BASE_COLUMNS)}-column "
+              f"trank schema{f' + {n_cols - len(TRANK_BASE_COLUMNS)} unnamed trailing column(s)' if n_cols > len(TRANK_BASE_COLUMNS) else ''})")
+
+    return pd.read_csv(path, header=None, skiprows=1 if has_header else 0, names=names, encoding="utf-8-sig")
 
 
 def safe(val, default=None):

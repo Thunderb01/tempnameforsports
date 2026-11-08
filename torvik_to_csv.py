@@ -21,6 +21,7 @@ Usage:
 """
 
 import argparse
+import csv
 import datetime
 import os
 import sys
@@ -67,22 +68,41 @@ def parse_args():
 
 
 def parse_trank_response(text):
-    """CSV text -> headered DataFrame, whether or not the response itself
-    has a header row."""
-    first_line = text.split("\n", 1)[0]
-    has_header = first_line.strip().split(",")[0].strip('"') == "player_name"
-    if has_header:
-        return pd.read_csv(StringIO(text))
+    """CSV text -> headered DataFrame, handling every header situation
+    torvik_metrics.py's read_trank_csv() handles (see that file's "TRANK CSV
+    READING" section for the full rationale) -- missing entirely, present
+    but shorter than the data rows (confirmed real case, 2026-11-08: a
+    header naming only the base 67 columns while every data row had 78 --
+    reading that with plain pd.read_csv() hits pandas' undocumented footgun
+    where a too-short header makes it silently consume extra leading fields
+    as an unnamed index instead of erroring, scrambling every column), or a
+    correct length. Never lets pandas infer column count from the header
+    row itself -- always measures a data row's width and passes an explicit
+    names= list sized to that."""
+    reader = csv.reader(StringIO(text))
+    first_row = next(reader)
+    has_header = first_row[:1] == ["player_name"]
+    data_row = next(reader, None) if has_header else first_row
 
-    n_cols = len(next(pd.read_csv(StringIO(text), header=None, nrows=1).itertuples(index=False)))
+    if data_row is None:
+        sys.exit("Response has a header row but no data rows.")
+
+    n_cols = len(data_row)
     if n_cols < len(TRANK_BASE_COLUMNS):
         sys.exit(f"Response has only {n_cols} columns, expected at least "
                   f"{len(TRANK_BASE_COLUMNS)} (base trank schema) -- this doesn't "
                   f"look like a trank CSV at all.")
     names = TRANK_BASE_COLUMNS + [f"unk_{i}" for i in range(len(TRANK_BASE_COLUMNS), n_cols)]
-    print(f"  (no header row in the response -- applying the known {len(TRANK_BASE_COLUMNS)}-column "
-          f"trank schema{f' + {n_cols - len(TRANK_BASE_COLUMNS)} unnamed trailing column(s)' if n_cols > len(TRANK_BASE_COLUMNS) else ''})")
-    return pd.read_csv(StringIO(text), header=None, names=names)
+
+    if has_header and len(first_row) != n_cols:
+        print(f"  (response's header row only names {len(first_row)} of the {n_cols} columns its data "
+              f"rows actually have -- extending with unk_N placeholders for the {n_cols - len(first_row)} "
+              f"unnamed trailing column(s) instead of letting pandas misread them as an index)")
+    elif not has_header:
+        print(f"  (no header row in the response -- applying the known {len(TRANK_BASE_COLUMNS)}-column "
+              f"trank schema{f' + {n_cols - len(TRANK_BASE_COLUMNS)} unnamed trailing column(s)' if n_cols > len(TRANK_BASE_COLUMNS) else ''})")
+
+    return pd.read_csv(StringIO(text), header=None, skiprows=1 if has_header else 0, names=names)
 
 
 def main():
