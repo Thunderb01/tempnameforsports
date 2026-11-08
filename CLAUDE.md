@@ -256,6 +256,33 @@ disk or over HTTP — must go through one of these two functions, never a bare
 `pd.read_csv()`, the same way name/team lookups must go through their own
 canonical helpers (see the table at the top of this file).
 
+**A header row being present is not enough — it can still be the wrong
+length, and that's worse than no header at all.** Confirmed against a second
+real production incident (2026-11-08, same day): a pushed `data/trank_data_2027.csv`
+had a header naming only the base 67 columns while every data row actually
+had 78 fields. `read_trank_csv()`/`parse_trank_response()` correctly saw
+`player_name` in the first field and took the "has a header" branch — which
+at the time just called plain `pd.read_csv()`. That hits an undocumented
+pandas footgun: when a header is *shorter* than the data rows, pandas
+silently consumes the extra leading fields as an unnamed index instead of
+erroring. Every named column then read 11 positions to the right of where
+it actually was — `pid` came back garbage for 4169/4179 rows and `Min_per`
+silently read a 0–1 ratio column instead of the real percentage. Unlike the
+missing-header case this doesn't crash; it runs clean and corrupts silently.
+In production it took out the whole board in one command: `torvik_metrics.py`
+found 0 qualified players (nothing cleared `Min_per >= 20` once the column
+was wrong), and `--repair-departed-on-board` saw only 10 valid pids in a
+2767+-row file, so it reverted ~2464 real `on_board=true` players to `false`
+and `team_players` rebuilt itself with 0 rows. Fixed: both functions now
+*never* let pandas infer column count from the header row at all — they
+always measure a data row's width and pass an explicit `names=` list sized
+to that, whether the header is missing, short, or a correct length. Recovery
+for an incident like this doesn't need manual DB surgery: once the CSV is
+read correctly, a normal `torvik_metrics.py --csv ...` run sets `on_board =
+true` for every player it actually matches (see "Season rollover" below), so
+re-running the pipeline against the same (now correctly-read) file is the
+designed fix, not a one-off patch.
+
 Missing `assisted_pct_*` data (a player the PBP importer never saw, or one
 with 0 makes in a bucket) is treated as `0` — "fully unassisted" — per the
 spec's own edge-case rule, not an error.
