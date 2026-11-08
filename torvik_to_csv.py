@@ -41,7 +41,7 @@ def main():
     args = parse_args()
     output = args.output or f"data/torvik_{args.year}.csv"
 
-    url = f"https://barttorvik.com/advstats.php?year={args.year}&csv=1"
+    url = f"https://barttorvik.com/getadvstats.php?year={args.year}&csv=1"
     print(f"Downloading: {url}")
 
     resp = requests.get(url, headers=HEADERS, timeout=30)

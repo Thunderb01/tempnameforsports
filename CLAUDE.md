@@ -228,7 +228,7 @@ python run_season_pipeline.py --year <year> --csv <csv> --pbp-json <pbp file>
 ```
 
 `--fetch` downloads the trank CSV live via `torvik_to_csv.py`
-(`barttorvik.com/advstats.php`) instead of requiring `--csv` — unverified
+(`barttorvik.com/getadvstats.php`) instead of requiring `--csv` — unverified
 from this repo's own sandboxed dev environment (outbound access to
 barttorvik.com is blocked there), so run `--fetch --dry-run` once and check
 the printed column list before trusting it for a real run. Women's has no
