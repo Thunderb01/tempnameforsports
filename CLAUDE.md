@@ -235,6 +235,20 @@ the printed column list before trusting it for a real run. Women's has no
 `team_players`-equivalent sync script yet (a pre-existing gap — see the
 fork-model section), so that step is auto-skipped for `--sport women`.
 
+**`.github/workflows/season-pipeline.yml` runs this on a schedule (men's
+only)** — biweekly (1st/15th, 13:00 UTC) plus a manual `workflow_dispatch`,
+writing straight to production Supabase with no PR-review gate, by explicit
+choice. Because of that, and because of the two incidents below, it fetches
+the CSV as its own step and validates row count / `pid` non-null rate /
+`Min_per` distribution *before* running anything that writes to Supabase,
+rather than trusting the fetch blindly — the validation would have caught
+both incidents before either reached Supabase. Reuses the same
+`SUPABASE_URL`/`SUPABASE_SERVICE_KEY` secrets `seed-womens-torvik.yml`
+already depends on. Women's isn't wired in — there's no live-fetch endpoint
+for it yet (`data/trank_ncaaw_2026.csv` is a one-time seed, not a
+refreshable live source); build a women's `torvik_to_csv.py` equivalent
+first if this needs to extend there.
+
 **Barttorvik's trank CSV exports have NO header row — confirmed against a
 real production `KeyError: 'player_name'` crash (2026-11-08), not a guess.**
 Every trank CSV barttorvik.com hands out — `getadvstats.php?csv=1` fetched
