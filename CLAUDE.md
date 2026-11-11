@@ -249,6 +249,20 @@ for it yet (`data/trank_ncaaw_2026.csv` is a one-time seed, not a
 refreshable live source); build a women's `torvik_to_csv.py` equivalent
 first if this needs to extend there.
 
+**Runs on a self-hosted Windows runner, not GitHub-hosted — confirmed via
+a real failed run (2026-11-11) that barttorvik.com returns 403 Forbidden to
+GitHub-hosted runner IPs.** `torvik_to_csv.py` already sends a browser-like
+`User-Agent`, so this is IP-based blocking (cloud/datacenter ASNs are a
+common anti-bot target), not a fixable header/code issue — confirmed by the
+user successfully fetching the same URL from their own machine. `runs-on:
+[self-hosted, Windows]` with `defaults.run.shell: bash` (so the existing
+bash-syntax steps run via Git Bash instead of PowerShell) on the same
+Windows machine the pipeline's been run on by hand all along. One real
+behavioral difference from a GitHub-hosted runner: a scheduled run just
+queues until that machine's runner service is online, rather than running
+instantly — see the workflow file's own header comment for runner setup
+steps (register as a self-hosted runner, install as a Windows service).
+
 **Barttorvik's trank CSV exports have NO header row — confirmed against a
 real production `KeyError: 'player_name'` crash (2026-11-08), not a guess.**
 Every trank CSV barttorvik.com hands out — `getadvstats.php?csv=1` fetched
