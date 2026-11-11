@@ -20,18 +20,39 @@
 # seed-womens-torvik.yml, not a refreshable live source). Build a women's
 # equivalent of torvik_to_csv.py first if you want this extended to women's.
 #
+# RUNS ON A SELF-HOSTED RUNNER, not GitHub-hosted — confirmed via a real
+# failed run (2026-11-11) that barttorvik.com returns 403 Forbidden to
+# requests from GitHub's hosted-runner IP ranges (cloud/datacenter IPs are
+# commonly blocked by anti-bot rules; this isn't a code/header problem,
+# torvik_to_csv.py already sends a browser-like User-Agent). A self-hosted
+# runner on an ordinary residential connection doesn't hit this.
+#
 # Setup:
-#   1. Go to Settings → Actions → General → Workflow permissions
+#   1. Settings → Actions → Runners → New self-hosted runner → Windows,
+#      and follow GitHub's generated download/config commands on the
+#      machine that will run this (the same Windows machine you've been
+#      running run_season_pipeline.py on by hand works fine).
+#   2. Install it as a Windows service (from the runner folder, elevated
+#      terminal: `./svc.cmd install` then `./svc.cmd start`) so it's
+#      listening even after you log off / reboot. Without this, the
+#      scheduled run just sits queued until you manually start run.cmd.
+#   3. The runner needs `bash` on PATH (Git for Windows bundles this as
+#      Git Bash — already true if `git` works in your terminal) and
+#      `python`/pip (already true, you run these scripts locally).
+#   4. Go to Settings → Actions → General → Workflow permissions
 #      → enable "Read and write permissions" (same requirement as
 #      scrape.yml) so this workflow can push its own commits.
-#   2. Confirm repo secrets SUPABASE_URL and SUPABASE_SERVICE_KEY are set
+#   5. Confirm repo secrets SUPABASE_URL and SUPABASE_SERVICE_KEY are set
 #      (Settings → Secrets and variables → Actions) — seed-womens-torvik.yml
 #      already uses these same two secrets, so they're likely set already.
 #
 # Schedule: the 1st and 15th of each month at 13:00 UTC (~biweekly — cron
 # can't express a true rolling 14-day interval, since its day-of-month
 # field anchors to calendar days, but twice a month is the common meaning
-# of "biweekly" and is simple to read/adjust here).
+# of "biweekly" and is simple to read/adjust here). Unlike a GitHub-hosted
+# runner, a self-hosted one only runs the job once it's online — if your
+# machine is off at 13:00 UTC on the 1st/15th, the run stays queued until
+# the runner service comes back up, it doesn't just silently get skipped.
 
 name: Season Data Refresh (men's)
 
@@ -45,7 +66,10 @@ permissions:
 
 jobs:
   refresh:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Windows]
+    defaults:
+      run:
+        shell: bash
 
     steps:
       - name: Checkout repo
@@ -62,7 +86,7 @@ jobs:
       - name: Compute season year
         id: year
         run: |
-          YEAR=$(python3 -c "import datetime; n = datetime.date.today(); print(n.year + 1 if n.month >= 10 else n.year)")
+          YEAR=$(python -c "import datetime; n = datetime.date.today(); print(n.year + 1 if n.month >= 10 else n.year)")
           echo "Season year: $YEAR"
           echo "year=$YEAR" >> "$GITHUB_OUTPUT"
 
@@ -74,7 +98,7 @@ jobs:
 
       - name: Validate fetched CSV before writing anything to Supabase
         run: |
-          python3 -c "
+          python -c "
           import sys
           sys.path.insert(0, '.')
           from torvik_metrics import read_trank_csv
