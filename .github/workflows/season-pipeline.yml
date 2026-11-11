@@ -1,0 +1,116 @@
+# .github/workflows/season-pipeline.yml
+# Runs the full men's season data-refresh pipeline (run_season_pipeline.py)
+# on a schedule and writes straight to production Supabase — no PR review
+# step, by explicit choice. Because of that, this fetches the trank CSV as
+# its own step and validates its shape BEFORE running anything that writes
+# to Supabase, rather than trusting torvik_to_csv.py's --fetch blindly.
+#
+# That validation exists because of two real incidents on 2026-11-08: a
+# CSV that pandas silently misread (missing header, then a header shorter
+# than its data rows) corrupted pid/Min_per for nearly every row, which
+# made --repair-departed-on-board revert ~2464 real on_board players to
+# false. read_trank_csv()'s own parsing fix now handles both those cases
+# correctly, but this workflow also sanity-checks the fetched data's shape
+# before writing anything to Supabase, in case of a future failure mode
+# neither of us has seen yet (e.g. Barttorvik serving an error page instead
+# of a CSV, or a truncated response).
+#
+# Women's is NOT included here: there's no live-fetch endpoint wired up for
+# women's yet (data/trank_ncaaw_2026.csv is a one-time seed via
+# seed-womens-torvik.yml, not a refreshable live source). Build a women's
+# equivalent of torvik_to_csv.py first if you want this extended to women's.
+#
+# Setup:
+#   1. Go to Settings → Actions → General → Workflow permissions
+#      → enable "Read and write permissions" (same requirement as
+#      scrape.yml) so this workflow can push its own commits.
+#   2. Confirm repo secrets SUPABASE_URL and SUPABASE_SERVICE_KEY are set
+#      (Settings → Secrets and variables → Actions) — seed-womens-torvik.yml
+#      already uses these same two secrets, so they're likely set already.
+#
+# Schedule: the 1st and 15th of each month at 13:00 UTC (~biweekly — cron
+# can't express a true rolling 14-day interval, since its day-of-month
+# field anchors to calendar days, but twice a month is the common meaning
+# of "biweekly" and is simple to read/adjust here).
+
+name: Season Data Refresh (men's)
+
+on:
+  schedule:
+    - cron: "0 13 1,15 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install pandas requests supabase rapidfuzz
+
+      - name: Compute season year
+        id: year
+        run: |
+          YEAR=$(python3 -c "import datetime; n = datetime.date.today(); print(n.year + 1 if n.month >= 10 else n.year)")
+          echo "Season year: $YEAR"
+          echo "year=$YEAR" >> "$GITHUB_OUTPUT"
+
+      - name: Fetch latest trank CSV from barttorvik.com
+        run: |
+          python torvik_to_csv.py \
+            --year "${{ steps.year.outputs.year }}" \
+            --output "data/trank_data_${{ steps.year.outputs.year }}.csv"
+
+      - name: Validate fetched CSV before writing anything to Supabase
+        run: |
+          python3 -c "
+          import sys
+          sys.path.insert(0, '.')
+          from torvik_metrics import read_trank_csv
+
+          path = 'data/trank_data_${{ steps.year.outputs.year }}.csv'
+          df = read_trank_csv(path)
+          n = len(df)
+          pid_rate = df['pid'].notna().mean() if 'pid' in df.columns else 0
+          qualified = int((df['Min_per'] >= 20).sum()) if 'Min_per' in df.columns else 0
+          print(f'{n} rows, pid non-null rate {pid_rate:.1%}, {qualified} qualified at Min_per >= 20%')
+
+          if n < 2000:
+              sys.exit(f'Only {n} rows fetched -- expected several thousand this far into the season. Aborting before any Supabase write.')
+          if pid_rate < 0.9:
+              sys.exit(f'Only {pid_rate:.1%} of rows have a pid -- looks corrupted (same failure mode as the 2026-11-08 incidents). Aborting before any Supabase write.')
+          if qualified < 500:
+              sys.exit(f'Only {qualified} players qualify at Min_per >= 20% -- looks corrupted. Aborting before any Supabase write.')
+          "
+
+      - name: Run season pipeline (writes to production Supabase)
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: |
+          python run_season_pipeline.py \
+            --year "${{ steps.year.outputs.year }}" \
+            --csv "data/trank_data_${{ steps.year.outputs.year }}.csv"
+
+      - name: Commit refreshed data + sessionBoardVer bump (if changed)
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          for f in "data/trank_data_${{ steps.year.outputs.year }}.csv" \
+                   nil_changes.csv unmatched_players.csv \
+                   src/hooks/useRosterBoard.js; do
+            [ -f "$f" ] && git add "$f"
+          done
+          git diff --cached --quiet || git commit -m "Scheduled season data refresh $(date -u '+%Y-%m-%d')"
+          git push
