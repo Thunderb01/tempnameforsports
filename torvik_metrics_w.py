@@ -1001,10 +1001,16 @@ def compute_ris(df, use_torvik=False):
         blk = 0.9 * df["blk_per"]
         drb = 0.4 * df["DRB_per"]
     else:
-        freethrow = 6 * (df["sb_tot_fta"] / (df["sb_tot_fga"] + 1))
-        orb = 1.2 * df["sb_orb_40"]
-        blk = 0.9 * df["sb_blk_40"]
-        drb = 0.4 * df["sb_drb_40"]
+        # sb_* only exists when the Supabase player_stats merge ran (skipped
+        # entirely under --dry-run -- see main()); guard each field and fall
+        # back to the same Torvik-only formula the use_torvik branch above
+        # uses, same pattern compute_cdi/compute_dds already follow here.
+        freethrow = (6 * (df["sb_tot_fta"] / (df["sb_tot_fga"] + 1))
+                     if "sb_tot_fta" in df.columns and "sb_tot_fga" in df.columns
+                     else 6 * df["FT_per"] / 100)
+        orb = (1.2 * df["sb_orb_40"]).fillna(1.2 * df["ORB_per"]) if "sb_orb_40" in df.columns else 1.2 * df["ORB_per"]
+        blk = (0.9 * df["sb_blk_40"]).fillna(0.9 * df["blk_per"]) if "sb_blk_40" in df.columns else 0.9 * df["blk_per"]
+        drb = (0.4 * df["sb_drb_40"]).fillna(0.4 * df["DRB_per"]) if "sb_drb_40" in df.columns else 0.4 * df["DRB_per"]
     df["_ris_raw"] = rimmade + freethrow + orb + blk + drb
     return percentrank_by_pos(df, "_ris_raw").apply(clamp)
 

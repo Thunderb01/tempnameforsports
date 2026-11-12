@@ -702,9 +702,19 @@ def compute_cdi(df):
     ast_score = df["AST_per"]
 
     # ast_tov from Torvik — direct measure of decision quality
-    # Use totals-derived when available, fall back to Torvik column
-    ast_40  = (df["sb_tot_ast"] / df["sb_tot_mp"].replace(0, float("nan"))) * 40
-    tov_40  = (df["sb_tot_tov"] / df["sb_tot_mp"].replace(0, float("nan"))) * 40
+    # Use totals-derived when available, fall back to Torvik column. sb_tot_*
+    # only exists when the Supabase player_stats merge ran (skipped entirely
+    # under --dry-run -- see main()), so guard column presence here the same
+    # way compute_dds's non-torvik branch already does, rather than assuming
+    # the merge always happened.
+    if "sb_tot_ast" in df.columns and "sb_tot_mp" in df.columns:
+        ast_40 = (df["sb_tot_ast"] / df["sb_tot_mp"].replace(0, float("nan"))) * 40
+    else:
+        ast_40 = pd.Series(float("nan"), index=df.index)
+    if "sb_tot_tov" in df.columns and "sb_tot_mp" in df.columns:
+        tov_40 = (df["sb_tot_tov"] / df["sb_tot_mp"].replace(0, float("nan"))) * 40
+    else:
+        tov_40 = pd.Series(float("nan"), index=df.index)
     ast_tov = (ast_40 / tov_40.replace(0, float("nan"))).fillna(df["ast/tov"])
 
     df["_cdi_raw"] = ast_score * (ast_tov ** 0.5) * pos_mult
@@ -1087,10 +1097,16 @@ def compute_ris(df, use_torvik=False):
         blk = 0.9 * df["blk_per"]
         drb = 0.4 * df["DRB_per"]
     else:
-        freethrow = 6 * (df["sb_tot_fta"] / (df["sb_tot_fga"] + 1))
-        orb = 1.2 * df["sb_orb_40"]
-        blk = 0.9 * df["sb_blk_40"]
-        drb = 0.4 * df["sb_drb_40"]
+        # sb_* only exists when the Supabase player_stats merge ran (skipped
+        # entirely under --dry-run -- see main()); guard each field and fall
+        # back to the same Torvik-only formula the use_torvik branch above
+        # uses, same pattern compute_dds's non-torvik branch already follows.
+        freethrow = (6 * (df["sb_tot_fta"] / (df["sb_tot_fga"] + 1))
+                     if "sb_tot_fta" in df.columns and "sb_tot_fga" in df.columns
+                     else 6 * df["FT_per"] / 100)
+        orb = (1.2 * df["sb_orb_40"]).fillna(1.2 * df["ORB_per"]) if "sb_orb_40" in df.columns else 1.2 * df["ORB_per"]
+        blk = (0.9 * df["sb_blk_40"]).fillna(0.9 * df["blk_per"]) if "sb_blk_40" in df.columns else 0.9 * df["blk_per"]
+        drb = (0.4 * df["sb_drb_40"]).fillna(0.4 * df["DRB_per"]) if "sb_drb_40" in df.columns else 0.4 * df["DRB_per"]
     df["_ris_raw"] = rimmade + freethrow + orb + blk + drb
     return percentrank_by_pos(df, "_ris_raw").apply(clamp)
 
