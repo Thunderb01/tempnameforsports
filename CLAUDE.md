@@ -228,40 +228,43 @@ python run_season_pipeline.py --year <year> --csv <csv> --pbp-json <pbp file>
 ```
 
 `--fetch` downloads the trank CSV live via `torvik_to_csv.py`
-(`barttorvik.com/getadvstats.php`) instead of requiring `--csv` — unverified
-from this repo's own sandboxed dev environment (outbound access to
-barttorvik.com is blocked there), so run `--fetch --dry-run` once and check
-the printed column list before trusting it for a real run. Women's has no
-`team_players`-equivalent sync script yet (a pre-existing gap — see the
-fork-model section), so that step is auto-skipped for `--sport women`.
+(`barttorvik.com/getadvstats.php`) instead of requiring `--csv`. Confirmed
+2026-11-11: barttorvik.com 403s requests from GitHub-hosted Actions runner
+IPs (cloud/datacenter ASNs are a common anti-bot target) — `torvik_to_csv.py`
+already sends a browser-like `User-Agent`, so this is IP-range blocking, not
+a fixable header/code issue. That means `--fetch` run from an ordinary
+residential connection (your own machine) isn't subject to it — still worth
+a `--fetch --dry-run` once to confirm before trusting it for a real run.
+Women's has no `team_players`-equivalent sync script yet (a pre-existing
+gap — see the fork-model section) and no live-fetch endpoint either (`data/
+trank_ncaaw_2026.csv` is a one-time seed, not a refreshable live source), so
+`--fetch` and the team_players step are men's-only for now.
 
-**`.github/workflows/season-pipeline.yml` runs this on a schedule (men's
-only)** — biweekly (1st/15th, 13:00 UTC) plus a manual `workflow_dispatch`,
-writing straight to production Supabase with no PR-review gate, by explicit
-choice. Because of that, and because of the two incidents below, it fetches
-the CSV as its own step and validates row count / `pid` non-null rate /
-`Min_per` distribution *before* running anything that writes to Supabase,
-rather than trusting the fetch blindly — the validation would have caught
-both incidents before either reached Supabase. Reuses the same
-`SUPABASE_URL`/`SUPABASE_SERVICE_KEY` secrets `seed-womens-torvik.yml`
-already depends on. Women's isn't wired in — there's no live-fetch endpoint
-for it yet (`data/trank_ncaaw_2026.csv` is a one-time seed, not a
-refreshable live source); build a women's `torvik_to_csv.py` equivalent
-first if this needs to extend there.
-
-**Runs on a self-hosted Windows runner, not GitHub-hosted — confirmed via
-a real failed run (2026-11-11) that barttorvik.com returns 403 Forbidden to
-GitHub-hosted runner IPs.** `torvik_to_csv.py` already sends a browser-like
-`User-Agent`, so this is IP-based blocking (cloud/datacenter ASNs are a
-common anti-bot target), not a fixable header/code issue — confirmed by the
-user successfully fetching the same URL from their own machine. `runs-on:
-[self-hosted, Windows]` with `defaults.run.shell: bash` (so the existing
-bash-syntax steps run via Git Bash instead of PowerShell) on the same
-Windows machine the pipeline's been run on by hand all along. One real
-behavioral difference from a GitHub-hosted runner: a scheduled run just
-queues until that machine's runner service is online, rather than running
-instantly — see the workflow file's own header comment for runner setup
-steps (register as a self-hosted runner, install as a Windows service).
+**Automation decision (2026-11-11): manual-but-streamlined, not scheduled.**
+A GitHub Actions workflow automating this on a schedule was built, then
+abandoned after the IP-blocking discovery above — a GitHub-hosted runner
+can't do the live fetch at all, and a self-hosted runner (the workaround)
+was decided against as more infra than it's worth right now. Instead,
+`run_season_pipeline.py` itself got the safety/convenience features that
+workflow would have had, so a manual run is as close to one-command as it
+gets:
+- **Every run validates the CSV's shape** — row count, `pid` non-null rate,
+  `Min_per` distribution — before anything writes to Supabase, whether the
+  CSV came from `--fetch` or `--csv` (`validate_csv_shape()`). This is the
+  guard that would have caught the two incidents below (a CSV whose columns
+  silently ended up misaligned without crashing) before either reached
+  production — now it protects every run, not just an automated one.
+- **`.env.local` support** (`python-dotenv`, optional — falls back to
+  whatever's already in your shell if not installed) means `SUPABASE_URL`/
+  `SUPABASE_SERVICE_KEY` don't need re-exporting every new terminal session —
+  same `.env.local` file the frontend's `VITE_SUPABASE_*` vars already live
+  in, so there's one env file for the repo, not two; see `.env.example`.
+- **`--git-push`** commits the refreshed CSV + diagnostic files +
+  `sessionBoardVer` bump and pushes once the run succeeds, so publishing is
+  part of the same command instead of a separate manual step.
+- Putting it together: `python run_season_pipeline.py --year <year> --fetch
+  --git-push` is the whole refresh, end to end, one command, entirely on
+  your own machine — no GitHub Actions involved at all.
 
 **Barttorvik's trank CSV exports have NO header row — confirmed against a
 real production `KeyError: 'player_name'` crash (2026-11-08), not a guess.**
