@@ -336,6 +336,37 @@ two slightly different measuring sticks. Not fixed here; revisit only if it
 turns out to matter in practice, same as other known-imprecision calls
 elsewhere in this file (e.g. Stretch 4 staying bucketed as Big).
 
+**Frontend: the player card shows this as a toggle, not a second page.** The
+"Beyond the Portal Skill Profile" radar in `PlayerModal.jsx` already toggled
+between seasons (`profileIdx`, one button per `player_stats` row); an
+"Overall" button was added to that same row (`profileIdx = "overall"`
+sentinel) rendering `player.overall` — the pentagon component
+(`SkillProfile`) doesn't care which season/blend it's fed, so no new chart
+code was needed, just a new data source for the same one. Only shown when
+at least one of `player.overall.{sei,ath,ris,dds,cdi}` is non-null
+(`hasOverallProfile`) — a player the pipeline hasn't recomputed since these
+columns existed just doesn't get the button, same "degrade, don't error"
+convention as everything else optional in this component. This is a
+*different* number from the market-value "Overall"/OVR badge at the top of
+the card (`overallFor()` in `src/lib/display.js`, reading `nil_valuation`/
+`open_market_high`) — don't conflate the two "overall"s when touching
+either.
+
+`player.overall` (`{sei, ath, ris, dds, cdi}`) and `player.nilValuationOverall`
+are populated in `useRosterBoard.js`'s three `vw_players`/`vw_w_players`-
+row-mapping blocks (main board, returning roster, incoming transfers) from
+the `*_overall` columns `extend_players_views_overall.sql` exposes on the
+view — straight passthrough, `select("*")` already picks them up. Adding a
+field to the per-player shape required bumping `sessionBoardVer` (see
+"State that's local vs. shared" above) in both `MENS_CONFIG` and
+`WOMENS_CONFIG` so already-cached sessions refetch and pick up the new
+field instead of rendering `undefined` until their 4h TTL expires. Not
+wired into `team_freshmen`-sourced or `custom_roster_players`-sourced
+player objects (different tables, no `*_overall` columns, and freshmen in
+particular rarely have the multi-season history for this to say anything
+useful yet) — the button simply doesn't render for those, which is the
+correct degrade, not a gap to backfill.
+
 ### Shot Difficulty, Adjusted SEI, Shot Creation — the assisted-share data source
 
 The missing input was "assisted share of makes" per shot zone (rim/mid/

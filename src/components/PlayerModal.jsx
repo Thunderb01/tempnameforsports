@@ -60,6 +60,11 @@ export function PlayerModal({ player, onClose, onReplace, sport = "mens" }) {
   const [archColors, setArchColors] = useState({});
   const [nilVisible] = useNilVisible();
   const overall = overallFor(player);
+  // Multi-season blend (CLAUDE.md "Overall (multi-season) rating") -- a
+  // different number from the market-value `overall` above. null on any
+  // player the pipeline hasn't recomputed since the *_overall columns were
+  // added, so this can be absent even when per-season `stats` exist.
+  const hasOverallProfile = PENTAGON_METRICS.some(m => player.overall?.[m.key] != null);
 
   const playersTable = sport === "womens" ? "w_players"        : "players";
   const defsTable    = sport === "womens" ? "w_archetype_defs" : "archetype_defs";
@@ -273,9 +278,19 @@ export function PlayerModal({ player, onClose, onReplace, sport = "mens" }) {
           <div className="modal-section">
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
               <h4 style={{ margin: 0 }}>Beyond the Portal Skill Profile</h4>
-              {stats?.length > 1 && (
+              {(stats?.length > 1 || hasOverallProfile) && (
                 <div style={{ display: "flex", gap: 4 }}>
-                  {stats.map((row, i) => (
+                  {hasOverallProfile && (
+                    <button onClick={() => setProfileIdx("overall")} style={{
+                      fontSize: 11, fontWeight: 600, padding: "2px 10px", borderRadius: 20, cursor: "pointer", border: "1px solid",
+                      background: profileIdx === "overall" ? "rgba(91,156,246,.2)" : "transparent",
+                      color:      profileIdx === "overall" ? "#5b9cf6" : "rgba(255,255,255,.35)",
+                      borderColor: profileIdx === "overall" ? "rgba(91,156,246,.5)" : "rgba(255,255,255,.12)",
+                    }}>
+                      Overall
+                    </button>
+                  )}
+                  {stats?.map((row, i) => (
                     <button key={row.calendar_year ?? i} onClick={() => setProfileIdx(i)} style={{
                       fontSize: 11, fontWeight: 600, padding: "2px 10px", borderRadius: 20, cursor: "pointer", border: "1px solid",
                       background: profileIdx === i ? "rgba(91,156,246,.2)" : "transparent",
@@ -289,9 +304,19 @@ export function PlayerModal({ player, onClose, onReplace, sport = "mens" }) {
               )}
             </div>
             <div style={{ fontSize: 11, opacity: .4, marginBottom: 10 }}>
-              Grades reflect percentile rank within position group (guards, wings, or bigs).
+              {profileIdx === "overall"
+                ? "Career blend — this season weighted most heavily, with up to 3 prior seasons factored in. Grades reflect percentile rank within position group."
+                : "Grades reflect percentile rank within position group (guards, wings, or bigs)."}
             </div>
-            {loadingStats ? (
+            {profileIdx === "overall" ? (
+              !hasOverallProfile ? (
+                <div style={{ opacity: .4, fontSize: 13, fontStyle: "italic" }}>
+                  No career rating yet — needs a pipeline run since this feature shipped.
+                </div>
+              ) : (
+                <SkillProfile stats={player.overall} />
+              )
+            ) : loadingStats ? (
               <div style={{ opacity: .4, fontSize: 13 }}>Loading…</div>
             ) : !stats ? (
               <div style={{ opacity: .4, fontSize: 13 }}>No metrics on file.</div>

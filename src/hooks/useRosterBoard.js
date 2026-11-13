@@ -270,6 +270,19 @@ export function createRosterBoardHook(cfg) {
           cdi:         row.cdi,
           calendar_year: row.calendar_year,
         },
+        // Multi-season blend (see CLAUDE.md's "Overall (multi-season) rating")
+        // -- a separate number from the current-season `stats` above, computed
+        // by torvik_metrics.py/torvik_metrics_w.py and stored on players/
+        // w_players directly. null on any row the pipeline hasn't recomputed
+        // since the *_overall columns were added.
+        overall: {
+          sei: row.sei_overall,
+          ath: row.ath_overall,
+          ris: row.ris_overall,
+          dds: row.dds_overall,
+          cdi: row.cdi_overall,
+        },
+        nilValuationOverall: row.nil_valuation_overall ?? null,
       }));
 
       // Reassign committed transfers to their destination team for scoring
@@ -352,6 +365,11 @@ export function createRosterBoardHook(cfg) {
               ris: row.ris, dds: row.dds, cdi: row.cdi,
               calendar_year: row.calendar_year,
             },
+            overall: {
+              sei: row.sei_overall, ath: row.ath_overall, ris: row.ris_overall,
+              dds: row.dds_overall, cdi: row.cdi_overall,
+            },
+            nilValuationOverall: row.nil_valuation_overall ?? null,
           }))
           .sort((a, b) => a.name.localeCompare(b.name));
 
@@ -397,6 +415,11 @@ export function createRosterBoardHook(cfg) {
               ppg: row.ppg, rpg: row.rpg, apg: row.apg, usg: row.usg,
               sei: row.sei, ath: row.ath, ris: row.ris, dds: row.dds, cdi: row.cdi,
             },
+            overall: {
+              sei: row.sei_overall, ath: row.ath_overall, ris: row.ris_overall,
+              dds: row.dds_overall, cdi: row.cdi_overall,
+            },
+            nilValuationOverall: row.nil_valuation_overall ?? null,
           }))
           .sort((a, b) => a.name.localeCompare(b.name));
         _incomingCache[teamName] = incomingMapped;
@@ -876,7 +899,7 @@ const MENS_CONFIG = {
   storageKeyPrefix:           "bp_roster_builder",
   legacyKeys:                 ["bp_roster_builder_v1", "bp_roster_builder"],
   sessionBoardKey:            "bp_board_cache",
-  sessionBoardVer:            21, // 7→8: board rows carry player_status/transfer_* inline instead of a second portal_transfers query. 8→9: added transfer_from_team (its absence blanked the from-team logo). 9→10: force one clean refetch so sessions cached before admin-write invalidation existed don't keep showing players whose status has since changed. 10→11: repair_positions_from_prior_role ran against the live players table (fixing rows stuck at positions=["SF"]), a server-side write the cache has no other way to find out about -- force one more clean refetch so already-cached sessions pick up the corrected positions instead of waiting out the 4h TTL. 11→12: same story for the current_team-on-transfer fix. 12→13: the pos_bucket fix, same story. 13→14: torvik_metrics.py was actually re-run with the pos_bucket fix in place, writing the real corrected ratings. 14→15: repair_departed_on_board flipped on_board=false for departed players directly against Supabase -- same story, no other invalidation path for a direct pipeline/repair write. 15→16: run_season_pipeline.py (2026-11-08) -- data refresh, no other invalidation path. 16→17: run_season_pipeline.py (2026-11-08) -- data refresh, no other invalidation path. 17→18: run_season_pipeline.py (2026-11-12) -- data refresh, no other invalidation path. 18→19: run_season_pipeline.py (2026-11-13) -- data refresh, no other invalidation path. 19→20: run_season_pipeline.py (2026-11-13) -- data refresh, no other invalidation path. 20→21: run_season_pipeline.py (2026-11-13) -- data refresh, no other invalidation path.
+  sessionBoardVer:            22, // 7→8: board rows carry player_status/transfer_* inline instead of a second portal_transfers query. 8→9: added transfer_from_team (its absence blanked the from-team logo). 9→10: force one clean refetch so sessions cached before admin-write invalidation existed don't keep showing players whose status has since changed. 10→11: repair_positions_from_prior_role ran against the live players table (fixing rows stuck at positions=["SF"]), a server-side write the cache has no other way to find out about -- force one more clean refetch so already-cached sessions pick up the corrected positions instead of waiting out the 4h TTL. 11→12: same story for the current_team-on-transfer fix. 12→13: the pos_bucket fix, same story. 13→14: torvik_metrics.py was actually re-run with the pos_bucket fix in place, writing the real corrected ratings. 14→15: repair_departed_on_board flipped on_board=false for departed players directly against Supabase -- same story, no other invalidation path for a direct pipeline/repair write. 15→16: run_season_pipeline.py (2026-11-08) -- data refresh, no other invalidation path. 16→17: run_season_pipeline.py (2026-11-08) -- data refresh, no other invalidation path. 17→18: run_season_pipeline.py (2026-11-12) -- data refresh, no other invalidation path. 18→19: run_season_pipeline.py (2026-11-13) -- data refresh, no other invalidation path. 19→20: run_season_pipeline.py (2026-11-13) -- data refresh, no other invalidation path. 20→21: run_season_pipeline.py (2026-11-13) -- data refresh, no other invalidation path. 21→22: added overall/nilValuationOverall to the per-player shape (multi-season rating blend) -- cached sessions need the new fields, not just a data refresh.
 };
 
 const _mens = createRosterBoardHook(MENS_CONFIG);

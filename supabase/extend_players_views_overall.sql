@@ -7,6 +7,18 @@
 -- requires CREATE OR REPLACE VIEW to preserve existing column order/types,
 -- appending is the only safe way to extend without a drop+recreate.
 --
+-- This must build on add_on_board_to_views.sql's column list (the one
+-- actually live in production), not the older extend_players_views.sql --
+-- add_on_board_to_views.sql appended p.on_board and a WHERE p.on_board =
+-- true filter AFTER extend_players_views.sql was written. An earlier
+-- draft of this file copied extend_players_views.sql directly and missed
+-- both: Postgres caught the column-rename (on_board -> cdi_overall at the
+-- same position) and refused to run, but had it not, running this would
+-- have silently dropped the on_board filter and re-exposed every
+-- departed/off-board player on the live board -- the exact failure mode
+-- the on_board mechanism exists to prevent (see CLAUDE.md's "Season
+-- rollover" section). Fixed by keeping on_board in the list and filter.
+--
 -- Safe to run more than once. Must run AFTER add_overall_ratings.sql.
 -- ============================================================
 
@@ -45,6 +57,7 @@ create or replace view public.vw_players as
     p.transfer_season_year,
     p.transfer_api_id,
     p.positions,
+    p.on_board,
     p.cdi_overall,
     p.dds_overall,
     p.sei_overall,
@@ -129,7 +142,8 @@ create or replace view public.vw_players as
            FROM player_stats
           WHERE player_stats.player_id = p.id
           ORDER BY player_stats.calendar_year DESC NULLS LAST
-         LIMIT 1) s ON true;
+         LIMIT 1) s ON true
+  WHERE p.on_board = true;
 
 create or replace view public.vw_w_players as
  SELECT p.id,
@@ -170,6 +184,7 @@ create or replace view public.vw_w_players as
     p.transfer_season_year,
     p.transfer_api_id,
     p.positions,
+    p.on_board,
     p.cdi_overall,
     p.dds_overall,
     p.sei_overall,
@@ -264,6 +279,7 @@ create or replace view public.vw_w_players as
            FROM w_player_stats ps
           WHERE ps.player_id = p.id
           ORDER BY ps.year DESC NULLS LAST
-         LIMIT 1) s ON true;
+         LIMIT 1) s ON true
+  WHERE p.on_board = true;
 
 notify pgrst, 'reload schema';
