@@ -10,7 +10,7 @@ const WOMENS_CONFIG = {
   storageKeyPrefix:           "bp_w_roster_builder",
   legacyKeys:                 [],
   sessionBoardKey:            "bp_w_board_cache",
-  sessionBoardVer:            16, // bumped from 15 — see useRosterBoard.js MENS_CONFIG comment
+  sessionBoardVer:            17, // bumped from 16 — see useRosterBoard.js MENS_CONFIG comment (21→22: added overall/nilValuationOverall to the per-player shape)
 };
 
 const _womens = createRosterBoardHook(WOMENS_CONFIG);
