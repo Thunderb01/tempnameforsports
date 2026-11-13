@@ -625,6 +625,27 @@ the Torvik-only equivalent, matching the pattern `compute_dds()` already used
 correctly. Any new formula reading an `sb_*` column must guard it the same
 way — the Supabase merge is best-effort, never guaranteed to populate it.
 
+**This created a new duplicate-row bug on the roster builder's "View Roster"
+tab, confirmed in production 2026-11-13.** Once `torvik_metrics.py`/
+`torvik_metrics_w.py` auto-create a freshman's real `players`/`w_players`
+row (the fix above), that player shows up in `board.returningPlayers` with
+real stats — but `team_freshmen`/`w_team_freshmen` (the admin-curated
+pre-season placeholder table) never gets cleaned up once the real pipeline
+catches up to a given freshman, so `AppPage.jsx`'s `rosterPlayers` memo
+rendered the *same player twice*: once correctly under "Returning" (or
+whatever retention status) with real PPG/RPG/APG/NIL, and again as a
+blank, read-only "Official FR" row (`—` stats, `$0` NIL) from the stale
+`team_freshmen` entry. Fixed by excluding any `teamFreshmen` entry whose
+name already appears in `board.returningPlayers` before building
+`officialFresh` — matched by name alone (lowercased, trimmed), not name+team,
+since both lists are already scoped to the one team being viewed. Same fix
+in both `src/pages/AppPage.jsx` and `src/pages/womens/AppPage.jsx` (this is
+a genuinely forked page per the fork-model table above, so the dedup logic
+had to be ported, not shared). `team_freshmen`/`w_team_freshmen` rows
+themselves are left untouched — an admin still owns clearing those out
+manually if they want the placeholder gone entirely; this just stops it
+from rendering a second time once a real row exists.
+
 ---
 
 ## Season rollover: clearing the board vs. the Time Machine archive

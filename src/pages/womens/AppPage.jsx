@@ -1142,13 +1142,19 @@ export function WomensAppPage() {
       nilOffer: p.nil_offer || 0, _type: "FR/RS", _typeKey: "custom", stats: {},
     }));
 
-    // Official, superadmin-added freshmen for this team (read-only).
-    const officialFresh = (board.teamFreshmen || []).map(p => ({
-      id: p.id, name: p.name, pos: p.pos || "—", year: "FR", team: p.team,
-      nilOffer: 0, _type: "Official FR", _typeKey: "official_fr", _readOnly: true,
-      freshman_tier: p.freshman_tier, stats: p.stats || {},
-      marketLow: p.marketLow || 0, marketHigh: p.marketHigh || 0, nilValuation: p.nilValuation || 0,
-    }));
+    // Official, superadmin-added freshmen for this team (read-only) --
+    // excluding anyone torvik_metrics_w.py has since created a real
+    // w_players row for (see src/pages/AppPage.jsx's comment at this same
+    // spot for the full reasoning -- identical fix, mirrored here).
+    const returningNameSet = new Set(board.returningPlayers.map(p => (p.name || "").trim().toLowerCase()));
+    const officialFresh = (board.teamFreshmen || [])
+      .filter(p => !returningNameSet.has((p.name || "").trim().toLowerCase()))
+      .map(p => ({
+        id: p.id, name: p.name, pos: p.pos || "—", year: "FR", team: p.team,
+        nilOffer: 0, _type: "Official FR", _typeKey: "official_fr", _readOnly: true,
+        freshman_tier: p.freshman_tier, stats: p.stats || {},
+        marketLow: p.marketLow || 0, marketHigh: p.marketHigh || 0, nilValuation: p.nilValuation || 0,
+      }));
 
     return [...transfers, ...returning, ...undecided, ...leaving, ...custom, ...officialFresh];
   }, [board.returningPlayers, board.incomingTransfers, board.state.board, board.state.roster, board.state.retentionById, board.state.nilById, board.customPlayers, board.teamFreshmen]);
