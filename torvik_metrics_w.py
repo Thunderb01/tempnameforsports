@@ -678,6 +678,29 @@ def shrink_toward_average(raw_score, mp, max_mp, pct=0.25, average=50):
     return weight * raw_score.fillna(average) + (1 - weight) * average
 
 
+# Overall (multi-season) rating weights -- mirrors torvik_metrics.py's
+# identical mechanism exactly, see that file for the full rationale.
+OVERALL_RATING_WEIGHTS = {
+    1: [1.0],
+    2: [0.70, 0.30],
+    3: [0.70, 0.20, 0.10],
+    4: [0.70, 0.15, 0.10, 0.05],
+}
+
+
+def compute_overall_rating(values):
+    """Blend a player's current-season value with however many prior
+    seasons exist, current season first. Mirrors torvik_metrics.py's
+    identical function exactly -- see that file for the full rationale."""
+    values = values[:4]
+    weights = OVERALL_RATING_WEIGHTS[len(values)]
+    known = [(v, w) for v, w in zip(values, weights) if v is not None]
+    if not known:
+        return None
+    total_w = sum(w for _, w in known)
+    return sum(v * w for v, w in known) / total_w
+
+
 # ── METRIC FORMULAS ────────────────────────────────────────────────────────────
 # Each function receives the full dataframe (already has pos_bucket column).
 # Return a Series of floats in [0, 200] where 100 = median, 200 = elite.
@@ -1675,7 +1698,7 @@ def main():
         # Build stats lookup: (player_id, calendar_year) → stats row id (paginated)
         _sr_rows, _page = [], 0
         while True:
-            _sr = db.table("w_player_stats").select("id, player_id, calendar_year, cdi") \
+            _sr = db.table("w_player_stats").select("id, player_id, calendar_year, cdi, dds, sei, ath, ris, nil_valuation") \
                     .range(_page * 1000, (_page + 1) * 1000 - 1).execute()
             _sr_rows.extend(_sr.data or [])
             if len(_sr.data or []) < 1000:
@@ -1690,12 +1713,21 @@ def main():
             for r in _sr_rows
             if r.get("cdi") is not None
         }
+        # player_id -> {calendar_year: {"cdi": ..., ...}} -- mirrors
+        # torvik_metrics.py's identical mechanism exactly.
+        _history_by_player = {}
+        for r in _sr_rows:
+            _history_by_player.setdefault(r["player_id"], {})[r["calendar_year"]] = {
+                "cdi": r.get("cdi"), "dds": r.get("dds"), "sei": r.get("sei"),
+                "ath": r.get("ath"), "ris": r.get("ris"), "nil_valuation": r.get("nil_valuation"),
+            }
     else:
         player_lookup          = {}
         player_height_lookup   = {}
         player_nil_lookup      = {}
         stats_lookup           = {}
         already_matched        = set()
+        _history_by_player     = {}
 
     # ── Process each row ──────────────────────────────────────────────────────
     matched        = 0
@@ -1918,6 +1950,31 @@ def main():
             if ht and ht not in ("nan", "") and not player_height_lookup.get(player_id):
                 player_patch["height"] = ht
             # player_patch["specialist_tags"] = "3pt_specialist" if is_3pt_specialist else None
+
+            # ── Overall (multi-season) rating ──────────────────────────────────
+            # Mirrors torvik_metrics.py's identical mechanism exactly.
+            _hist = _history_by_player.get(player_id, {})
+            _prior_years = sorted((y for y in _hist if y != args.year), reverse=True)[:3]
+            cdi_overall = compute_overall_rating([cdi] + [_hist[y]["cdi"] for y in _prior_years])
+            dds_overall = compute_overall_rating([dds] + [_hist[y]["dds"] for y in _prior_years])
+            sei_overall = compute_overall_rating([sei] + [_hist[y]["sei"] for y in _prior_years])
+            ath_overall = compute_overall_rating([ath] + [_hist[y]["ath"] for y in _prior_years])
+            ris_overall = compute_overall_rating([ris] + [_hist[y]["ris"] for y in _prior_years])
+            if cdi_overall is not None:
+                player_patch["cdi_overall"] = cdi_overall
+            if dds_overall is not None:
+                player_patch["dds_overall"] = dds_overall
+            if sei_overall is not None:
+                player_patch["sei_overall"] = sei_overall
+            if ath_overall is not None:
+                player_patch["ath_overall"] = ath_overall
+            if ris_overall is not None:
+                player_patch["ris_overall"] = ris_overall
+            if nil is not None and not args.skip_nil:
+                nil_overall = compute_overall_rating([nil] + [_hist[y]["nil_valuation"] for y in _prior_years])
+                if nil_overall is not None:
+                    player_patch["nil_valuation_overall"] = nil_overall
+
             if player_patch:
                 db.table("w_players").update(player_patch).eq("id", player_id).execute()
                 if nil is not None:
@@ -1960,6 +2017,10 @@ def main():
             stats_patch["projected_tier"] = tier
         if nil_perf_score is not None and not args.skip_nil:
             stats_patch["nil_perf_score"] = round(float(nil_perf_score), 6)
+        # Captured per-season starting now -- mirrors torvik_metrics.py's
+        # identical change exactly, see that file for the full rationale.
+        if nil is not None and not args.skip_nil:
+            stats_patch["nil_valuation"] = nil
 
         stats_id = stats_lookup.get((player_id, args.year))
         if stats_id:
