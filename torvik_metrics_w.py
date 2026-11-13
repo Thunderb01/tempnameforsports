@@ -680,6 +680,29 @@ def shrink_toward_average(raw_score, mp, max_mp, pct=0.25, average=50):
     return weight * raw_score.fillna(average) + (1 - weight) * average
 
 
+# Overall (multi-season) rating weights -- mirrors torvik_metrics.py's
+# identical mechanism exactly, see that file for the full rationale.
+OVERALL_RATING_WEIGHTS = {
+    1: [1.0],
+    2: [0.70, 0.30],
+    3: [0.70, 0.20, 0.10],
+    4: [0.70, 0.15, 0.10, 0.05],
+}
+
+
+def compute_overall_rating(values):
+    """Blend a player's current-season value with however many prior
+    seasons exist, current season first. Mirrors torvik_metrics.py's
+    identical function exactly -- see that file for the full rationale."""
+    values = values[:4]
+    weights = OVERALL_RATING_WEIGHTS[len(values)]
+    known = [(v, w) for v, w in zip(values, weights) if v is not None]
+    if not known:
+        return None
+    total_w = sum(w for _, w in known)
+    return sum(v * w for v, w in known) / total_w
+
+
 # ── METRIC FORMULAS ────────────────────────────────────────────────────────────
 # Each function receives the full dataframe (already has pos_bucket column).
 # Return a Series of floats in [0, 200] where 100 = median, 200 = elite.
@@ -1109,13 +1132,33 @@ def compute_nil_valuation(df, reference_mask=None):
         "ath":                   0.08,
         "3pt_score":             0.02,
     }
+    # Forward = Wing/Big midpoint, same placeholder convention compute_ath's
+    # weight dicts and compute_cdi's pos_mult already use for this bucket.
+    # Mirrors torvik_metrics.py's identical fix exactly -- see that file for
+    # the full rationale (without this, w(key) returned 0 for every key on
+    # a Forward row, zeroing every Forward player's NIL valuation).
+    FORWARD_WEIGHTS = {
+        "ppg":                   0.165,
+        "mpg":                   0.05,
+        "nil_def_score":         0.035,
+        "nil_versatility_score": 0.03,
+        "nil_motor_score":       0.06,
+        "nil_iq_score":          0.045,
+        "sei":                   0.18,
+        "dds":                   0.14,
+        "cdi":                   0.08,
+        "ris":                   0.095,
+        "ath":                   0.07,
+        "3pt_score":             0.05,
+    }
     # Map each row to its weight dict; default Wing
     def w(key):
         """Return a per-row Series of weights for the given key."""
         return (
-            (_pos == "Guard") * GUARD_WEIGHTS[key] +
-            (_pos == "Wing")  * WING_WEIGHTS[key]  +
-            (_pos == "Big")   * BIG_WEIGHTS[key]
+            (_pos == "Guard")   * GUARD_WEIGHTS[key]   +
+            (_pos == "Wing")    * WING_WEIGHTS[key]    +
+            (_pos == "Forward") * FORWARD_WEIGHTS[key] +
+            (_pos == "Big")     * BIG_WEIGHTS[key]
         )
 
     # ── Percentile-rank each stat across full df (0–1 scale) ─────────────────
@@ -1138,10 +1181,13 @@ def compute_nil_valuation(df, reference_mask=None):
     # MPG         0.80        2.79       0.49       2.11      0.48      0.71
 
     _pos = df["pos_bucket"]
+    # Forward bounds throughout this function are the Wing/Big midpoint —
+    # mirrors torvik_metrics.py's identical fix exactly.
     pts_clipped = df["pts"].copy()
-    pts_clipped = pts_clipped.where(_pos != "Guard", pts_clipped.clip(4.89, 19.60))
-    pts_clipped = pts_clipped.where(_pos != "Wing",  pts_clipped.clip(3.25, 15.63))
-    pts_clipped = pts_clipped.where(_pos != "Big",   pts_clipped.clip(2.80, 13.98))
+    pts_clipped = pts_clipped.where(_pos != "Guard",   pts_clipped.clip(4.89, 19.60))
+    pts_clipped = pts_clipped.where(_pos != "Wing",    pts_clipped.clip(3.25, 15.63))
+    pts_clipped = pts_clipped.where(_pos != "Forward", pts_clipped.clip(3.025, 14.805))
+    pts_clipped = pts_clipped.where(_pos != "Big",     pts_clipped.clip(2.80, 13.98))
 
     stat_scores = (
         prank(pts_clipped)   * w("ppg") +  # pts per game (position-bounded)
@@ -1171,10 +1217,15 @@ def compute_nil_valuation(df, reference_mask=None):
     _drb   = pr(df["DRB_per"])
     _fc    = pr_inv(df["pfr"])
 
+    # Forward = Wing/Big midpoint -- mirrors torvik_metrics.py's identical fix.
+    # Without this branch, _nil_def_raw was literally 0 for every Forward
+    # row, which after percentrank_by_pos made nil_def_score exactly 0 too --
+    # the root of the "Unrated" Forward-player bug.
     df["_nil_def_raw"] = (
-        (_pos == "Guard") * (_dbpm*0.30 + _dprpg*0.20 + _stl*0.25 + _drb*0.10 + _fc*0.15) +
-        (_pos == "Wing")  * (_dbpm*0.25 + _dprpg*0.25 + _stl*0.15 + _blk*0.10 + _drb*0.15 + _fc*0.10) +
-        (_pos == "Big")   * (_dbpm*0.30 + _dprpg*0.20 + _blk*0.30 + _drb*0.15 + _fc*0.05)
+        (_pos == "Guard")   * (_dbpm*0.30  + _dprpg*0.20  + _stl*0.25  + _drb*0.10  + _fc*0.15) +
+        (_pos == "Wing")    * (_dbpm*0.25  + _dprpg*0.25  + _stl*0.15  + _blk*0.10  + _drb*0.15  + _fc*0.10) +
+        (_pos == "Forward") * (_dbpm*0.275 + _dprpg*0.225 + _stl*0.075 + _blk*0.20  + _drb*0.15  + _fc*0.075) +
+        (_pos == "Big")     * (_dbpm*0.30  + _dprpg*0.20  + _blk*0.30  + _drb*0.15  + _fc*0.05)
     )
     # Re-rank within position groups (0–1) so Guards compete vs Guards, etc.
     nil_def_score = percentrank_by_pos(df, "_nil_def_raw", scale=1, reference_mask=reference_mask)
@@ -1187,10 +1238,12 @@ def compute_nil_valuation(df, reference_mask=None):
     _to    = pr_inv(df["TO_per"])   # lower turnovers = better
     _ato   = pr(df["ast/tov"].fillna(0))
 
+    # Forward = Wing/Big midpoint -- mirrors torvik_metrics.py's identical fix.
     df["_nil_iq_raw"] = (
-        (_pos == "Guard") * (_efg*0.20 + _ortg*0.20 + _ast*0.25 + _to*0.20 + _ato*0.15) +
-        (_pos == "Wing")  * (_efg*0.35 + _ortg*0.25 + _ast*0.15 + _to*0.15 + _ato*0.10) +
-        (_pos == "Big")   * (_efg*0.40 + _ortg*0.30 + _ast*0.05 + _to*0.20 + _ato*0.05)
+        (_pos == "Guard")   * (_efg*0.20  + _ortg*0.20  + _ast*0.25 + _to*0.20  + _ato*0.15) +
+        (_pos == "Wing")    * (_efg*0.35  + _ortg*0.25  + _ast*0.15 + _to*0.15  + _ato*0.10) +
+        (_pos == "Forward") * (_efg*0.375 + _ortg*0.275 + _ast*0.10 + _to*0.175 + _ato*0.075) +
+        (_pos == "Big")     * (_efg*0.40  + _ortg*0.30  + _ast*0.05 + _to*0.20  + _ato*0.05)
     )
     nil_iq_score = percentrank_by_pos(df, "_nil_iq_raw", scale=1, reference_mask=reference_mask)
 
@@ -1201,10 +1254,12 @@ def compute_nil_valuation(df, reference_mask=None):
     _blk40 = pr(df["blk_per"])
     _stl40 = pr(df["stl_per"])
 
+    # Forward = Wing/Big midpoint -- mirrors torvik_metrics.py's identical fix.
     df["_nil_motor_raw"] = (
-        (_pos == "Guard") * (_orb40*0.35 + _drb40*0.15 + _blk40*0.10 + _stl40*0.40) +
-        (_pos == "Wing")  * (_orb40*0.25 + _drb40*0.25 + _blk40*0.25 + _stl40*0.25) +
-        (_pos == "Big")   * (_orb40*0.25 + _drb40*0.30 + _blk40*0.35 + _stl40*0.10)
+        (_pos == "Guard")   * (_orb40*0.35  + _drb40*0.15  + _blk40*0.10 + _stl40*0.40) +
+        (_pos == "Wing")    * (_orb40*0.25  + _drb40*0.25  + _blk40*0.25 + _stl40*0.25) +
+        (_pos == "Forward") * (_orb40*0.25  + _drb40*0.275 + _blk40*0.30 + _stl40*0.175) +
+        (_pos == "Big")     * (_orb40*0.25  + _drb40*0.30  + _blk40*0.35 + _stl40*0.10)
     )
     nil_motor_score = percentrank_by_pos(df, "_nil_motor_raw", scale=1, reference_mask=reference_mask)
 
@@ -1228,10 +1283,12 @@ def compute_nil_valuation(df, reference_mask=None):
         _h_pos = pd.Series(0.5, index=df.index)
         _h_all = pd.Series(0.5, index=df.index)
 
+    # Forward = Wing/Big midpoint -- mirrors torvik_metrics.py's identical fix.
     df["_nil_size_raw"] = (
-        (_pos == "Guard") * (_h_pos*0.75  + _h_all*0.25) +
-        (_pos == "Wing")  * (_h_pos*0.571 + _h_all*0.429) +
-        (_pos == "Big")   * (_h_pos*0.333 + _h_all*0.667)
+        (_pos == "Guard")   * (_h_pos*0.75  + _h_all*0.25) +
+        (_pos == "Wing")    * (_h_pos*0.571 + _h_all*0.429) +
+        (_pos == "Forward") * (_h_pos*0.452 + _h_all*0.548) +
+        (_pos == "Big")     * (_h_pos*0.333 + _h_all*0.667)
     )
     nil_size_score = percentrank_by_pos(df, "_nil_size_raw", scale=1, reference_mask=reference_mask)
 
@@ -1239,10 +1296,12 @@ def compute_nil_valuation(df, reference_mask=None):
     # Guard: DBPM×0.30 + DPRPG×0.15 + DRB×0.10 + STL×0.25 + BLK×0.05 + FC×0.15
     # Wing:  DBPM×0.25 + DPRPG×0.20 + DRB×0.15 + STL×0.15 + BLK×0.15 + FC×0.10
     # Big:   DBPM×0.25 + DPRPG×0.15 + DRB×0.20 + STL×0.15 + BLK×0.25 + FC×0.10
+    # Forward = Wing/Big midpoint -- mirrors torvik_metrics.py's identical fix.
     df["_nil_defv_raw"] = (
-        (_pos == "Guard") * (_dbpm*0.30 + _dprpg*0.15 + _drb*0.10 + _stl*0.25 + _blk*0.05 + _fc*0.15) +
-        (_pos == "Wing")  * (_dbpm*0.25 + _dprpg*0.20 + _drb*0.15 + _stl*0.15 + _blk*0.15 + _fc*0.10) +
-        (_pos == "Big")   * (_dbpm*0.25 + _dprpg*0.15 + _drb*0.20 + _stl*0.15 + _blk*0.25 + _fc*0.10)
+        (_pos == "Guard")   * (_dbpm*0.30  + _dprpg*0.15  + _drb*0.10  + _stl*0.25 + _blk*0.05 + _fc*0.15) +
+        (_pos == "Wing")    * (_dbpm*0.25  + _dprpg*0.20  + _drb*0.15  + _stl*0.15 + _blk*0.15 + _fc*0.10) +
+        (_pos == "Forward") * (_dbpm*0.25  + _dprpg*0.175 + _drb*0.175 + _stl*0.15 + _blk*0.20 + _fc*0.10) +
+        (_pos == "Big")     * (_dbpm*0.25  + _dprpg*0.15  + _drb*0.20  + _stl*0.15 + _blk*0.25 + _fc*0.10)
     )
     nil_defv_score = percentrank_by_pos(df, "_nil_defv_raw", scale=1, reference_mask=reference_mask)
 
@@ -1254,10 +1313,12 @@ def compute_nil_valuation(df, reference_mask=None):
     _s = df.get("_stl_per_per", pr(df["stl_per"]))
     _b = df.get("_blk_per_per", pr(df["blk_per"]))
     _d = df.get("_drb_per_per", pr(df["DRB_per"]))
+    # Forward = Wing/Big midpoint -- mirrors torvik_metrics.py's identical fix.
     df["_nil_lateral_raw"] = (
-        (_pos == "Guard") * (_s*0.55 + _b*0.20 + _d*0.25) +
-        (_pos == "Wing")  * (_s*0.40 + _b*0.30 + _d*0.30) +
-        (_pos == "Big")   * (_s*0.20 + _b*0.45 + _d*0.35)
+        (_pos == "Guard")   * (_s*0.55  + _b*0.20  + _d*0.25) +
+        (_pos == "Wing")    * (_s*0.40  + _b*0.30  + _d*0.30) +
+        (_pos == "Forward") * (_s*0.30  + _b*0.375 + _d*0.325) +
+        (_pos == "Big")     * (_s*0.20  + _b*0.45  + _d*0.35)
     )
     nil_lateral_score = percentrank_by_pos(df, "_nil_lateral_raw", scale=1, reference_mask=reference_mask)
 
@@ -1279,19 +1340,23 @@ def compute_nil_valuation(df, reference_mask=None):
     )
 
     # ── 3PT Score (volume × efficiency, position-relative) ───────────────────
-    # 3PA/G bounds: Guard [1.34, 6.90], Wing [0.79, 6.07], Big [0.00, 3.88]
+    # 3PA/G bounds: Guard [1.34, 6.90], Wing [0.79, 6.07], Big [0.00, 3.88].
+    # Forward = Wing/Big midpoint -- mirrors torvik_metrics.py's identical fix.
     tpa_pg = (df["TPA"] / df["GP"].replace(0, float("nan"))).fillna(0)
     tpa_pg_clipped = tpa_pg.copy()
-    tpa_pg_clipped = tpa_pg_clipped.where(_pos != "Guard", tpa_pg_clipped.clip(1.34, 6.90))
-    tpa_pg_clipped = tpa_pg_clipped.where(_pos != "Wing",  tpa_pg_clipped.clip(0.79, 6.07))
-    tpa_pg_clipped = tpa_pg_clipped.where(_pos != "Big",   tpa_pg_clipped.clip(0.00, 3.88))
+    tpa_pg_clipped = tpa_pg_clipped.where(_pos != "Guard",   tpa_pg_clipped.clip(1.34, 6.90))
+    tpa_pg_clipped = tpa_pg_clipped.where(_pos != "Wing",    tpa_pg_clipped.clip(0.79, 6.07))
+    tpa_pg_clipped = tpa_pg_clipped.where(_pos != "Forward", tpa_pg_clipped.clip(0.395, 4.975))
+    tpa_pg_clipped = tpa_pg_clipped.where(_pos != "Big",     tpa_pg_clipped.clip(0.00, 3.88))
 
-    # 3P% bounds: Guard [0.25, 0.44], Wing [0.21, 0.43], Big [0.00, 0.71]
+    # 3P% bounds: Guard [0.25, 0.44], Wing [0.21, 0.43], Big [0.00, 0.71].
+    # Forward = Wing/Big midpoint -- mirrors torvik_metrics.py's identical fix.
     tp_pct = df["TP_per"].fillna(0)  # TP_per is already a decimal (e.g. 0.381 = 38.1%)
     tp_pct_clipped = tp_pct.copy()
-    tp_pct_clipped = tp_pct_clipped.where(_pos != "Guard", tp_pct_clipped.clip(0.25, 0.44))
-    tp_pct_clipped = tp_pct_clipped.where(_pos != "Wing",  tp_pct_clipped.clip(0.21, 0.43))
-    tp_pct_clipped = tp_pct_clipped.where(_pos != "Big",   tp_pct_clipped.clip(0.00, 0.71))
+    tp_pct_clipped = tp_pct_clipped.where(_pos != "Guard",   tp_pct_clipped.clip(0.25, 0.44))
+    tp_pct_clipped = tp_pct_clipped.where(_pos != "Wing",    tp_pct_clipped.clip(0.21, 0.43))
+    tp_pct_clipped = tp_pct_clipped.where(_pos != "Forward", tp_pct_clipped.clip(0.105, 0.57))
+    tp_pct_clipped = tp_pct_clipped.where(_pos != "Big",     tp_pct_clipped.clip(0.00, 0.71))
 
     df["_tpa_pg_clipped"]  = tpa_pg_clipped
     df["_tp_pct_clipped"]  = tp_pct_clipped
@@ -1692,12 +1757,21 @@ def main():
             for r in _sr_rows
             if r.get("cdi") is not None
         }
+        # player_id -> {calendar_year: {"cdi": ..., ...}} -- mirrors
+        # torvik_metrics.py's identical mechanism exactly.
+        _history_by_player = {}
+        for r in _sr_rows:
+            _history_by_player.setdefault(r["player_id"], {})[r["calendar_year"]] = {
+                "cdi": r.get("cdi"), "dds": r.get("dds"), "sei": r.get("sei"),
+                "ath": r.get("ath"), "ris": r.get("ris"), "nil_valuation": r.get("nil_valuation"),
+            }
     else:
         player_lookup          = {}
         player_height_lookup   = {}
         player_nil_lookup      = {}
         stats_lookup           = {}
         already_matched        = set()
+        _history_by_player     = {}
 
     # ── Process each row ──────────────────────────────────────────────────────
     matched        = 0
@@ -1920,6 +1994,31 @@ def main():
             if ht and ht not in ("nan", "") and not player_height_lookup.get(player_id):
                 player_patch["height"] = ht
             # player_patch["specialist_tags"] = "3pt_specialist" if is_3pt_specialist else None
+
+            # ── Overall (multi-season) rating ──────────────────────────────────
+            # Mirrors torvik_metrics.py's identical mechanism exactly.
+            _hist = _history_by_player.get(player_id, {})
+            _prior_years = sorted((y for y in _hist if y != args.year), reverse=True)[:3]
+            cdi_overall = compute_overall_rating([cdi] + [_hist[y]["cdi"] for y in _prior_years])
+            dds_overall = compute_overall_rating([dds] + [_hist[y]["dds"] for y in _prior_years])
+            sei_overall = compute_overall_rating([sei] + [_hist[y]["sei"] for y in _prior_years])
+            ath_overall = compute_overall_rating([ath] + [_hist[y]["ath"] for y in _prior_years])
+            ris_overall = compute_overall_rating([ris] + [_hist[y]["ris"] for y in _prior_years])
+            if cdi_overall is not None:
+                player_patch["cdi_overall"] = cdi_overall
+            if dds_overall is not None:
+                player_patch["dds_overall"] = dds_overall
+            if sei_overall is not None:
+                player_patch["sei_overall"] = sei_overall
+            if ath_overall is not None:
+                player_patch["ath_overall"] = ath_overall
+            if ris_overall is not None:
+                player_patch["ris_overall"] = ris_overall
+            if nil is not None and not args.skip_nil:
+                nil_overall = compute_overall_rating([nil] + [_hist[y]["nil_valuation"] for y in _prior_years])
+                if nil_overall is not None:
+                    player_patch["nil_valuation_overall"] = nil_overall
+
             if player_patch:
                 run_query(db.table("w_players").update(player_patch).eq("id", player_id))
                 if nil is not None:
@@ -1962,6 +2061,10 @@ def main():
             stats_patch["projected_tier"] = tier
         if nil_perf_score is not None and not args.skip_nil:
             stats_patch["nil_perf_score"] = round(float(nil_perf_score), 6)
+        # Captured per-season starting now -- mirrors torvik_metrics.py's
+        # identical change exactly, see that file for the full rationale.
+        if nil is not None and not args.skip_nil:
+            stats_patch["nil_valuation"] = nil
 
         stats_id = stats_lookup.get((player_id, args.year))
         if stats_id:

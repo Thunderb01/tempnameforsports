@@ -146,6 +146,41 @@ bucket set again:
   spec's Forward split yet).
 - NIL valuation's `pos_boost` — `.map()` with `.fillna(1.0)`, so a
   forgotten bucket silently gets a neutral boost rather than breaking.
+- **`compute_nil_valuation`'s own internal weight/raw-score formulas were
+  the one real casualty, confirmed in production 2026-11-13** — see
+  "Every Forward player showed Unrated" below. Unlike `pos_boost`, these
+  had no fallback at all.
+
+**Every Forward player showed "Unrated" (NIL = exactly $0) until fixed
+2026-11-13 — 569 of 4179 real players in production, not an edge case.**
+Traced from a player card showing "Unrated" despite having real sei/ath/
+cdi/dds/ris grades — the skill-profile radar (those five BTP metrics) and
+the "Overall"/NIL badge are two *different* numbers (`overallFor()` in
+`src/lib/display.js` reads `nil_valuation`/`open_market_high`, not
+cdi/dds/sei/ath/ris), so a player can have real grades and still show
+Unrated if NIL specifically is broken. Root cause: `compute_nil_valuation`
+in both files predates the Forward bucket and was never fully updated for
+it — `GUARD_WEIGHTS`/`WING_WEIGHTS`/`BIG_WEIGHTS` plus the `w(key)` lookup
+that reads them only checked `_pos == "Guard"/"Wing"/"Big"`; on a Forward
+row none of the three match, so `w(key)` returned `0` for every key,
+zeroing `stat_scores`/`scout_scores`/`btp_scores` → `total_score (W)` → a
+flat `$0` `base_nil` for every single Forward player, regardless of their
+actual stats. The same `(_pos==Guard)*(...) + (_pos==Wing)*(...) +
+(_pos==Big)*(...)` pattern (no Forward term) was *also* missing from six
+more places in the same function — `_nil_def_raw`, `_nil_iq_raw`,
+`_nil_motor_raw`, `_nil_defv_raw`, `_nil_lateral_raw`, `_nil_size_raw` (hard
+zero, same bug) and the `pts_clipped`/`tpa_pg_clipped`/`tp_pct_clipped`
+position-bound `.where()` chains (milder — Forward rows were left fully
+unclipped rather than zeroed, since none of the three conditions matched).
+Fixed by adding an explicit `FORWARD_WEIGHTS` dict and a Forward branch to
+every one of these, each using the Wing/Big midpoint — the same convention
+already established for `compute_ath`'s weight dicts and `compute_cdi`'s
+`pos_mult` for this exact bucket. Verified end-to-end against the real
+`data/trank_data_2027.csv`: 0 players with a null/zero NIL after the fix,
+down from all 569 Forward-bucket players before it. If you ever add a 5th
+bucket, audit `compute_nil_valuation` itself line-by-line in addition to
+the three bullets above — it has the most `pos_bucket`-keyed branches of
+any function in either file, and none of them have a safe fallback.
 
 **`pos_bucket` itself must never default straight to one bucket when the
 CSV's `role` column is blank.** `df["pos_bucket"] = df["role"].apply(normalise_pos)`
@@ -232,6 +267,74 @@ misalign (pandas aligns boolean Series by label, not position) the moment
 `df`'s index changed under it. If you ever see a `reference_mask` or
 similar boolean Series produce nonsensical results after a `merge()`,
 check this first.
+
+### Overall (multi-season) rating — a proven track record carries weight
+
+By request (2026-11-13): a returning player's displayed rating blends their
+current season with however many prior seasons they have on record, so a
+proven track record counts for something beyond this year's sample —
+distinct from, and on top of, the within-season shrinkage above.
+
+**Storage**: `player_stats`/`w_player_stats` already keep one row per
+`(player_id, calendar_year)` with that season's own `cdi`/`dds`/`sei`/`ath`/
+`ris` — those stay exactly as they are, never touched by this. The blend
+goes into six new columns on `players`/`w_players` instead
+(`cdi_overall`/`dds_overall`/`sei_overall`/`ath_overall`/`ris_overall`/
+`nil_valuation_overall` — `supabase/add_overall_ratings.sql`, exposed on
+`vw_players`/`vw_w_players` by `supabase/extend_players_views_overall.sql`,
+which must run after it). NIL had no per-season history to blend from at
+all — `player_stats`/`w_player_stats` never stored `nil_valuation`, only
+`players.nil_valuation`, overwritten every run — so
+`add_overall_ratings.sql` also adds a plain `nil_valuation` column to
+`player_stats`/`w_player_stats`, and both metrics files now write that
+every run (`stats_patch["nil_valuation"] = nil`) so `nil_valuation_overall`
+has something real to draw on going forward. It has nothing to draw on
+retroactively for seasons before this column existed, beyond whatever
+`season_board_archive`/`w_season_board_archive` happened to capture for an
+already-archived season.
+
+**Weights** (`OVERALL_RATING_WEIGHTS` in both metrics files), current season
+first, by explicit request — the bulk of the rating always stays on *this*
+season rather than shrinking as career length grows the way an earlier
+draft of this did:
+
+| Seasons on record | Weights |
+|---|---|
+| 1 | 100% |
+| 2 | 70 / 30 |
+| 3 | 70 / 20 / 10 |
+| 4+ | 70 / 15 / 10 / 5 |
+
+Capped at 4 total seasons — a 5th-year player's oldest season is dropped
+from the blend, not folded into a 5th tier nobody specified.
+
+**`compute_overall_rating(values)`** (both files, identical, pure function)
+takes `values[0]` = this season, `values[1:]` = prior seasons most-recent-
+first, slices to 4, drops any `None` (a gap year, a stat not tracked yet)
+and renormalizes the remaining weights to sum to 1 rather than letting a
+missing value silently depress the result toward 0, and returns `None` only
+if every value including the current season is missing.
+
+**`_history_by_player`** (built once per `main()` run, from the same bulk
+`player_stats`/`w_player_stats` fetch already used for `stats_lookup` — not
+a second, per-player query, which would be an N+1 problem against 4000+
+players) maps `player_id → {calendar_year: {cdi, dds, sei, ath, ris,
+nil_valuation}}`. In the write loop, `_prior_years` excludes the row for
+`args.year` itself (so re-running the current season's CSV twice doesn't
+count this run's own write as history) and takes the 3 most recent of
+whatever remains. Each `_overall` value is computed from the already-shrunk
+current-season value plus those prior stored values, and only written into
+`player_patch`/`stats_patch` when not `None` — same "only write what you
+actually computed" convention as every other optional field in this loop.
+`nil_valuation_overall` is gated behind the same `nil is not None and not
+args.skip_nil` check the rest of NIL already uses.
+
+**Known accepted imprecision**: a season's stored `cdi`/`dds`/etc. was
+computed under whatever formula version was live that season — blending a
+prior season's number with this season's under the current formula mixes
+two slightly different measuring sticks. Not fixed here; revisit only if it
+turns out to matter in practice, same as other known-imprecision calls
+elsewhere in this file (e.g. Stretch 4 staying bucketed as Big).
 
 ### Shot Difficulty, Adjusted SEI, Shot Creation — the assisted-share data source
 
