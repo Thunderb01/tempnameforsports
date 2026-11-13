@@ -91,6 +91,8 @@ try:
 except ImportError:
     sys.exit("Run: pip install supabase")
 
+from db_retry import run_query
+
 try:
     from match_utils import build_lookup, match_player as mu_match, norm_name
 except ImportError:
@@ -546,8 +548,8 @@ def repair_positions_from_prior_role(db, csv_path, dry_run):
     print("\nFetching players (id, torvik_pid, positions, name, current_team) …")
     rows, page, page_size = [], 0, 1000
     while True:
-        res = db.table("players").select("id, torvik_pid, positions, name, current_team") \
-                .range(page * page_size, (page + 1) * page_size - 1).execute()
+        res = run_query(db.table("players").select("id, torvik_pid, positions, name, current_team") \
+                .range(page * page_size, (page + 1) * page_size - 1))
         rows.extend(res.data or [])
         if len(res.data or []) < page_size:
             break
@@ -592,10 +594,10 @@ def repair_positions_from_prior_role(db, csv_path, dry_run):
 
     written = 0
     for id_, name, team, positions in updates:
-        db.table("players").update({
+        run_query(db.table("players").update({
             "positions": positions,
             "primary_position": positions[0],
-        }).eq("id", id_).execute()
+        }).eq("id", id_))
         written += 1
         if written % 500 == 0:
             print(f"  ... {written}/{len(updates)} repaired")
@@ -632,8 +634,8 @@ def repair_departed_on_board(db, current_csv_path, dry_run):
     print("\nFetching on_board players (id, torvik_pid, name, current_team) …")
     rows, page, page_size = [], 0, 1000
     while True:
-        res = db.table("players").select("id, torvik_pid, name, current_team") \
-                .eq("on_board", True).range(page * page_size, (page + 1) * page_size - 1).execute()
+        res = run_query(db.table("players").select("id, torvik_pid, name, current_team") \
+                .eq("on_board", True).range(page * page_size, (page + 1) * page_size - 1))
         rows.extend(res.data or [])
         if len(res.data or []) < page_size:
             break
@@ -654,7 +656,7 @@ def repair_departed_on_board(db, current_csv_path, dry_run):
 
     written = 0
     for r in updates:
-        db.table("players").update({"on_board": False}).eq("id", r["id"]).execute()
+        run_query(db.table("players").update({"on_board": False}).eq("id", r["id"]))
         written += 1
         if written % 500 == 0:
             print(f"  ... {written}/{len(updates)} repaired")
@@ -1669,7 +1671,7 @@ def main():
         print("Fetching player_stats from Supabase for merge …")
         _ps_rows, _page, _ps = [], 0, 1000
         while True:
-            _res = _db_tmp.table("player_stats") \
+            _res = run_query(_db_tmp.table("player_stats") \
                           .select("player_id, ppg, apg, rpg, stl_40, blk_40, "
                                   "drb_40, orb_40, trb_40, ast_40, ast_tov, usg, "
                                   "fg_pct, ft_pct, 3p_pct, "
@@ -1678,7 +1680,7 @@ def main():
                                   "tot_ft, tot_fta, tot_orb, tot_drb, tot_trb, "
                                   "tot_ast, tot_stl, tot_blk, tot_tov, tot_pf, tot_pts, "
                                   "school, conference") \
-                          .range(_page * _ps, (_page + 1) * _ps - 1).execute()
+                          .range(_page * _ps, (_page + 1) * _ps - 1))
             _ps_rows.extend(_res.data or [])
             if len(_res.data or []) < _ps:
                 break
@@ -1688,8 +1690,8 @@ def main():
         # to merge assisted_pct_rim/mid/three by pid rather than name/team)
         _pl_rows, _page = [], 0
         while True:
-            _res = _db_tmp.table("players").select("id, name, current_team, height, weight, torvik_pid, positions") \
-                          .range(_page * _ps, (_page + 1) * _ps - 1).execute()
+            _res = run_query(_db_tmp.table("players").select("id, name, current_team, height, weight, torvik_pid, positions") \
+                          .range(_page * _ps, (_page + 1) * _ps - 1))
             _pl_rows.extend(_res.data or [])
             if len(_res.data or []) < _ps:
                 break
@@ -1756,10 +1758,10 @@ def main():
             _assist_rows = []
             _page = 0
             while True:
-                _res = db.table("player_stats") \
+                _res = run_query(db.table("player_stats") \
                           .select("player_id, assisted_pct_rim, assisted_pct_mid, assisted_pct_three") \
                           .eq("calendar_year", args.year) \
-                          .range(_page * 1000, (_page + 1) * 1000 - 1).execute()
+                          .range(_page * 1000, (_page + 1) * 1000 - 1))
                 _assist_rows.extend(_res.data or [])
                 if len(_res.data or []) < 1000:
                     break
@@ -1883,8 +1885,8 @@ def main():
         players = []
         page, page_size = 0, 1000
         while True:
-            res = db.table("players").select("id, name, current_team, height, nil_valuation, torvik_pid") \
-                    .range(page * page_size, (page + 1) * page_size - 1).execute()
+            res = run_query(db.table("players").select("id, name, current_team, height, nil_valuation, torvik_pid") \
+                    .range(page * page_size, (page + 1) * page_size - 1))
             players.extend(res.data)
             if len(res.data) < page_size:
                 break
@@ -1914,8 +1916,8 @@ def main():
         # Build stats lookup: (player_id, calendar_year) → stats row id (paginated)
         _sr_rows, _page = [], 0
         while True:
-            _sr = db.table("player_stats").select("id, player_id, calendar_year, cdi, dds, sei, ath, ris, nil_valuation") \
-                    .range(_page * 1000, (_page + 1) * 1000 - 1).execute()
+            _sr = run_query(db.table("player_stats").select("id, player_id, calendar_year, cdi") \
+                    .range(_page * 1000, (_page + 1) * 1000 - 1))
             _sr_rows.extend(_sr.data or [])
             if len(_sr.data or []) < 1000:
                 break
@@ -2092,13 +2094,13 @@ def main():
 
             new_school = display_school(team)
             try:
-                res = db.table("players").insert({
+                res = run_query(db.table("players").insert({
                     "name":         name,
                     "current_team": new_school,
                     "source":       "program",
                     "on_board":     True,
                     "torvik_pid":   torvik_pid_val,
-                }).execute()
+                }))
                 player_id = res.data[0]["id"]
             except Exception as e:
                 print(f"  ✗ Failed to create {name} ({team}): {e}")
@@ -2217,7 +2219,7 @@ def main():
                     player_patch["nil_valuation_overall"] = nil_overall
 
             if player_patch:
-                db.table("players").update(player_patch).eq("id", player_id).execute()
+                run_query(db.table("players").update(player_patch).eq("id", player_id))
                 if nil is not None:
                     old_nil = player_nil_lookup.get(player_id)
                     changed = old_nil is None or abs(nil - old_nil) > 1
@@ -2267,12 +2269,12 @@ def main():
 
         stats_id = stats_lookup.get((player_id, args.year))
         if stats_id:
-            db.table("player_stats").update(stats_patch).eq("id", stats_id).execute()
+            run_query(db.table("player_stats").update(stats_patch).eq("id", stats_id))
         else:
-            db.table("player_stats").insert({
+            run_query(db.table("player_stats").insert({
                 **stats_patch,
                 "player_id":    player_id,
-            }).execute()
+            }))
 
         matched += 1
         print(f"  ✓ {name} ({team})")
