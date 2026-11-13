@@ -146,6 +146,41 @@ bucket set again:
   spec's Forward split yet).
 - NIL valuation's `pos_boost` — `.map()` with `.fillna(1.0)`, so a
   forgotten bucket silently gets a neutral boost rather than breaking.
+- **`compute_nil_valuation`'s own internal weight/raw-score formulas were
+  the one real casualty, confirmed in production 2026-11-13** — see
+  "Every Forward player showed Unrated" below. Unlike `pos_boost`, these
+  had no fallback at all.
+
+**Every Forward player showed "Unrated" (NIL = exactly $0) until fixed
+2026-11-13 — 569 of 4179 real players in production, not an edge case.**
+Traced from a player card showing "Unrated" despite having real sei/ath/
+cdi/dds/ris grades — the skill-profile radar (those five BTP metrics) and
+the "Overall"/NIL badge are two *different* numbers (`overallFor()` in
+`src/lib/display.js` reads `nil_valuation`/`open_market_high`, not
+cdi/dds/sei/ath/ris), so a player can have real grades and still show
+Unrated if NIL specifically is broken. Root cause: `compute_nil_valuation`
+in both files predates the Forward bucket and was never fully updated for
+it — `GUARD_WEIGHTS`/`WING_WEIGHTS`/`BIG_WEIGHTS` plus the `w(key)` lookup
+that reads them only checked `_pos == "Guard"/"Wing"/"Big"`; on a Forward
+row none of the three match, so `w(key)` returned `0` for every key,
+zeroing `stat_scores`/`scout_scores`/`btp_scores` → `total_score (W)` → a
+flat `$0` `base_nil` for every single Forward player, regardless of their
+actual stats. The same `(_pos==Guard)*(...) + (_pos==Wing)*(...) +
+(_pos==Big)*(...)` pattern (no Forward term) was *also* missing from six
+more places in the same function — `_nil_def_raw`, `_nil_iq_raw`,
+`_nil_motor_raw`, `_nil_defv_raw`, `_nil_lateral_raw`, `_nil_size_raw` (hard
+zero, same bug) and the `pts_clipped`/`tpa_pg_clipped`/`tp_pct_clipped`
+position-bound `.where()` chains (milder — Forward rows were left fully
+unclipped rather than zeroed, since none of the three conditions matched).
+Fixed by adding an explicit `FORWARD_WEIGHTS` dict and a Forward branch to
+every one of these, each using the Wing/Big midpoint — the same convention
+already established for `compute_ath`'s weight dicts and `compute_cdi`'s
+`pos_mult` for this exact bucket. Verified end-to-end against the real
+`data/trank_data_2027.csv`: 0 players with a null/zero NIL after the fix,
+down from all 569 Forward-bucket players before it. If you ever add a 5th
+bucket, audit `compute_nil_valuation` itself line-by-line in addition to
+the three bullets above — it has the most `pos_bucket`-keyed branches of
+any function in either file, and none of them have a safe fallback.
 
 **`pos_bucket` itself must never default straight to one bucket when the
 CSV's `role` column is blank.** `df["pos_bucket"] = df["role"].apply(normalise_pos)`
