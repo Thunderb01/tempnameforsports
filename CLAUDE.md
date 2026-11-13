@@ -169,9 +169,69 @@ The five-position model (`torvik_role_to_positions` / `src/lib/positions.js`)
 is unrelated to this and wasn't touched — `Wing F` still maps to `["SF", "PF"]`
 and `Stretch 4` to `["PF"]` for display/lineup purposes, same as always.
 
-**Minutes cutoff is now 20%** (`Min_per >= 20`, was 10%), also per the spec —
-players below it get basic stats written but no metrics or NIL, same as
-before, just a higher bar.
+**Minutes cutoff is 20%** (`Min_per >= 20`) for *who counts as the reference
+population* — not, as of 2026-11-13, for who gets a rating at all. See
+"Shrinkage toward the position average" below: every player gets real
+cdi/dds/sei/ath/ris/NIL now, qualified or not.
+
+### Shrinkage toward the position average — every player gets a rating, not just qualified ones
+
+Confirmed 2026-11-12/13: real teams were missing players from the board, and
+separately, a low-minutes player's `cdi`/`dds`/`sei`/`ath`/`ris`/NIL used to
+come back `None` outright (the `Min_per >= 20%` cutoff gated metrics
+entirely, not just display). By request: every player now gets a real
+rating, but a small sample's noise still can't swing it the way it would if
+their raw stats were trusted outright or let into the comparison pool.
+
+**The mechanism**: `percentrank_by_pos()` (both files) takes an optional
+`reference_mask` — when given, the COMPARISON population for every
+percentile is restricted to that mask (the qualified pool) regardless of
+which rows are being ranked. A low-minutes player's own noisy value can
+never distort anyone else's percentile and never becomes part of the
+population itself — the same integrity guarantee the old hard cutoff gave,
+just without blanking the player's own result. Threaded through every
+`percentrank_by_pos` call in `compute_cdi`/`dds`/`sei`/`shot_difficulty`/
+`adjusted_sei`/`shot_creation`/`ath`/`ris`/`nil_valuation` (11 internal calls
+inside `compute_nil_valuation` alone) in both files.
+`compute_dds`'s `pos_avg_drtg` and `compute_shot_difficulty`'s
+`pos_avg_difficulty` (population aggregates, not percentiles, computed via
+groupby) get the equivalent treatment: computed from the qualified subset
+only, then mapped back onto every row including the ones excluded from
+computing it.
+
+**Then `shrink_toward_average(raw_score, mp, max_mp, pct=0.25)`** blends
+that percentile toward 50 (the position average) by `weight = mp / (mp +
+0.25*max_mp)`, where `mp` is the Torvik CSV's own total-minutes-played
+column and `max_mp` is the season-high across the current run. A player at
+the season-high minutes gets ~80% weight on their own number; a player with
+none of the season's minutes yet gets ~0%, i.e. pure average. Scaling the
+stabilization point off `max_mp` (not a fixed minutes floor) means this
+adapts to how far into the season the data actually is — a fixed threshold
+would unfairly shrink everyone, starters included, in the season's first
+few weeks, when nobody has played many total minutes yet. 25% was chosen so
+a player at roughly a quarter of the season leader's minutes already gets a
+50/50 blend with the position average.
+
+Applied in `main()` uniformly to every player, qualified or not — a
+qualified player's own minutes are already close to `max_mp`, so this
+barely moves their number; this is also why the qualified/low-minutes split
+and the old "basic stats only, no metrics" write loop are gone entirely —
+one unified write loop now handles everyone. NIL inherits the shrinkage
+through its five biggest inputs (it reads `df["_cdi"]` etc., already shrunk
+by the time `compute_nil_valuation` runs); NIL's own minor internal
+sub-scores (def/iq/motor/size/lateral/versatility) still rank against the
+qualified reference so they can't be corrupted by a low-minutes player's
+presence, but aren't individually re-shrunk given their small combined
+weight next to the five that already are.
+
+**A real index-alignment bug surfaced building this**: `qualified_mask`
+must be computed AFTER the Supabase merges and the `reset_index` that
+follows them, not before — `df.merge()` always returns a fresh `0..N-1`
+index, and a mask built against the pre-merge index would silently
+misalign (pandas aligns boolean Series by label, not position) the moment
+`df`'s index changed under it. If you ever see a `reference_mask` or
+similar boolean Series produce nonsensical results after a `merge()`,
+check this first.
 
 ### Shot Difficulty, Adjusted SEI, Shot Creation — the assisted-share data source
 
