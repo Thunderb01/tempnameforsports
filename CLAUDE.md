@@ -379,6 +379,60 @@ Why forked and not toggle-driven:
 
 ---
 
+## New players: `torvik_metrics.py` creates them now, not just `scraper_to_supabase.py`
+
+Confirmed 2026-11-12: "this season's freshmen aren't showing up on the board"
+traced back to `torvik_metrics.py`/`torvik_metrics_w.py` only ever **updating**
+an existing `players`/`w_players` row (matched by `torvik_pid` or name+team via
+`match_utils`) — any player with no existing row got logged to
+`unmatched_players.csv` and silently dropped, no matter how much they played.
+The only path that ever created new rows was `scraper_to_supabase.py`, a
+*separate* Sports-Reference scrape never wired into `run_season_pipeline.py`.
+Real impact at the time: 931 unmatched players across 323 of ~364 D1 teams —
+450 Freshman, 205 Junior, 141 Sophomore, 135 Senior. Not exclusively
+freshmen (anyone never scraped in shows up this way), but by far the
+largest group, since they're the players most likely to be new to the DB.
+
+Fixed, by explicit choice — Torvik as the single source of truth, no second,
+differently-spelled source (`scraper_to_supabase.py`'s `source: "program"`
+rows use Sports-Reference's own name/team spelling, exactly the cross-source
+mismatch risk this avoids): when no match is found, both files now **insert**
+a new row directly from the Torvik CSV row (`name`, `current_team`,
+`torvik_pid`, `source: "torvik"`, `on_board: true`) and fall through into the
+existing matched-player path, which fills in positions/year/height/NIL via
+the same `player_patch` `UPDATE` every existing player already gets — no
+duplicated field-population logic for new rows. The low-minutes write loop
+(separate code path, "no metrics, no NIL") gets its own copy of this since it
+never otherwise touches the players table for an existing match either —
+there's no later patch to fall through into there.
+
+Creation is gated off (falls back to the old log-and-skip behavior) under
+`--skip-team-sync` and `--historical` — neither is a trustworthy signal that
+a player is actually on this season's live roster, and creating a new
+`on_board=true` row from either would be the exact mistake
+`repair_departed_on_board()` exists to undo (see below).
+
+**Weight is intentionally left blank** on newly created rows: confirmed unused
+everywhere at the time of this fix — `compute_ath()`'s own comment claims it
+reads `_weight_pct`, but the function never actually does, and no frontend
+component displays player weight at all. No payoff yet for a second-source
+lookup Torvik's CSV can't provide on its own (it has no weight column;
+`ht`/height is available and used). Revisit together if weight ever actually
+gets wired into a metric or a player card.
+
+**`compute_ath()` in both files had the same underlying bug class**, found
+while building an end-to-end test for the fix above: it unconditionally read
+`df["sb_drb_40"]` with no column-existence guard, crashing whenever the
+Supabase `player_stats` merge returns zero rows — not just under `--dry-run`
+(that part was already broken; confirmed separately the same day as a
+`KeyError: 'sb_tot_ast'` crash in `compute_cdi()`/`compute_ris()`, same root
+cause, same fix). All of these now guard every `sb_*` access and fall back to
+the Torvik-only equivalent, matching the pattern `compute_dds()` already used
+correctly. Any new formula reading an `sb_*` column must guard it the same
+way — the Supabase merge is best-effort, never guaranteed to populate it.
+
+---
+
 ## Season rollover: clearing the board vs. the Time Machine archive
 
 There's no season dimension on the live tables — `players`/`w_players` and

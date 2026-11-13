@@ -702,9 +702,19 @@ def compute_cdi(df):
     ast_score = df["AST_per"]
 
     # ast_tov from Torvik — direct measure of decision quality
-    # Use totals-derived when available, fall back to Torvik column
-    ast_40  = (df["sb_tot_ast"] / df["sb_tot_mp"].replace(0, float("nan"))) * 40
-    tov_40  = (df["sb_tot_tov"] / df["sb_tot_mp"].replace(0, float("nan"))) * 40
+    # Use totals-derived when available, fall back to Torvik column. sb_tot_*
+    # only exists when the Supabase player_stats merge ran (skipped entirely
+    # under --dry-run -- see main()), so guard column presence here the same
+    # way compute_dds's non-torvik branch already does, rather than assuming
+    # the merge always happened.
+    if "sb_tot_ast" in df.columns and "sb_tot_mp" in df.columns:
+        ast_40 = (df["sb_tot_ast"] / df["sb_tot_mp"].replace(0, float("nan"))) * 40
+    else:
+        ast_40 = pd.Series(float("nan"), index=df.index)
+    if "sb_tot_tov" in df.columns and "sb_tot_mp" in df.columns:
+        tov_40 = (df["sb_tot_tov"] / df["sb_tot_mp"].replace(0, float("nan"))) * 40
+    else:
+        tov_40 = pd.Series(float("nan"), index=df.index)
     ast_tov = (ast_40 / tov_40.replace(0, float("nan"))).fillna(df["ast/tov"])
 
     df["_cdi_raw"] = ast_score * (ast_tov ** 0.5) * pos_mult
@@ -987,7 +997,12 @@ def compute_ath(df, use_torvik=False):
     df["_blk_per_per"]   = percentrank_by_pos(df, "blk_per")
     df["_orb_per_per"]   = percentrank_by_pos(df, "ORB_per")
 
-    if use_torvik:
+    if use_torvik or "sb_drb_40" not in df.columns:
+        # sb_drb_40 only exists when the Supabase player_stats merge ran AND
+        # returned at least one row -- skipped under --dry-run, and also
+        # absent whenever the merge simply finds nothing to merge (e.g. an
+        # empty/near-empty player_stats table). Falls back to Torvik's own
+        # DRB_per the same way every other sb_* access in this file does.
         df["_drb_per_per"] = percentrank_by_pos(df, "DRB_per")
     else:
         df["_drb_per_per"] = percentrank_by_pos(df, "sb_drb_40")
@@ -1087,10 +1102,16 @@ def compute_ris(df, use_torvik=False):
         blk = 0.9 * df["blk_per"]
         drb = 0.4 * df["DRB_per"]
     else:
-        freethrow = 6 * (df["sb_tot_fta"] / (df["sb_tot_fga"] + 1))
-        orb = 1.2 * df["sb_orb_40"]
-        blk = 0.9 * df["sb_blk_40"]
-        drb = 0.4 * df["sb_drb_40"]
+        # sb_* only exists when the Supabase player_stats merge ran (skipped
+        # entirely under --dry-run -- see main()); guard each field and fall
+        # back to the same Torvik-only formula the use_torvik branch above
+        # uses, same pattern compute_dds's non-torvik branch already follows.
+        freethrow = (6 * (df["sb_tot_fta"] / (df["sb_tot_fga"] + 1))
+                     if "sb_tot_fta" in df.columns and "sb_tot_fga" in df.columns
+                     else 6 * df["FT_per"] / 100)
+        orb = (1.2 * df["sb_orb_40"]).fillna(1.2 * df["ORB_per"]) if "sb_orb_40" in df.columns else 1.2 * df["ORB_per"]
+        blk = (0.9 * df["sb_blk_40"]).fillna(0.9 * df["blk_per"]) if "sb_blk_40" in df.columns else 0.9 * df["blk_per"]
+        drb = (0.4 * df["sb_drb_40"]).fillna(0.4 * df["DRB_per"]) if "sb_drb_40" in df.columns else 0.4 * df["DRB_per"]
     df["_ris_raw"] = rimmade + freethrow + orb + blk + drb
     return percentrank_by_pos(df, "_ris_raw").apply(clamp)
 
@@ -1735,6 +1756,7 @@ def main():
 
     # ── Process each row ──────────────────────────────────────────────────────
     matched        = 0
+    created        = 0
     unmatched      = 0
     unmatched_rows = []
     nil_changes    = []
@@ -1850,11 +1872,53 @@ def main():
             player_id = _mr.player_id
 
         if not player_id:
-            unmatched += 1
-            match_method = "pid" if torvik_pid_val else "name+team"
-            print(f"  ✗ NO MATCH ({match_method}): {name} ({team})")
-            unmatched_rows.append({"name": name, "team": team, "yr": yr})
-            continue
+            # Create a new players row directly from this Torvik CSV row --
+            # rather than only ever updating a row some OTHER source (the
+            # Sports-Reference scraper, scraper_to_supabase.py) already
+            # created. Torvik is otherwise the single source of truth for
+            # everything this script writes, so a player genuinely new this
+            # season (freshmen, portal transfers never scraped) shouldn't
+            # depend on a second, differently-spelled source just to get a
+            # row at all. Confirmed real-world impact (2026-11-12): 931
+            # unmatched players across 323 of ~364 D1 teams, 450 of them
+            # freshmen, silently dropped every run before this fix.
+            #
+            # Skipped under --skip-team-sync / --historical: neither is a
+            # trustworthy signal that this player is actually on this
+            # season's live roster (an older/off-season CSV borrowed just to
+            # refresh metrics, or a past-season historical run) -- creating
+            # a new on_board=true row from either would be the same mistake
+            # repair_departed_on_board() exists to undo. Falls back to the
+            # old log-and-skip behavior in that case.
+            if args.skip_team_sync or args.historical:
+                unmatched += 1
+                match_method = "pid" if torvik_pid_val else "name+team"
+                print(f"  ✗ NO MATCH ({match_method}): {name} ({team})")
+                unmatched_rows.append({"name": name, "team": team, "yr": yr})
+                continue
+
+            new_school = display_school(team)
+            try:
+                res = db.table("players").insert({
+                    "name":         name,
+                    "current_team": new_school,
+                    "source":       "torvik",
+                    "on_board":     True,
+                    "torvik_pid":   torvik_pid_val,
+                }).execute()
+                player_id = res.data[0]["id"]
+            except Exception as e:
+                print(f"  ✗ Failed to create {name} ({team}): {e}")
+                unmatched += 1
+                unmatched_rows.append({"name": name, "team": team, "yr": yr})
+                continue
+
+            created += 1
+            print(f"  + Created new player: {name} ({new_school})")
+            # Falls through into the normal matched-player path below, which
+            # fills in positions/year/height/hometown/nil via the same
+            # player_patch UPDATE every existing player already gets --
+            # no separate, duplicated field-population logic for new rows.
 
         if args.skip_matched and player_id in already_matched:
             continue
@@ -1983,7 +2047,7 @@ def main():
         matched += 1
         print(f"  ✓ {name} ({team})")
 
-    print(f"\nDone. Matched: {matched} | Unmatched: {unmatched}")
+    print(f"\nDone. Matched: {matched} | Created: {created} | Unmatched: {unmatched}")
     import csv
     if unmatched_rows:
         out_path = "unmatched_players.csv"
@@ -2004,6 +2068,7 @@ def main():
     # ── Write basic stats for low-minutes players (no metrics, no NIL) ───────
     if not df_low.empty and not args.dry_run:
         written = 0
+        created_low = 0
         for _, row in df_low.iterrows():
             name = str(row.get("player_name", "")).strip()
             team = str(row.get("team", "")).strip()
@@ -2013,7 +2078,42 @@ def main():
                 _mr = mu_match(name, team, player_lookup)
                 player_id = _mr.player_id
             if not player_id:
-                continue
+                # Same reasoning as the qualified-players loop above: create
+                # a new players row directly from Torvik rather than silently
+                # dropping a player nothing else has ever scraped in. This
+                # loop never otherwise touches the players table (stats-only,
+                # "no metrics, no NIL"), so the insert here fills in
+                # positions/year/height itself rather than relying on a
+                # later patch -- there isn't one for this path.
+                if args.skip_team_sync or args.historical:
+                    continue
+                _low_role_raw = row.get("role", "")
+                _low_role_str = str(_low_role_raw).strip().lower()
+                _low_positions = []
+                if _low_role_str and _low_role_str != "nan":
+                    _low_positions = torvik_role_to_positions(_low_role_raw)
+                    if not _low_positions:
+                        _low_positions = list(_BUCKET_TO_POSITIONS.get(normalise_pos(_low_role_raw), []))
+                _low_yr_raw = str(row.get("yr", "")).strip()
+                _low_ht = str(row.get("ht", "")).strip()
+                try:
+                    _res = db.table("players").insert({
+                        "name":             name,
+                        "current_team":     display_school(team),
+                        "primary_position": _low_positions[0] if _low_positions else None,
+                        "positions":        _low_positions or None,
+                        "year":             {"Fr": "Freshman", "So": "Sophomore", "Jr": "Junior", "Sr": "Senior", "Gr": "Graduate"}.get(_low_yr_raw, _low_yr_raw or None),
+                        "height":           _low_ht if _low_ht and _low_ht not in ("nan", "") else None,
+                        "source":           "torvik",
+                        "on_board":         True,
+                        "torvik_pid":       torvik_pid_val,
+                    }).execute()
+                    player_id = _res.data[0]["id"]
+                except Exception as e:
+                    print(f"  ✗ Failed to create {name} ({team}): {e}")
+                    continue
+                created_low += 1
+                print(f"  + Created new player (low-minutes): {name} ({team})")
 
             _gp    = int(safe(row.get("GP"), 0) or 0)
             _twoPM = safe(row.get("twoPM")); _twoPA = safe(row.get("twoPA"))
@@ -2082,7 +2182,7 @@ def main():
                     "player_id":     player_id,
                 }).execute()
             written += 1
-        print(f"  Wrote basic stats for {written} low-minutes players (no metrics/NIL)")
+        print(f"  Wrote basic stats for {written} low-minutes players (no metrics/NIL), {created_low} newly created")
 
     if args.dry_run:
         print("(dry-run — nothing written)")
