@@ -661,22 +661,61 @@ def repair_departed_on_board(db, current_csv_path, dry_run):
     print(f"\nDone. Reverted {written} row(s) to on_board=false.")
 
 
-def percentrank_by_pos(df, col, pos_col="pos_bucket", scale=100):
+def percentrank_by_pos(df, col, pos_col="pos_bucket", scale=100, reference_mask=None):
     """
     For each row, compute percentile rank of df[col] within its position group.
     Returns a Series of floats in [0, scale]. Higher = better.
     Lower = better columns (like drtg, to_per) should be passed negated.
+
+    reference_mask (optional boolean Series aligned to df.index) restricts the
+    COMPARISON population to rows where it's True -- e.g. the qualified
+    (Min_per >= 20%) pool -- while every row in df (qualified or not) still
+    gets ranked against that same population. This lets a low-minutes row's
+    noisy raw value get ranked against trustworthy peers without a) ever
+    becoming part of the comparison population itself, so it can't distort
+    anyone else's percentile, and b) without a separate codepath -- every
+    row goes through the same formula either way. Omit for the old
+    behavior (rank within the group's own members, unchanged).
     """
     result = pd.Series(index=df.index, dtype=float)
-    for _, group in df.groupby(pos_col):
-        vals = group[col].dropna()
-        if vals.empty:
+    for pos, group in df.groupby(pos_col):
+        if reference_mask is not None:
+            ref_vals = df.loc[(df[pos_col] == pos) & reference_mask, col].dropna()
+        else:
+            ref_vals = group[col].dropna()
+        if ref_vals.empty:
             continue
         result[group.index] = group[col].apply(
-            lambda x: round((vals < x).sum() / len(vals) * scale, 2)
+            lambda x: round((ref_vals < x).sum() / len(ref_vals) * scale, 2)
             if pd.notna(x) else None
         )
     return result
+
+
+def shrink_toward_average(raw_score, mp, max_mp, pct=0.25, average=50):
+    """
+    Blend a player's raw percentile score toward the position average,
+    weighted by how much of the season-leader's total minutes (mp, from the
+    Torvik CSV) they've actually played -- so a small sample's noise can't
+    swing their rating as hard as a real season's worth of data would.
+    weight = mp / (mp + stabilization_point), stabilization_point = pct *
+    max_mp: a player at the season-high minutes total gets ~80% weight on
+    their own number (pct=0.25 -> stabilization_point = 0.25*max_mp, weight
+    at mp=max_mp is max_mp/(max_mp+0.25*max_mp) = 0.8); a player with none
+    of the season's minutes yet gets weight ~0, i.e. the average. Applied
+    uniformly to every player, not just a "low-minutes" subset -- a
+    well-established qualified player's own minutes are already close to
+    max_mp, so this barely moves their number.
+
+    mp/max_mp may be NaN (e.g. mp missing from the CSV, or max_mp is 0 this
+    early in the season) -- falls back to the raw score unshrunk rather
+    than propagating NaN into every rating.
+    """
+    stabilization_point = pct * max_mp
+    if not stabilization_point or pd.isna(stabilization_point):
+        return raw_score
+    weight = (mp / (mp + stabilization_point)).fillna(0)
+    return weight * raw_score.fillna(average) + (1 - weight) * average
 
 
 # ── METRIC FORMULAS ────────────────────────────────────────────────────────────
@@ -690,7 +729,7 @@ def percentrank_by_pos(df, col, pos_col="pos_bucket", scale=100):
 #   blk_per, stl_per, pfr, ftr, gbpm, ogbpm, dgbpm, Min_per, GP
 #   ast/tov
 
-def compute_cdi(df):
+def compute_cdi(df, reference_mask=None):
     # Forward (Wing F / Stretch 4) sits between Wing and Big in playmaking
     # responsibility — 1.04 is the Wing/Big midpoint, a placeholder like the
     # rest of these multipliers, not a tuned value. Without an explicit entry
@@ -719,11 +758,11 @@ def compute_cdi(df):
 
     df["_cdi_raw"] = ast_score * (ast_tov ** 0.5) * pos_mult
 
-    return percentrank_by_pos(df, "_cdi_raw").apply(clamp)
+    return percentrank_by_pos(df, "_cdi_raw", reference_mask=reference_mask).apply(clamp)
 
 
 
-def compute_dds(df, use_torvik=False):
+def compute_dds(df, use_torvik=False, reference_mask=None):
     """
     DDS — Defensive Disruption Score (BTP Metrics Spec)
 
@@ -762,10 +801,17 @@ def compute_dds(df, use_torvik=False):
             blk = df["blk_per"].fillna(0)
             pfr = df["pfr"].fillna(0)
 
-    # Position-average DRTG — computed over whatever's already in df (the
-    # qualified, >= 20% minutes pool by the time this runs), grouped by the
-    # same four-bucket pos_bucket every other BTP metric uses.
-    pos_avg_drtg = df.groupby("pos_bucket")["drtg"].transform("mean")
+    # Position-average DRTG — restricted to reference_mask (the qualified,
+    # >= 20% minutes pool) when given, same reasoning as percentrank_by_pos's
+    # reference_mask: a low-minutes player's own DRTG shouldn't dilute the
+    # "typical" DRTG everyone (including them) gets compared against. Maps
+    # the qualified-only per-position mean back onto every row, including
+    # ones excluded from computing it.
+    if reference_mask is not None:
+        qual_pos_avg_drtg = df.loc[reference_mask].groupby("pos_bucket")["drtg"].mean()
+        pos_avg_drtg = df["pos_bucket"].map(qual_pos_avg_drtg)
+    else:
+        pos_avg_drtg = df.groupby("pos_bucket")["drtg"].transform("mean")
 
     df["_dds_raw"] = (
         stops
@@ -774,10 +820,10 @@ def compute_dds(df, use_torvik=False):
         - 0.25 * pfr
     )
 
-    return percentrank_by_pos(df, "_dds_raw").apply(clamp)
+    return percentrank_by_pos(df, "_dds_raw", reference_mask=reference_mask).apply(clamp)
 
 
-def compute_sei(df, use_torvik=False):
+def compute_sei(df, use_torvik=False, reference_mask=None):
     """
     SEI — Scoring Efficiency Index
     Measures how efficiently a player scores relative to usage.
@@ -829,7 +875,7 @@ def compute_sei(df, use_torvik=False):
         fga_40_adj = fga_40.where(fga_40 > 0, usg_adj)
         df["_sei_raw"] = ts * (fga_40_adj ** 0.5)
 
-    return percentrank_by_pos(df, "_sei_raw").apply(clamp)
+    return percentrank_by_pos(df, "_sei_raw", reference_mask=reference_mask).apply(clamp)
 
 
 # ── Shot Difficulty / Adjusted SEI / Shot Creation (BTP Metrics Spec 3-5) ───────
@@ -872,7 +918,7 @@ def _shot_bucket_attempts(df):
     }
 
 
-def compute_shot_difficulty(df):
+def compute_shot_difficulty(df, reference_mask=None):
     """
     Shot Difficulty (BTP Metrics Spec section 3)
 
@@ -910,8 +956,19 @@ def compute_shot_difficulty(df):
 
     # Position-average difficulty is POOLED (sum of weighted / sum of total
     # across the group), not a mean of per-player ratios — spec section 3.
+    # Restricted to reference_mask (the qualified pool) when given, same
+    # reasoning as compute_dds's pos_avg_drtg: a low-minutes player's own
+    # attempts shouldn't dilute the baseline everyone (including them) gets
+    # compared against.
     _tmp = pd.DataFrame({"pos_bucket": df["pos_bucket"], "weighted": weighted_total, "total": attempts_total})
-    pos_sums = _tmp.groupby("pos_bucket")[["weighted", "total"]].transform("sum")
+    if reference_mask is not None:
+        _qual_sums = _tmp.loc[reference_mask].groupby("pos_bucket")[["weighted", "total"]].sum()
+        pos_sums = pd.DataFrame({
+            "weighted": df["pos_bucket"].map(_qual_sums["weighted"]),
+            "total":    df["pos_bucket"].map(_qual_sums["total"]),
+        })
+    else:
+        pos_sums = _tmp.groupby("pos_bucket")[["weighted", "total"]].transform("sum")
     pos_avg_difficulty = pos_sums["weighted"] / pos_sums["total"].replace(0, float("nan"))
 
     modifier = (df["_shot_difficulty_raw"] / pos_avg_difficulty).clip(*SHOT_DIFFICULTY_CLAMP)
@@ -923,10 +980,10 @@ def compute_shot_difficulty(df):
         print(f"  Shot Difficulty modifier clamp hits: {n_low_clamp} at {SHOT_DIFFICULTY_CLAMP[0]}, {n_high_clamp} at {SHOT_DIFFICULTY_CLAMP[1]} "
               f"(spec section 6: a large number here means the range needs widening)")
 
-    return percentrank_by_pos(df, "_shot_difficulty_raw").apply(clamp), modifier
+    return percentrank_by_pos(df, "_shot_difficulty_raw", reference_mask=reference_mask).apply(clamp), modifier
 
 
-def compute_adjusted_sei(df):
+def compute_adjusted_sei(df, reference_mask=None):
     """
     Adjusted SEI (BTP Metrics Spec section 4) — raw SEI (compute_sei's
     _sei_raw side-effect column) times the Shot Difficulty modifier. Must be
@@ -936,12 +993,12 @@ def compute_adjusted_sei(df):
     to compare (spec: "ideally with a column showing the difference").
     """
     df["_adjusted_sei_raw"] = df["_sei_raw"] * df["_shot_difficulty_modifier"]
-    adjusted_pct = percentrank_by_pos(df, "_adjusted_sei_raw").apply(clamp)
+    adjusted_pct = percentrank_by_pos(df, "_adjusted_sei_raw", reference_mask=reference_mask).apply(clamp)
     sei_diff = adjusted_pct - df["_sei"]
     return adjusted_pct, sei_diff
 
 
-def compute_shot_creation(df):
+def compute_shot_creation(df, reference_mask=None):
     """
     Shot Creation (BTP Metrics Spec section 5) — "optional, may be retired."
     weighted_unassisted_makes = makes * (1 - ASM) * bucket_weight, summed
@@ -967,10 +1024,10 @@ def compute_shot_creation(df):
         weighted_unassisted_makes += data["makes"] * (1 - asm[bucket]) * w
 
     df["_shot_creation_raw"] = weighted_unassisted_makes / weighted_makes.replace(0, float("nan"))
-    return percentrank_by_pos(df, "_shot_creation_raw").apply(clamp)
+    return percentrank_by_pos(df, "_shot_creation_raw", reference_mask=reference_mask).apply(clamp)
 
 
-def compute_ath(df, use_torvik=False):
+def compute_ath(df, use_torvik=False, reference_mask=None):
     """
     ATH — Athleticism Index
     Measures athleticism and physical impact.
@@ -989,13 +1046,13 @@ def compute_ath(df, use_torvik=False):
       Big    → explosion + contact
     """
     # ── Shared Torvik columns (available regardless of flag) ──────────────────
-    df["_dunk_vol_per"]  = percentrank_by_pos(df, "dunksmade")
-    df["_dunk_rate_per"] = percentrank_by_pos(df, "dunksmade/(dunksmiss+dunksmade)")
-    df["_rim_fin_per"]   = percentrank_by_pos(df, "rimmade/(rimmade+rimmiss)")
-    df["_ftr_per"]       = percentrank_by_pos(df, "ftr")
-    df["_stl_per_per"]   = percentrank_by_pos(df, "stl_per")
-    df["_blk_per_per"]   = percentrank_by_pos(df, "blk_per")
-    df["_orb_per_per"]   = percentrank_by_pos(df, "ORB_per")
+    df["_dunk_vol_per"]  = percentrank_by_pos(df, "dunksmade", reference_mask=reference_mask)
+    df["_dunk_rate_per"] = percentrank_by_pos(df, "dunksmade/(dunksmiss+dunksmade)", reference_mask=reference_mask)
+    df["_rim_fin_per"]   = percentrank_by_pos(df, "rimmade/(rimmade+rimmiss)", reference_mask=reference_mask)
+    df["_ftr_per"]       = percentrank_by_pos(df, "ftr", reference_mask=reference_mask)
+    df["_stl_per_per"]   = percentrank_by_pos(df, "stl_per", reference_mask=reference_mask)
+    df["_blk_per_per"]   = percentrank_by_pos(df, "blk_per", reference_mask=reference_mask)
+    df["_orb_per_per"]   = percentrank_by_pos(df, "ORB_per", reference_mask=reference_mask)
 
     if use_torvik or "sb_drb_40" not in df.columns:
         # sb_drb_40 only exists when the Supabase player_stats merge ran AND
@@ -1003,9 +1060,9 @@ def compute_ath(df, use_torvik=False):
         # absent whenever the merge simply finds nothing to merge (e.g. an
         # empty/near-empty player_stats table). Falls back to Torvik's own
         # DRB_per the same way every other sb_* access in this file does.
-        df["_drb_per_per"] = percentrank_by_pos(df, "DRB_per")
+        df["_drb_per_per"] = percentrank_by_pos(df, "DRB_per", reference_mask=reference_mask)
     else:
-        df["_drb_per_per"] = percentrank_by_pos(df, "sb_drb_40")
+        df["_drb_per_per"] = percentrank_by_pos(df, "sb_drb_40", reference_mask=reference_mask)
 
     # Fill NaN percentiles with 0 so players with no data (e.g. 0 dunks → 0/0 = NaN)
     # don't propagate NaN into component sums and inflate scores for others.
@@ -1075,10 +1132,10 @@ def compute_ath(df, use_torvik=False):
     # Weight by minutes share so rate-stat flukes from small samples rank lower
     min_weight = (df["Min_per"] / 100).clip(0.15, 1.0)
     df["_ath_raw"] = df.apply(ath_raw, axis=1) * min_weight
-    return percentrank_by_pos(df, "_ath_raw").apply(clamp)
+    return percentrank_by_pos(df, "_ath_raw", reference_mask=reference_mask).apply(clamp)
 
 
-def compute_ris(df, use_torvik=False):
+def compute_ris(df, use_torvik=False, reference_mask=None):
     """
     RIS — Rebounding Impact Score
     Measures rebounding contribution and impact.
@@ -1113,12 +1170,12 @@ def compute_ris(df, use_torvik=False):
         blk = (0.9 * df["sb_blk_40"]).fillna(0.9 * df["blk_per"]) if "sb_blk_40" in df.columns else 0.9 * df["blk_per"]
         drb = (0.4 * df["sb_drb_40"]).fillna(0.4 * df["DRB_per"]) if "sb_drb_40" in df.columns else 0.4 * df["DRB_per"]
     df["_ris_raw"] = rimmade + freethrow + orb + blk + drb
-    return percentrank_by_pos(df, "_ris_raw").apply(clamp)
+    return percentrank_by_pos(df, "_ris_raw", reference_mask=reference_mask).apply(clamp)
 
 
 
 
-def compute_nil_valuation(df):
+def compute_nil_valuation(df, reference_mask=None):
     """
     NIL Valuation matching the Weighted_Performance_Score sheet formula.
 
@@ -1237,7 +1294,7 @@ def compute_nil_valuation(df):
         (_pos == "Big")   * (_dbpm*0.30 + _dprpg*0.20 + _blk*0.30 + _drb*0.15 + _fc*0.05)
     )
     # Re-rank within position groups (0–1) so Guards compete vs Guards, etc.
-    nil_def_score = percentrank_by_pos(df, "_nil_def_raw", scale=1)
+    nil_def_score = percentrank_by_pos(df, "_nil_def_raw", scale=1, reference_mask=reference_mask)
 
     # ── IQ/Playmaking metric  (position-specific, matches BtP sheet) ────────
     # Components: eFG%, ORtg, AST%, TO% (inverted), A/TO
@@ -1252,7 +1309,7 @@ def compute_nil_valuation(df):
         (_pos == "Wing")  * (_efg*0.35 + _ortg*0.25 + _ast*0.15 + _to*0.15 + _ato*0.10) +
         (_pos == "Big")   * (_efg*0.40 + _ortg*0.30 + _ast*0.05 + _to*0.20 + _ato*0.05)
     )
-    nil_iq_score = percentrank_by_pos(df, "_nil_iq_raw", scale=1)
+    nil_iq_score = percentrank_by_pos(df, "_nil_iq_raw", scale=1, reference_mask=reference_mask)
 
     # ── Motor/Hustle metric (position-specific, matches BtP sheet) ─────────
     # Components: ORB/40, DRB/40, BLK/40, STL/40
@@ -1266,7 +1323,7 @@ def compute_nil_valuation(df):
         (_pos == "Wing")  * (_orb40*0.25 + _drb40*0.25 + _blk40*0.25 + _stl40*0.25) +
         (_pos == "Big")   * (_orb40*0.25 + _drb40*0.30 + _blk40*0.35 + _stl40*0.10)
     )
-    nil_motor_score = percentrank_by_pos(df, "_nil_motor_raw", scale=1)
+    nil_motor_score = percentrank_by_pos(df, "_nil_motor_raw", scale=1, reference_mask=reference_mask)
 
     # ── Versatility Score (position-specific, matches BtP sheet) ─────────────────
     # --- Positional Size: pos-height percentile + overall height percentile ---
@@ -1282,7 +1339,7 @@ def compute_nil_valuation(df):
             return None
     if "sb_height" in df.columns:
         df["_height_in"] = df["sb_height"].apply(height_to_inches).astype(float)
-        _h_pos = percentrank_by_pos(df, "_height_in", scale=1)
+        _h_pos = percentrank_by_pos(df, "_height_in", scale=1, reference_mask=reference_mask)
         _h_all = pr(df["_height_in"])
     else:
         _h_pos = pd.Series(0.5, index=df.index)
@@ -1293,7 +1350,7 @@ def compute_nil_valuation(df):
         (_pos == "Wing")  * (_h_pos*0.571 + _h_all*0.429) +
         (_pos == "Big")   * (_h_pos*0.333 + _h_all*0.667)
     )
-    nil_size_score = percentrank_by_pos(df, "_nil_size_raw", scale=1)
+    nil_size_score = percentrank_by_pos(df, "_nil_size_raw", scale=1, reference_mask=reference_mask)
 
     # --- Defensive Versatility: DBPM, D-PRPG, DRB%, STL%, BLK%, FC(inv) ---
     # Guard: DBPM×0.30 + DPRPG×0.15 + DRB×0.10 + STL×0.25 + BLK×0.05 + FC×0.15
@@ -1304,7 +1361,7 @@ def compute_nil_valuation(df):
         (_pos == "Wing")  * (_dbpm*0.25 + _dprpg*0.20 + _drb*0.15 + _stl*0.15 + _blk*0.15 + _fc*0.10) +
         (_pos == "Big")   * (_dbpm*0.25 + _dprpg*0.15 + _drb*0.20 + _stl*0.15 + _blk*0.25 + _fc*0.10)
     )
-    nil_defv_score = percentrank_by_pos(df, "_nil_defv_raw", scale=1)
+    nil_defv_score = percentrank_by_pos(df, "_nil_defv_raw", scale=1, reference_mask=reference_mask)
 
     # --- Lateral: same as mobility() in compute_ath ---
     # Guard: STL×0.55 + BLK×0.20 + DRB×0.25
@@ -1319,7 +1376,7 @@ def compute_nil_valuation(df):
         (_pos == "Wing")  * (_s*0.40 + _b*0.30 + _d*0.30) +
         (_pos == "Big")   * (_s*0.20 + _b*0.45 + _d*0.35)
     )
-    nil_lateral_score = percentrank_by_pos(df, "_nil_lateral_raw", scale=1)
+    nil_lateral_score = percentrank_by_pos(df, "_nil_lateral_raw", scale=1, reference_mask=reference_mask)
 
     # --- Versatility Score = Size×0.40 + DefVersatility×0.35 + Lateral×0.25 ---
     df["_nil_vers_raw"] = (
@@ -1327,7 +1384,7 @@ def compute_nil_valuation(df):
         nil_defv_score  * 0.35 +
         nil_lateral_score * 0.25
     )
-    nil_versatility_score = percentrank_by_pos(df, "_nil_vers_raw", scale=1)
+    nil_versatility_score = percentrank_by_pos(df, "_nil_vers_raw", scale=1, reference_mask=reference_mask)
 
     # Scout scores — position-weighted
     scout_scores = (
@@ -1355,10 +1412,10 @@ def compute_nil_valuation(df):
 
     df["_tpa_pg_clipped"]  = tpa_pg_clipped
     df["_tp_pct_clipped"]  = tp_pct_clipped
-    _tpa_pct_pos  = percentrank_by_pos(df, "_tpa_pg_clipped", scale=1)  # volume pct by pos
-    _tpct_pct_pos = percentrank_by_pos(df, "_tp_pct_clipped", scale=1)  # efficiency pct by pos
+    _tpa_pct_pos  = percentrank_by_pos(df, "_tpa_pg_clipped", scale=1, reference_mask=reference_mask)  # volume pct by pos
+    _tpct_pct_pos = percentrank_by_pos(df, "_tp_pct_clipped", scale=1, reference_mask=reference_mask)  # efficiency pct by pos
     df["_3pt_score_raw"] = _tpa_pct_pos * _tpct_pct_pos
-    nil_3pt_score = percentrank_by_pos(df, "_3pt_score_raw", scale=1)
+    nil_3pt_score = percentrank_by_pos(df, "_3pt_score_raw", scale=1, reference_mask=reference_mask)
 
     # Beyond the Portal metrics — position-weighted
     btp_scores = (
@@ -1503,19 +1560,22 @@ def main():
 
     print(f"  {len(df)} rows after dedup")
 
-    # Split into qualified (Min_per >= 20%, per BTP Metrics Spec) and
-    # low-minutes players. Metrics (CDI/DDS/SEI/ATH/RIS) are only computed on
-    # qualified players so small-sample outliers don't skew percentile ranks —
-    # this is also the pool percentrank_by_pos and position-average DRTG (DDS)
-    # draw from. Low-minutes players still get their basic stats written
-    # (ppg, rpg, fg_pct, etc.) but no metrics or NIL.
-    if "Min_per" in df.columns:
-        before = len(df)
-        df_low = df[df["Min_per"] < 20].copy()
-        df     = df[df["Min_per"] >= 20].reset_index(drop=True)
-        print(f"  {len(df)} rows after filtering Min_per < 20% ({before - len(df)} set aside for stats-only write)")
-    else:
-        df_low = pd.DataFrame()
+    # Everyone gets metrics now, qualified (Min_per >= 20%, per BTP Metrics
+    # Spec) or not -- but the QUALIFIED pool stays the exclusive reference
+    # population every percentile is computed against (percentrank_by_pos's
+    # reference_mask, threaded through every compute_* call below), so a
+    # low-minutes player's noisy small-sample value can never skew anyone
+    # else's rating, the same guarantee the old hard cutoff gave. What
+    # changes is that a low-minutes player's OWN rating no longer comes out
+    # blank -- it gets shrunk toward the position average afterward
+    # (shrink_toward_average, weighted by total minutes played vs. this
+    # run's season-high) instead of being set to None. See CLAUDE.md.
+    #
+    # Computed further down, AFTER the Supabase merges below and the final
+    # reset_index that precedes it -- not here. df.merge() always returns a
+    # fresh 0..N-1 index, so a mask built against THIS index would silently
+    # misalign (pandas aligns boolean Series by index label, not position)
+    # once df's index changes under it.
 
     # ── Merge Supabase player_stats into df ───────────────────────────────────
     # Gives access to ppg, apg, rpg, stl_40, blk_40, ast/40, etc. in formulas.
@@ -1632,7 +1692,7 @@ def main():
                 ]).drop_duplicates(subset=["pid"])
                 df = df.merge(_assist_df, on="pid", how="left")
                 _n_with_data = df[["assisted_pct_rim", "assisted_pct_mid", "assisted_pct_three"]].notna().any(axis=1).sum()
-                print(f"  {_n_with_data}/{len(df)} qualified players have at least one assisted-share bucket")
+                print(f"  {_n_with_data}/{len(df)} players have at least one assisted-share bucket")
             else:
                 print("  No assisted_pct_* rows found for this season — run import_pbp_shot_assists.py first if you want Shot Difficulty/Adjusted SEI/Shot Creation populated")
         except Exception as e:
@@ -1652,6 +1712,12 @@ def main():
 
     # ── Position buckets + pre-compute metrics over full df ───────────────────
     df = df.reset_index(drop=True)
+
+    if "Min_per" in df.columns:
+        qualified_mask = df["Min_per"] >= 20
+        print(f"  {int(qualified_mask.sum())}/{len(df)} rows qualify at Min_per >= 20% (the rest still get shrunk ratings, not blank ones)")
+    else:
+        qualified_mask = pd.Series(True, index=df.index)
 
     def _pos_bucket_for_row(row):
         role_raw = row.get("role", "") if "role" in df.columns else ""
@@ -1673,22 +1739,54 @@ def main():
 
     # Physical percentiles (position-relative) — used inside compute_ath
     if "sb_height" in df.columns:
-        df["_height_pct"] = percentrank_by_pos(df, "sb_height")
+        df["_height_pct"] = percentrank_by_pos(df, "sb_height", reference_mask=qualified_mask)
     if "sb_weight" in df.columns:
-        df["_weight_pct"] = percentrank_by_pos(df, "sb_weight")
+        df["_weight_pct"] = percentrank_by_pos(df, "sb_weight", reference_mask=qualified_mask)
+
+    # Season-high total minutes played (mp, straight from the Torvik CSV)
+    # this run -- shrink_toward_average's stabilization point is a fraction
+    # of this, so it scales with how far into the season this data actually
+    # is, rather than a fixed minutes floor that would unfairly shrink
+    # everyone (starters included) in the season's first few weeks. See
+    # CLAUDE.md for the full rationale.
+    _max_mp = df["mp"].max() if "mp" in df.columns else None
+    _mp_series = df["mp"] if "mp" in df.columns else pd.Series(float("nan"), index=df.index)
+
+    def _shrink(raw_pct):
+        return shrink_toward_average(raw_pct, _mp_series, _max_mp) if _max_mp else raw_pct
 
     use_torvik = args.use_torvik_data
-    df["_cdi"] = compute_cdi(df)
-    df["_dds"] = compute_dds(df, use_torvik=use_torvik)
-    df["_sei"] = compute_sei(df, use_torvik=use_torvik)
+    # Every percentrank_by_pos call inside these ranks against qualified_mask
+    # (the Min_per >= 20% pool) specifically -- never against other
+    # low-minutes players, never contaminated by one. _shrink() then pulls
+    # each player's own result toward the position average (50) by how
+    # little they've played so far, applied uniformly whether they qualify
+    # or not -- a qualified player's own minutes are already close to
+    # _max_mp, so this barely moves their number.
+    df["_cdi"] = _shrink(compute_cdi(df, reference_mask=qualified_mask))
+    df["_dds"] = _shrink(compute_dds(df, use_torvik=use_torvik, reference_mask=qualified_mask))
+    df["_sei"] = _shrink(compute_sei(df, use_torvik=use_torvik, reference_mask=qualified_mask))
     # Shot Difficulty / Adjusted SEI — must run after compute_sei (reads its
     # _sei_raw/_sei side-effect columns). See each function's docstring.
-    df["_shot_difficulty"], _shot_difficulty_modifier = compute_shot_difficulty(df)
-    df["_adjusted_sei"], df["_sei_diff"] = compute_adjusted_sei(df)
-    df["_shot_creation"] = compute_shot_creation(df)
-    df["_ath"] = compute_ath(df, use_torvik=use_torvik)
-    df["_ris"] = compute_ris(df, use_torvik=use_torvik)
-    df["_nil"], df["_nil_low"], df["_nil_high"], df["_projected_tier"], df["_nil_perf_score"] = compute_nil_valuation(df)
+    # sei_diff is computed here (not taken from compute_adjusted_sei's own
+    # return) so it's the difference of the two SHRUNK percentiles, not a
+    # stale unshrunk adjusted_pct minus the already-shrunk df["_sei"].
+    _shot_difficulty_pct, _shot_difficulty_modifier = compute_shot_difficulty(df, reference_mask=qualified_mask)
+    df["_shot_difficulty"] = _shrink(_shot_difficulty_pct)
+    _adjusted_sei_pct, _ = compute_adjusted_sei(df, reference_mask=qualified_mask)
+    df["_adjusted_sei"] = _shrink(_adjusted_sei_pct)
+    df["_sei_diff"] = df["_adjusted_sei"] - df["_sei"]
+    df["_shot_creation"] = _shrink(compute_shot_creation(df, reference_mask=qualified_mask))
+    df["_ath"] = _shrink(compute_ath(df, use_torvik=use_torvik, reference_mask=qualified_mask))
+    df["_ris"] = _shrink(compute_ris(df, use_torvik=use_torvik, reference_mask=qualified_mask))
+    # NIL reads df["_cdi"]/df["_sei"]/etc. for its weighted sum (see
+    # compute_nil_valuation), which are the SHRUNK values by this point, so
+    # NIL inherits the shrinkage for its five biggest inputs automatically.
+    # Its own internal sub-scores (def/iq/motor/size/lateral/versatility)
+    # still rank against qualified_mask so they can't be corrupted by a
+    # low-minutes player's presence, but aren't individually re-shrunk —
+    # their combined weight is small next to the five that already are.
+    df["_nil"], df["_nil_low"], df["_nil_high"], df["_projected_tier"], df["_nil_perf_score"] = compute_nil_valuation(df, reference_mask=qualified_mask)
 
     # ── Specialist tags ───────────────────────────────────────────────────────
     _total_fga   = (df["twoPA"].fillna(0) + df["TPA"].fillna(0)).replace(0, float("nan"))
@@ -2064,125 +2162,6 @@ def main():
             writer.writeheader()
             writer.writerows(nil_changes)
         print(f"  → NIL changes written to {out_path} ({len(nil_changes)} players updated)")
-
-    # ── Write basic stats for low-minutes players (no metrics, no NIL) ───────
-    if not df_low.empty and not args.dry_run:
-        written = 0
-        created_low = 0
-        for _, row in df_low.iterrows():
-            name = str(row.get("player_name", "")).strip()
-            team = str(row.get("team", "")).strip()
-            torvik_pid_val = int(row["pid"]) if str(row.get("pid", "")).strip().isdigit() else None
-            player_id = pid_lookup.get(torvik_pid_val) if torvik_pid_val else None
-            if not player_id:
-                _mr = mu_match(name, team, player_lookup)
-                player_id = _mr.player_id
-            if not player_id:
-                # Same reasoning as the qualified-players loop above: create
-                # a new players row directly from Torvik rather than silently
-                # dropping a player nothing else has ever scraped in. This
-                # loop never otherwise touches the players table (stats-only,
-                # "no metrics, no NIL"), so the insert here fills in
-                # positions/year/height itself rather than relying on a
-                # later patch -- there isn't one for this path.
-                if args.skip_team_sync or args.historical:
-                    continue
-                _low_role_raw = row.get("role", "")
-                _low_role_str = str(_low_role_raw).strip().lower()
-                _low_positions = []
-                if _low_role_str and _low_role_str != "nan":
-                    _low_positions = torvik_role_to_positions(_low_role_raw)
-                    if not _low_positions:
-                        _low_positions = list(_BUCKET_TO_POSITIONS.get(normalise_pos(_low_role_raw), []))
-                _low_yr_raw = str(row.get("yr", "")).strip()
-                _low_ht = str(row.get("ht", "")).strip()
-                try:
-                    _res = db.table("players").insert({
-                        "name":             name,
-                        "current_team":     display_school(team),
-                        "primary_position": _low_positions[0] if _low_positions else None,
-                        "positions":        _low_positions or None,
-                        "year":             {"Fr": "Freshman", "So": "Sophomore", "Jr": "Junior", "Sr": "Senior", "Gr": "Graduate"}.get(_low_yr_raw, _low_yr_raw or None),
-                        "height":           _low_ht if _low_ht and _low_ht not in ("nan", "") else None,
-                        "source":           "torvik",
-                        "on_board":         True,
-                        "torvik_pid":       torvik_pid_val,
-                    }).execute()
-                    player_id = _res.data[0]["id"]
-                except Exception as e:
-                    print(f"  ✗ Failed to create {name} ({team}): {e}")
-                    continue
-                created_low += 1
-                print(f"  + Created new player (low-minutes): {name} ({team})")
-
-            _gp    = int(safe(row.get("GP"), 0) or 0)
-            _twoPM = safe(row.get("twoPM")); _twoPA = safe(row.get("twoPA"))
-            _tpm   = safe(row.get("TPM"));   _tpa   = safe(row.get("TPA"))
-            _fgm   = (_twoPM or 0) + (_tpm or 0)
-            _fga   = (_twoPA or 0) + (_tpa or 0)
-
-            stats_patch = {
-                "torvik_ortg":    safe(row.get("ORtg")),
-                "torvik_usg":     safe(row.get("usg")),
-                "torvik_efg":     safe(row.get("eFG")),
-                "torvik_ts":      safe(row.get("TS_per")),
-                "torvik_obpm":    safe(row.get("obpm")),
-                "torvik_dbpm":    safe(row.get("dbpm")),
-                "torvik_bpm":     safe(row.get("bpm")),
-                "torvik_drtg":    safe(row.get("drtg")),
-                "torvik_stops":   safe(row.get("stops")),
-                "torvik_ast_pct": safe(row.get("AST_per")),
-                "torvik_to_pct":  safe(row.get("TO_per")),
-                "torvik_orb_pct": safe(row.get("ORB_per")),
-                "torvik_drb_pct": safe(row.get("DRB_per")),
-                "torvik_rim_pct": safe(row.get("rimmade/(rimmade+rimmiss)")),
-                "torvik_mid_pct": safe(row.get("midmade/(midmade+midmiss)")),
-                "torvik_3p_pct":  safe(row.get("TP_per")),
-                "torvik_porpag":  safe(row.get("porpag")),
-                "torvik_adjoe":   safe(row.get("adjoe")),
-                "torvik_min_pct": safe(row.get("Min_per")),
-                "torvik_gp":      _gp,
-                "torvik_blk_pct": safe(row.get("blk_per")),
-                "torvik_stl_pct": safe(row.get("stl_per")),
-                "torvik_ftr":     safe(row.get("ftr")),
-                "torvik_pfr":     safe(row.get("pfr")),
-                "torvik_adrtg":   safe(row.get("adrtg")),
-                "torvik_dporpag": safe(row.get("dporpag")),
-                "torvik_ogbpm":   safe(row.get("ogbpm")),
-                "torvik_dgbpm":   safe(row.get("dgbpm")),
-                "torvik_gbpm":    safe(row.get("gbpm")),
-                "torvik_rec_rank":safe(row.get("Rec_Rank")),
-                "ppg":    round(safe(row.get("pts")),  1) if safe(row.get("pts"))  is not None else None,
-                "rpg":    round(safe(row.get("treb")), 1) if safe(row.get("treb")) is not None else None,
-                "apg":    round(safe(row.get("ast")),  1) if safe(row.get("ast"))  is not None else None,
-                "fg_pct": round((_fgm / _fga) * 100, 1) if _fga else None,
-                "3p_pct": round((safe(row.get("TP_per")) or 0) * 100, 1) if safe(row.get("TP_per")) is not None else None,
-                "ft_pct": round((safe(row.get("FT_per")) or 0) * 100, 1) if safe(row.get("FT_per")) is not None else None,
-                "usg":     safe(row.get("usg")),
-                "ast_tov": safe(row.get("ast/tov")),
-                "cdi": None, "dds": None, "sei": None, "ath": None, "ris": None,
-                "shot_difficulty": None, "shot_difficulty_modifier": None,
-                "adjusted_sei": None, "sei_diff": None, "shot_creation": None,
-                "name":   name,
-                # Same reasoning as the qualified-players loop above: this
-                # row's calendar_year is still the player's CURRENT season,
-                # so with --skip-team-sync its school should follow the
-                # live current_team, not the borrowed CSV's team.
-                "school": (_pl_map.get(player_id, {}).get("current_team") if args.skip_team_sync else None) or display_school(team),
-                "year":   {"Fr": "Freshman", "So": "Sophomore", "Jr": "Junior", "Sr": "Senior", "Gr": "Graduate"}.get(str(row.get("yr", "")).strip(), str(row.get("yr", "")).strip()),
-                "calendar_year": args.year,
-            }
-
-            stats_id = stats_lookup.get((player_id, args.year))
-            if stats_id:
-                db.table("player_stats").update(stats_patch).eq("id", stats_id).execute()
-            else:
-                db.table("player_stats").insert({
-                    **stats_patch,
-                    "player_id":     player_id,
-                }).execute()
-            written += 1
-        print(f"  Wrote basic stats for {written} low-minutes players (no metrics/NIL), {created_low} newly created")
 
     if args.dry_run:
         print("(dry-run — nothing written)")
