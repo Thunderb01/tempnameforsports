@@ -1832,7 +1832,7 @@ def main():
                 res = db.table("w_players").insert({
                     "name":         name,
                     "current_team": new_school,
-                    "source":       "torvik",
+                    "source":       "program",
                     "on_board":     True,
                     "torvik_pid":   torvik_pid_val,
                 }).execute()
