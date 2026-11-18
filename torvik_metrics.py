@@ -1902,6 +1902,11 @@ def main():
             for p in players
             if p.get("torvik_pid") is not None
         }
+        # Reverse of pid_lookup: player_id -> torvik_pid (or None if never
+        # recorded). Used below to guard against match_utils's name-only
+        # fallback merging two DIFFERENT real people who share a name --
+        # see the torvik_pid-conflict guard at the match site.
+        id_to_pid = {p["id"]: p.get("torvik_pid") for p in players}
         # Track existing heights so we only backfill blanks
         player_height_lookup = {
             p["id"]: p.get("height")
@@ -2065,6 +2070,26 @@ def main():
         if not player_id:
             _mr = mu_match(name, team, player_lookup)
             player_id = _mr.player_id
+            # Guard against match_utils's "name-only, unique across teams"
+            # fallback merging two DIFFERENT real people who happen to share
+            # a name -- confirmed in production 2026-11-13 ("Trent Perry",
+            # UCLA pid 126582 vs Kansas pid 145270, got combined into one
+            # players row). match_player() has no pid context at all, so it
+            # can't tell them apart on its own; we can, here, since this CSV
+            # row carries this season's real torvik_pid. If the matched
+            # player_id already has a DIFFERENT, known torvik_pid on file,
+            # that's positive evidence they're not the same person -- reject
+            # the match so this row creates its own new player instead of
+            # overwriting someone else's identity/stats. A matched player
+            # with NO torvik_pid on file yet is left alone (no contradicting
+            # evidence, not a reason to reject).
+            if player_id and torvik_pid_val is not None:
+                existing_pid = id_to_pid.get(player_id)
+                if existing_pid is not None and existing_pid != torvik_pid_val:
+                    print(f"  ⚠ {name} ({team}, pid {torvik_pid_val}) name-matched an existing "
+                          f"player with a different torvik_pid ({existing_pid}) -- treating as a "
+                          f"different person, not overwriting that row")
+                    player_id = None
 
         if not player_id:
             # Create a new players row directly from this Torvik CSV row --

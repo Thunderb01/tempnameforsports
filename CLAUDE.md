@@ -50,6 +50,41 @@ rewriting the upsert as select-then-insert-or-update.
    bypassing the helper later.
 4. Update this table.
 
+**Two different real people can share a name — `match_player()`'s name-only
+fallback doesn't know that, and in production (2026-11-13) it merged two
+real players into one row.** `match_player()`'s matching order includes a
+step 2, "exact name, any team, only if unique by name" — built to handle a
+legitimate case (a stale/mismatched team string for a player who's actually
+unique). But "unique by name in the lookup" isn't the same thing as "the
+same person" — Trent Perry (UCLA, Torvik pid 126582, Jr) and Trent Perry
+(Kansas, pid 145270, Fr) are two different real freshman/transfer-portal
+prospects who happen to share a name, confirmed directly in
+`data/torvik_2027.csv`. `match_player()` itself has no pid context to catch
+this (its `lookup` dict is keyed on `(norm_name, norm_team)` only), and its
+other caller (`import_portal.py`, matching portal-announcement text) has no
+pid to give it either — so the fix isn't inside `match_player()`, it's at
+the two call sites that DO have pid context: `torvik_metrics.py`/
+`torvik_metrics_w.py` build an `id_to_pid` reverse lookup (`player_id ->
+torvik_pid`, from the same already-fetched `players`/`w_players` rows used
+for `pid_lookup`) and, right after `mu_match()` returns a name-based match,
+check it: if this CSV row's `torvik_pid` is known and the matched
+`player_id` already has a *different*, non-null `torvik_pid` on file,
+that's positive evidence they're not the same person — reject the match
+(falls through to the existing "create a new player" path) instead of
+overwriting someone else's identity/stats/team. A matched player with *no*
+`torvik_pid` on file yet (a pre-pid-tracking legacy row) is left alone —
+absence of a pid isn't contradicting evidence, so the legitimate
+stale-team case this fallback exists for still works. Verified end-to-end:
+seeding UCLA's Trent Perry (pid 126582) and running the real CSV (which
+also has Kansas's, pid 145270) now creates a second, separate row instead
+of overwriting UCLA's; a legacy no-pid row for a genuinely unique name
+(Steele Venters) still correctly backfills via the name-only path, same as
+before. **This only prevents the merge going forward — it does not repair
+whichever single row already absorbed both real people's data in
+production before this fix shipped.** That needs a manual look at the
+affected row's `player_stats` history (which season's row actually belongs
+to which real person) before splitting it apart; not attempted here.
+
 ---
 
 ## State that's local vs. shared

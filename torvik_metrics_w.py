@@ -1728,6 +1728,8 @@ def main():
             for p in players
             if p.get("torvik_pid") is not None
         }
+        # Reverse of pid_lookup -- mirrors torvik_metrics.py's identical fix.
+        id_to_pid = {p["id"]: p.get("torvik_pid") for p in players}
         # Track existing heights so we only backfill blanks
         player_height_lookup = {
             p["id"]: p.get("height")
@@ -1889,6 +1891,16 @@ def main():
         if not player_id:
             _mr = mu_match(name, team, player_lookup)
             player_id = _mr.player_id
+            # Guard against match_utils's name-only fallback merging two
+            # different real people who share a name -- mirrors
+            # torvik_metrics.py's identical fix exactly.
+            if player_id and torvik_pid_val is not None:
+                existing_pid = id_to_pid.get(player_id)
+                if existing_pid is not None and existing_pid != torvik_pid_val:
+                    print(f"  ⚠ {name} ({team}, pid {torvik_pid_val}) name-matched an existing "
+                          f"player with a different torvik_pid ({existing_pid}) -- treating as a "
+                          f"different person, not overwriting that row")
+                    player_id = None
 
         if not player_id:
             # Create a new w_players row directly from this Torvik CSV row --
