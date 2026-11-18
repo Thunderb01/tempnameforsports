@@ -103,7 +103,7 @@ except ImportError:
 from db_retry import run_query
 
 try:
-    from match_utils import build_lookup, match_player as mu_match, norm_name
+    from match_utils import norm_name
 except ImportError:
     sys.exit("match_utils.py not found — make sure it's in the same directory.")
 
@@ -1562,9 +1562,11 @@ def main():
         for r in _ps_rows:
             pl = _pl_map.get(r["player_id"], {})
             if pl:
-                # Always use players.current_team as the team key so _sb_df and
-                # player_lookup both resolve to the same string — avoids mismatches
-                # caused by player_stats.school diverging from players.current_team
+                # Always use players.current_team as the team key, not
+                # player_stats.school -- the two can diverge (a team name
+                # edited on the player row after the fact, e.g.) and this
+                # keeps _sb_team consistent with whatever the player row
+                # itself says.
                 school = pl.get("current_team", "") or r.get("school", "")
                 _sb_stats.append({
                     "_sb_name": norm_name(pl["name"]),
@@ -1720,16 +1722,16 @@ def main():
 
         print(f"  {len(players)} players in Supabase")
 
-        # Build lookup: (norm_name, norm_team) → player_id  (via match_utils)
-        player_lookup = build_lookup(players)
-        # Build PID lookup: torvik_pid (int) → player_id
+        # Build PID lookup: torvik_pid (int) → player_id. torvik_pid is the
+        # ONLY identity key now -- no name/team fallback. Mirrors
+        # torvik_metrics.py's identical change exactly; see that file for
+        # the full rationale (name-based matching merged two different real
+        # players in production 2026-11-13).
         pid_lookup = {
             p["torvik_pid"]: p["id"]
             for p in players
             if p.get("torvik_pid") is not None
         }
-        # Reverse of pid_lookup -- mirrors torvik_metrics.py's identical fix.
-        id_to_pid = {p["id"]: p.get("torvik_pid") for p in players}
         # Track existing heights so we only backfill blanks
         player_height_lookup = {
             p["id"]: p.get("height")
@@ -1768,12 +1770,12 @@ def main():
                 "ath": r.get("ath"), "ris": r.get("ris"), "nil_valuation": r.get("nil_valuation"),
             }
     else:
-        player_lookup          = {}
-        player_height_lookup   = {}
-        player_nil_lookup      = {}
-        stats_lookup           = {}
-        already_matched        = set()
-        _history_by_player     = {}
+        pid_lookup            = {}
+        player_height_lookup  = {}
+        player_nil_lookup     = {}
+        stats_lookup          = {}
+        already_matched       = set()
+        _history_by_player    = {}
 
     # ── Process each row ──────────────────────────────────────────────────────
     matched        = 0
@@ -1885,22 +1887,11 @@ def main():
             continue
 
         # ── Match to Supabase ─────────────────────────────────────────────────
-        # Prefer torvik_pid (exact) over name+team (fuzzy via match_utils)
+        # torvik_pid is the ONLY identity key -- no name/team fallback.
+        # Mirrors torvik_metrics.py's identical change exactly; see that
+        # file for the full rationale.
         torvik_pid_val = int(row["pid"]) if str(row.get("pid", "")).strip().isdigit() else None
         player_id = pid_lookup.get(torvik_pid_val) if torvik_pid_val else None
-        if not player_id:
-            _mr = mu_match(name, team, player_lookup)
-            player_id = _mr.player_id
-            # Guard against match_utils's name-only fallback merging two
-            # different real people who share a name -- mirrors
-            # torvik_metrics.py's identical fix exactly.
-            if player_id and torvik_pid_val is not None:
-                existing_pid = id_to_pid.get(player_id)
-                if existing_pid is not None and existing_pid != torvik_pid_val:
-                    print(f"  ⚠ {name} ({team}, pid {torvik_pid_val}) name-matched an existing "
-                          f"player with a different torvik_pid ({existing_pid}) -- treating as a "
-                          f"different person, not overwriting that row")
-                    player_id = None
 
         if not player_id:
             # Create a new w_players row directly from this Torvik CSV row --
@@ -1910,7 +1901,7 @@ def main():
             # run before this fix -- same root cause applies here).
             if args.skip_team_sync or args.historical:
                 unmatched += 1
-                match_method = "pid" if torvik_pid_val else "name+team"
+                match_method = "pid" if torvik_pid_val else "no pid in csv row"
                 print(f"  ✗ NO MATCH ({match_method}): {name} ({team})")
                 unmatched_rows.append({"name": name, "team": team, "yr": yr})
                 continue

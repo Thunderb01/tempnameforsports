@@ -50,40 +50,42 @@ rewriting the upsert as select-then-insert-or-update.
    bypassing the helper later.
 4. Update this table.
 
-**Two different real people can share a name — `match_player()`'s name-only
-fallback doesn't know that, and in production (2026-11-13) it merged two
-real players into one row.** `match_player()`'s matching order includes a
-step 2, "exact name, any team, only if unique by name" — built to handle a
-legitimate case (a stale/mismatched team string for a player who's actually
-unique). But "unique by name in the lookup" isn't the same thing as "the
-same person" — Trent Perry (UCLA, Torvik pid 126582, Jr) and Trent Perry
-(Kansas, pid 145270, Fr) are two different real freshman/transfer-portal
-prospects who happen to share a name, confirmed directly in
-`data/torvik_2027.csv`. `match_player()` itself has no pid context to catch
-this (its `lookup` dict is keyed on `(norm_name, norm_team)` only), and its
-other caller (`import_portal.py`, matching portal-announcement text) has no
-pid to give it either — so the fix isn't inside `match_player()`, it's at
-the two call sites that DO have pid context: `torvik_metrics.py`/
-`torvik_metrics_w.py` build an `id_to_pid` reverse lookup (`player_id ->
-torvik_pid`, from the same already-fetched `players`/`w_players` rows used
-for `pid_lookup`) and, right after `mu_match()` returns a name-based match,
-check it: if this CSV row's `torvik_pid` is known and the matched
-`player_id` already has a *different*, non-null `torvik_pid` on file,
-that's positive evidence they're not the same person — reject the match
-(falls through to the existing "create a new player" path) instead of
-overwriting someone else's identity/stats/team. A matched player with *no*
-`torvik_pid` on file yet (a pre-pid-tracking legacy row) is left alone —
-absence of a pid isn't contradicting evidence, so the legitimate
-stale-team case this fallback exists for still works. Verified end-to-end:
-seeding UCLA's Trent Perry (pid 126582) and running the real CSV (which
-also has Kansas's, pid 145270) now creates a second, separate row instead
-of overwriting UCLA's; a legacy no-pid row for a genuinely unique name
-(Steele Venters) still correctly backfills via the name-only path, same as
-before. **This only prevents the merge going forward — it does not repair
-whichever single row already absorbed both real people's data in
-production before this fix shipped.** That needs a manual look at the
-affected row's `player_stats` history (which season's row actually belongs
-to which real person) before splitting it apart; not attempted here.
+**`torvik_metrics.py`/`torvik_metrics_w.py` now match players by
+`torvik_pid` ONLY — no name/team fallback, by explicit decision
+(2026-11-13).** Two different real people can share a name:
+`match_player()`'s old "exact name, any team, only if unique by name"
+fallback step had no `torvik_pid` context at all, and merged Trent Perry
+(UCLA, Torvik pid 126582, Jr) and Trent Perry (Kansas, pid 145270, Fr) —
+two different real freshman/transfer-portal prospects, confirmed directly
+in `data/torvik_2027.csv` — into one `players` row. A narrower guard
+(reject a name-match only when it conflicts with a different *known*
+pid) was tried first and worked, but the call was made to go further and
+remove name-matching from this path entirely: `pid_lookup` (torvik_pid →
+player_id) is now the only way a CSV row resolves to an existing player.
+`build_lookup`/`match_player` (`match_utils.py`) are both still imported
+and used elsewhere (`import_portal.py`) — only these two files' own match
+site changed; `match_utils.py` itself wasn't touched, since its other
+caller has no pid to give it anyway.
+
+**Known, accepted consequence: any existing `players`/`w_players` row with
+no `torvik_pid` on file is no longer findable at all, and the next
+pipeline run creates a brand-new duplicate for that player instead of
+updating their real row.** Neither `scraper_to_supabase.py` nor
+`import_portal.py` ever sets `torvik_pid` on creation, so this isn't
+theoretical — it's every player who was ever added through either of
+those paths and hasn't since been through a *successful* Torvik-CSV
+match (which used to backfill `torvik_pid` onto their row regardless of
+whether the match came from `pid_lookup` or the name fallback; that
+backfill path is gone along with the fallback that fed it). Confirmed by
+test: seeding a legacy no-pid row for a genuinely unique name and running
+the real CSV created a second, duplicate row instead of updating the
+first. No backfill pass was run before this shipped — current on-board
+players are likely covered already from recent pipeline runs (the
+backfill-while-name-matching era), but anyone who isn't will duplicate on
+their next match. If that turns out to matter in practice, the fix is a
+one-time repair pass (name-match once, write `torvik_pid` only, touch
+nothing else) run before trusting pid-only matching for that player going
+forward — not attempted here, by request.
 
 ---
 
