@@ -116,6 +116,22 @@ PF-without-C falls back to Big, same as the old 3-bucket behavior — Stretch
 4 stays coarsely bucketed as Big on the board (a known, accepted imprecision)
 rather than guessing.
 
+### Player tags (`src/lib/playerTags.js`) — rule-based, ported from the Excel tag sheet
+
+`getPlayerTags(input)` is pure: zero-or-more `{ name, category }` tags in
+`TAG_RULES` order. `tagInputsFromRepo(player, statsRow)` builds its input
+from a players row + `player_stats` row. Not wired into any UI yet.
+- Metric thresholds are written as `idx(<Excel index>)` and converted in
+  `src/lib/playerTagsConfig.js` (`IDX_TABLE`) — the only place that
+  conversion lives. While any entry is `null`, `idx()` throws and every
+  metric-based tag is skipped; never fill entries by interpolation.
+- Missing input → that tag is skipped. Never coerce to 0 (the Excel did).
+- Position reuses the Full Board bucket (`legacyBucketFor()`). The Excel
+  only had Guard/Wing/Big, so Forward is an open question: Guard-only rules
+  treat it as non-Guard, and Slasher (Guard or Wing) is skipped for it.
+- Shotmaking tags are unimplemented: `player_stats.smi` is never populated.
+- Tests: `scripts/test-player-tags.mjs`, part of `npm run build`.
+
 ### Metric peer groups: 4-bucket (Guard/Wing/Forward/Big), per the BTP Metrics Spec
 
 `torvik_metrics.py`/`torvik_metrics_w.py`'s `normalise_pos` / `percentrank_by_pos`
