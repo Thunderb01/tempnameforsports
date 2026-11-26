@@ -2,6 +2,8 @@
 // Shared display/formatting utilities used across pages and components.
 // Import what you need: import { money, projectedTier, ... } from "@/lib/display";
 
+import { HM_PLAYER_CEILING, scaleLegacyDollars } from "@/lib/nilBudget";
+
 // ── Currency ──────────────────────────────────────────────────────────────────
 export function money(n) {
   return Number(n || 0).toLocaleString(undefined, {
@@ -20,21 +22,25 @@ export function nilRange(low, high) {
 // ── Overall rating (2K-style) ───────────────────────────────────────────────
 // Public-facing player VALUE is shown as a 60–99 "Overall", not a NIL dollar
 // figure. Monotonic in the underlying (calculated) value so the ranking order is
-// identical — the $3M cap maps to 99. Returns null for unrated (value ≤ 0) so
-// callers can show "—"/"N/A" instead of a misleading floor rating.
-const OVERALL_VALUE_CAP = 3_000_000;
-export function overallRating(value) {
+// identical — the per-player ceiling maps to 99. Returns null for unrated
+// (value ≤ 0) so callers can show "—"/"N/A" instead of a misleading floor rating.
+//
+// `ceiling` is the per-player dollar cap the value was computed under: the
+// high-major ceiling (30% × $20M) for men's current season by default; pass
+// valueCeilingFor({ sport, season }) from @/lib/nilBudget for women's or an
+// archived pre-revamp season, which are still on the legacy $3M scale.
+export function overallRating(value, ceiling = HM_PLAYER_CEILING) {
   const v = Math.max(0, Number(value) || 0);
   if (v <= 0) return null;
   const FLOOR = 60, CEIL = 99;
-  return Math.round(FLOOR + (CEIL - FLOOR) * Math.sqrt(Math.min(v / OVERALL_VALUE_CAP, 1)));
+  return Math.round(FLOOR + (CEIL - FLOOR) * Math.sqrt(Math.min(v / ceiling, 1)));
 }
 
 // Pick the best available calculated value off a player-shaped object and rate it.
-export function overallFor(p) {
+export function overallFor(p, ceiling = HM_PLAYER_CEILING) {
   if (!p) return null;
   const v = p.marketHigh ?? p.open_market_high ?? p.nilValuation ?? p.nil_valuation ?? 0;
-  return overallRating(v);
+  return overallRating(v, ceiling);
 }
 
 // Color for a 60–99 overall (reuses the 0–100 metric palette).
@@ -111,13 +117,16 @@ export const PROJECTED_TIER_OPTIONS = [
 // Domestic: NIL valuation → tier label. The labels below MUST stay in sync with
 // torvik_metrics.py's assign_tier(), since the DB column players.projected_tier
 // is populated by that script.
-export function projectedTier(v) {
+// Thresholds are written on the legacy $3M-cap scale and rescaled to `ceiling`
+// (see overallRating above for what to pass).
+export function projectedTier(v, ceiling = HM_PLAYER_CEILING) {
   v = Number(v) || 0;
-  if (v >= 2_000_000) return "HM All-American / Pre-Draft";
-  if (v >= 1_200_000) return "HM All-Conference";
-  if (v >=   400_000) return "HM Starter / MM All-Conference";
-  if (v >=   200_000) return "HM Rotation / MM Starter";
-  if (v >=   100_000) return "MM Starter / LM All-Conference";
+  const t = amt => scaleLegacyDollars(amt, ceiling);
+  if (v >= t(2_000_000)) return "HM All-American / Pre-Draft";
+  if (v >= t(1_200_000)) return "HM All-Conference";
+  if (v >= t(  400_000)) return "HM Starter / MM All-Conference";
+  if (v >= t(  200_000)) return "HM Rotation / MM Starter";
+  if (v >= t(  100_000)) return "MM Starter / LM All-Conference";
   return "LM Rotation";
 }
 

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { money, nilRange, tierColor, projectedTier, overallFor, overallColor } from "@/lib/display";
+import { valueCeilingFor } from "@/lib/nilBudget";
 import { positionLabel } from "@/lib/positions";
 import { SkillProfile, PENTAGON_METRICS } from "@/components/SkillProfile";
 import { useNilVisible } from "@/hooks/useNilVisible";
@@ -50,7 +51,9 @@ const ADV_ROWS = [
 //   { key: "ris", label: "RIS" },
 // ];
 
-export function PlayerModal({ player, onClose, onReplace, sport = "mens" }) {
+// `season`: pass when showing an archived season, so pre-revamp valuations
+// are rated on the legacy dollar scale (see valueCeilingFor in @/lib/nilBudget).
+export function PlayerModal({ player, onClose, onReplace, sport = "mens", season = null }) {
   const navigate = useNavigate();
   const [stats, setStats] = useState(null);
   const [loadingStats, setLoadingStats] = useState(true);
@@ -59,7 +62,8 @@ export function PlayerModal({ player, onClose, onReplace, sport = "mens" }) {
   const [archetypes, setArchetypes] = useState([]);
   const [archColors, setArchColors] = useState({});
   const [nilVisible] = useNilVisible();
-  const overall = overallFor(player);
+  const valueCeiling = valueCeilingFor({ sport, season });
+  const overall = overallFor(player, valueCeiling);
   // Multi-season blend (CLAUDE.md "Overall (multi-season) rating") -- a
   // different number from the market-value `overall` above. null on any
   // player the pipeline hasn't recomputed since the *_overall columns were
@@ -168,7 +172,7 @@ export function PlayerModal({ player, onClose, onReplace, sport = "mens" }) {
               </div>
             )}
             {player.nilValuation > 0 && (() => {
-              const label = projectedTier(player.nilValuation);
+              const label = projectedTier(player.nilValuation, valueCeiling);
               const color = tierColor(label);
               return (
                 <div style={{ marginTop: 6, display: "inline-block", padding: "3px 10px", borderRadius: 20, fontSize: 12, fontWeight: 600, background: `${color}22`, color, border: `1px solid ${color}55` }}>

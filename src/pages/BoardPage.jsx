@@ -10,6 +10,7 @@ import { supabase }        from "@/lib/supabase";
 import { getTeamConference } from "@/lib/teamLookup";
 import { useTeamLogos } from "@/hooks/useTeamLogos";
 import { money, nilValue, nilRange, heightToInches, tierColor, projectedTier, overallFor, overallColor } from "@/lib/display";
+import { valueCeilingFor, scaleLegacyDollars } from "@/lib/nilBudget";
 import { useNilVisible } from "@/hooks/useNilVisible";
 import { MultiSelectFilter, RangeFilter, FilterChips, FilterField, parseHeight, formatHeight, playerHeightInches } from "@/components/Filters";
 import { NLSearch } from "@/components/NLSearch";
@@ -29,7 +30,9 @@ const COLS = [
   { label: "PPG",       get: p => p.stats?.ppg    ?? "—" },
   { label: "RPG",       get: p => p.stats?.rpg    ?? "—" },
   { label: "APG",       get: p => p.stats?.apg    ?? "—" },
-  { label: "OVR",       get: p => overallFor(p) ?? "—" },
+  // `ceiling` = per-player dollar cap this board's values were computed under
+  // (women's / pre-revamp archive seasons are on the legacy scale).
+  { label: "OVR",       get: (p, ceiling) => overallFor(p, ceiling) ?? "—" },
   { label: "Mkt Low",   get: p => nilValue(p.marketLow),  nilOnly: true },
   { label: "Mkt High",  get: p => nilValue(p.marketHigh), nilOnly: true },
   { label: "To Team",   get: p => p._toTeam || "—" },
@@ -97,6 +100,7 @@ async function loadArchiveBoard(table, season) {
 export function BoardPage({ sport = "men", season = null, title = "Full Board", headerExtra = null }) {
   const isWomens = sport === "women";
   const archiveMode = season != null;
+  const valueCeiling = valueCeilingFor({ sport, season });
   const useBoardHook = isWomens ? useWomensRosterBoard : useRosterBoard;
 
   const { profile, user } = useAuth();
@@ -192,8 +196,8 @@ export function BoardPage({ sport = "men", season = null, title = "Full Board", 
     { key: "fg_pct",     label: "FG%",                      src: "stat",   lo: 30,  hi: 65      },
     { key: "3p_pct",     label: "3P%",                      src: "stat",   lo: 20,  hi: 50      },
     { key: "ft_pct",     label: "FT%",                      src: "stat",   lo: 40,  hi: 100     },
-    { key: "marketLow",  label: "NIL Market Low ($)",       src: "player", lo: 0,   hi: 500000  },
-    { key: "marketHigh", label: "NIL Market High ($)",      src: "player", lo: 0,   hi: 2000000 },
+    { key: "marketLow",  label: "NIL Market Low ($)",       src: "player", lo: 0,   hi: scaleLegacyDollars(500000,  valueCeiling) },
+    { key: "marketHigh", label: "NIL Market High ($)",      src: "player", lo: 0,   hi: scaleLegacyDollars(2000000, valueCeiling) },
   ];
   const emptyAdvc = () => Object.fromEntries(ADVC_FIELDS.map(f => [f.key, { min: "", max: "" }]));
   // Short suggestion text for the Min/Max placeholders — the narrow NIL
@@ -425,8 +429,8 @@ export function BoardPage({ sport = "men", season = null, title = "Full Board", 
     const col = COLS.find(c => c.label === sortKey);
     if (!col) return filtered;
     return [...filtered].sort((a, b) => {
-      const av = col.get(a);
-      const bv = col.get(b);
+      const av = col.get(a, valueCeiling);
+      const bv = col.get(b, valueCeiling);
       let cmp;
       if (sortKey === "Ht") {
         cmp = heightToInches(av) - heightToInches(bv);
@@ -439,7 +443,7 @@ export function BoardPage({ sport = "men", season = null, title = "Full Board", 
       }
       return sortDir === "asc" ? cmp : -cmp;
     });
-  }, [filtered, sortKey, sortDir]);
+  }, [filtered, sortKey, sortDir, valueCeiling]);
 
   // ── Roster state helpers (delegated to shared useRosterBoard hook) ──────────
   function inRoster(id)    { return board.inRoster(id); }
@@ -747,8 +751,8 @@ export function BoardPage({ sport = "men", season = null, title = "Full Board", 
                           );
                         })()}
                         <div className="row-sub">
-                          <span style={{ fontWeight: 700, color: overallColor(overallFor(p)) }}>
-                            {overallFor(p) != null ? `${overallFor(p)} OVR` : "Unrated"}
+                          <span style={{ fontWeight: 700, color: overallColor(overallFor(p, valueCeiling)) }}>
+                            {overallFor(p, valueCeiling) != null ? `${overallFor(p, valueCeiling)} OVR` : "Unrated"}
                           </span>
                           {nilVisible && (p.marketLow > 0 || p.marketHigh > 0) && (
                             <span style={{ opacity: .6 }}>{"  ·  "}{nilRange(p.marketLow, p.marketHigh)}</span>
@@ -779,7 +783,7 @@ export function BoardPage({ sport = "men", season = null, title = "Full Board", 
                           </div>
                         )}
                         {p.nilValuation > 0 && (() => {
-                          const label = projectedTier(p.nilValuation);
+                          const label = projectedTier(p.nilValuation, valueCeiling);
                           const color = tierColor(label);
                           return (
                             <div style={{ marginTop: 6, display: "inline-block", padding: "2px 8px", borderRadius: 20, fontSize: 11, fontWeight: 600, background: `${color}22`, color, border: `1px solid ${color}55` }}>
@@ -852,7 +856,7 @@ export function BoardPage({ sport = "men", season = null, title = "Full Board", 
                             </td>
                           )}
                           {cols.map(col => (
-                            <td key={col.label} style={tdStyle}>{col.get(row)}</td>
+                            <td key={col.label} style={tdStyle}>{col.get(row, valueCeiling)}</td>
                           ))}
                         </tr>
                       );
@@ -889,6 +893,7 @@ export function BoardPage({ sport = "men", season = null, title = "Full Board", 
         <PlayerModal
           player={modal}
           {...(isWomens ? { sport: "womens" } : {})}
+          {...(archiveMode ? { season } : {})}
           {...(archiveMode ? {} : { status: board.state.statusById?.[modal.id], onStatus: setStatus })}
           onClose={() => setModal(null)}
         />

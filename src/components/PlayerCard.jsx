@@ -1,11 +1,12 @@
 import { memo } from "react";
 import { nilRange, overallFor, overallColor } from "@/lib/display";
+import { HM_PLAYER_CEILING } from "@/lib/nilBudget";
 import { positionLabel } from "@/lib/positions";
 import { useNilVisible } from "@/hooks/useNilVisible";
 
-export const PlayerCard = memo(function PlayerCard({ player, inRoster, inShortlist, onRoster, onShortlist, onClick, archetypeColor = "#f5a623" }) {
+export const PlayerCard = memo(function PlayerCard({ player, inRoster, inShortlist, onRoster, onShortlist, onClick, archetypeColor = "#f5a623", valueCeiling = HM_PLAYER_CEILING }) {
   const [nilVisible] = useNilVisible();
-  const overall = overallFor(player);
+  const overall = overallFor(player, valueCeiling);
   const s = player.stats || {};
   const stat = (val, label) => val != null && val !== "" && String(val) !== "NaN"
     ? `${label} ${Number(val).toFixed(1)}`

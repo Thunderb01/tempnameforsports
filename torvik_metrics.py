@@ -102,6 +102,25 @@ SUPABASE_URL         = os.environ.get("SUPABASE_URL", "")
 SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")
 
 
+# ── NIL budget tiers ───────────────────────────────────────────────────────────
+# data/nil_budget_tiers.json is the single source of truth, shared with the
+# frontend (src/lib/nilBudget.js). A player's valuation is capped at
+# max_player_share of their conference tier's TEAM budget (e.g. 30% of $20M
+# for a high-major) instead of a flat per-player dollar cap.
+def _load_nil_budget_tiers():
+    import json
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "nil_budget_tiers.json")
+    with open(path) as f:
+        return json.load(f)
+
+NIL_BUDGET_TIERS = _load_nil_budget_tiers()
+
+
+def nil_tier_for_conf(conf):
+    """Conference code (Torvik/team_conferences.csv spelling) -> tier key."""
+    return NIL_BUDGET_TIERS["conferences"].get(str(conf).strip(), NIL_BUDGET_TIERS["default_tier"])
+
+
 def parse_args():
     p = argparse.ArgumentParser()
     p.add_argument("--csv",     default="data/trank_data_2026.csv")
@@ -1215,9 +1234,11 @@ def compute_nil_valuation(df, reference_mask=None):
     """
     NIL Valuation matching the Weighted_Performance_Score sheet formula.
 
-    Total Score = SUMPRODUCT of percentile-ranked stats × weights
-    Base NIL    = MIN(cap, cap × W² × (1 - (1 - V⁴)(1 - W)²)^1.2)
-    Final NIL   = Base NIL × Position Boost × Age Boost
+    Total Score = SUMPRODUCT of percentile-ranked stats × weights   (W)
+    cap         = max_player_share × tier team budget  (data/nil_budget_tiers.json)
+    Base NIL    = MIN(cap, cap × W³ × (1 - (1 - V⁴)(1 - W)²)^1.5)
+    Final NIL   = Base NIL × Position Boost × Age Boost × 3PT Specialist Boost
+    Cap share   = Final NIL / tier team budget   (0 .. max_player_share)
     """
     # ── Stat weights — position-specific ─────────────────────────────────────
     GUARD_WEIGHTS = {
@@ -1514,30 +1535,20 @@ def compute_nil_valuation(df, reference_mask=None):
 
     total_score = (stat_scores + scout_scores + btp_scores).clip(0, 1)  # W
 
-    # ── Conference adjustment (V) ─────────────────────────────────────────────
-    CONF_WEIGHTS = {
-        # High Major
-        "ACC": 1.0, "B10": 1.0, "B12": 1.0, "SEC": 1.0, "BE": 1.0,
-        # Mid Major
-        "MWC": 0.8, "A10": 0.8, "WCC": 0.8, "Amer": 0.8, "P12": 0.8,
-        # Low Major
-        "MVC": 0.6, "SC": 0.6, "MAC": 0.6, "CUSA": 0.6,
-        "SB": 0.6, "MAAC": 0.6, "CAA": 0.6, "ASun": 0.6,
-        "Horz": 0.6, "BW": 0.6, "WAC": 0.6, "BSky": 0.6,
-        "Slnd": 0.6, "OVC": 0.6, "Pat": 0.6, "NEC": 0.6,
-        "AE": 0.6, "Ivy": 0.6, "BSth": 0.6, "Sum": 0.6,
-        "MEAC": 0.6, "SWAC": 0.6,
-    }
-    conf_adj = df["conf"].map(CONF_WEIGHTS).fillna(0.6)  # V — default low major
+    # ── NIL budget tier (V + per-player ceiling) ────────────────────────────
+    # Tier, team budget and competition factor V all come from
+    # data/nil_budget_tiers.json (shared with src/lib/nilBudget.js). The
+    # per-player ceiling is max_player_share of the tier's TEAM budget —
+    # e.g. 30% x $20M = $6M for a high-major, 30% x $4.5M = $1.35M for a
+    # low-major — replacing the old flat $3M x V cap.
+    _tiers     = NIL_BUDGET_TIERS["tiers"]
+    max_share  = NIL_BUDGET_TIERS["max_player_share"]
+    nil_tier   = df["conf"].map(nil_tier_for_conf)
+    conf_adj   = nil_tier.map(lambda t: _tiers[t]["competition_factor"])  # V
+    team_budget  = nil_tier.map(lambda t: _tiers[t]["team_budget"])
+    conf_ceiling = team_budget * max_share  # per-player effective cap
 
-    # ── NIL Cap + conference-adjusted ceiling ─────────────────────────────────
-    # High Major (V=1.0) → $3M ceiling
-    # Mid Major  (V=0.8) → $2.4M ceiling
-    # Low Major  (V=0.6) → $1.8M ceiling
-    nil_cap      = 3_000_000
-    conf_ceiling = nil_cap * conf_adj  # per-player effective cap
-
-    # ── Base NIL = MIN(conf_ceiling, conf_ceiling × W² × (1 - (1-V⁴)(1-W)²)^1.2) ──
+    # ── Base NIL = MIN(ceiling, ceiling × W³ × (1 - (1-V⁴)(1-W)²)^1.5) ──────
     W = total_score
     V = conf_adj
     blend    = (1 - (1 - V**4) * (1 - W)**2) ** 1.5
@@ -1564,6 +1575,10 @@ def compute_nil_valuation(df, reference_mask=None):
     specialist_boost = (1 + 0.20 * ((three_ratio - 0.70) / 0.30).clip(0, 1)).where(is_specialist, 1.0)
 
     base_nil_final = (base_nil * pos_boost * yr_boost * specialist_boost).clip(lower=0, upper=conf_ceiling)
+    # Share of a team budget this player commands (0 .. max_player_share).
+    # Budget-independent, so the frontend can price the same player against
+    # any team's projected NIL spend: value_to_team = share x team budget.
+    nil_cap_share = base_nil_final / team_budget
 
     # ── Minutes Volatility → Market Range ────────────────────────────────────
     # Min_per = % of team minutes played (0–100); higher = more certain starter
@@ -1582,17 +1597,21 @@ def compute_nil_valuation(df, reference_mask=None):
     market_high = base_nil_final * (1 + nil_interval_pct)
 
     # ── Projected Tier ────────────────────────────────────────────────────────
+    # Thresholds are fractions of the high-major per-player ceiling (they
+    # were $2.2M/$1.5M/$1.0M/$400K/$100K against the old flat $3M cap), so
+    # the labels track the budget config instead of a hard-coded dollar scale.
+    hm_ceiling = _tiers["HM"]["team_budget"] * max_share
     def assign_tier(v):
-        if v >= 2_200_000: return "HM All-American / Pre-Draft"
-        if v >= 1_500_000: return "HM All-Conference"
-        if v >= 1_000_000: return "HM Starter / MM All-Conference"
-        if v >=   400_000: return "HM Rotation / MM Starter"
-        if v >=   100_000: return "MM Role Player / LM All-Conference"
+        if v >= hm_ceiling * 0.733: return "HM All-American / Pre-Draft"
+        if v >= hm_ceiling * 0.500: return "HM All-Conference"
+        if v >= hm_ceiling * 0.333: return "HM Starter / MM All-Conference"
+        if v >= hm_ceiling * 0.133: return "HM Rotation / MM Starter"
+        if v >= hm_ceiling * 0.033: return "MM Role Player / LM All-Conference"
         return "LM Rotation"
-        
+
     projected_tier = base_nil_final.apply(assign_tier)
 
-    return base_nil_final, market_low, market_high, projected_tier, total_score
+    return base_nil_final, market_low, market_high, projected_tier, total_score, nil_cap_share
 
 
 
@@ -1872,7 +1891,7 @@ def main():
     # still rank against qualified_mask so they can't be corrupted by a
     # low-minutes player's presence, but aren't individually re-shrunk —
     # their combined weight is small next to the five that already are.
-    df["_nil"], df["_nil_low"], df["_nil_high"], df["_projected_tier"], df["_nil_perf_score"] = compute_nil_valuation(df, reference_mask=qualified_mask)
+    df["_nil"], df["_nil_low"], df["_nil_high"], df["_projected_tier"], df["_nil_perf_score"], df["_nil_cap_share"] = compute_nil_valuation(df, reference_mask=qualified_mask)
 
     # ── Specialist tags ───────────────────────────────────────────────────────
     _total_fga   = (df["twoPA"].fillna(0) + df["TPA"].fillna(0)).replace(0, float("nan"))
@@ -1948,6 +1967,18 @@ def main():
         stats_lookup           = {}
         already_matched        = set()
         _history_by_player     = {}
+
+    # players.nil_cap_share only exists once supabase/add_nil_cap_share.sql
+    # has run. Probe once instead of letting every row's update fail on an
+    # unknown column.
+    _has_nil_cap_share_col = False
+    if not args.dry_run and not args.historical:
+        try:
+            db.table("players").select("nil_cap_share").limit(1).execute()
+            _has_nil_cap_share_col = True
+        except Exception:
+            print("  ⚠ players.nil_cap_share missing -- run supabase/add_nil_cap_share.sql; "
+                  "skipping that column this run (nil_valuation still written).")
 
     # ── Process each row ──────────────────────────────────────────────────────
     matched        = 0
@@ -2038,6 +2069,7 @@ def main():
         nil           = safe(df.at[idx, "_nil"])
         nil_low       = safe(df.at[idx, "_nil_low"])
         nil_high      = safe(df.at[idx, "_nil_high"])
+        nil_cap_share = safe(df.at[idx, "_nil_cap_share"]) if "_nil_cap_share" in df.columns else None
         tier          = str(df.at[idx, "_projected_tier"]) if "_projected_tier" in df.columns else None
         nil_perf_score = safe(df.at[idx, "_nil_perf_score"]) if "_nil_perf_score" in df.columns else None
         # is_3pt_specialist = bool(df.at[idx, "_specialist_3pt"]) if "_specialist_3pt" in df.columns else False
@@ -2157,6 +2189,10 @@ def main():
                 player_patch["open_market_low"] = nil_low
             if nil_high is not None and not args.skip_nil:
                 player_patch["open_market_high"] = nil_high
+            # Only once supabase/add_nil_cap_share.sql has added the column —
+            # writing an unknown column would fail the whole row update.
+            if nil_cap_share is not None and not args.skip_nil and _has_nil_cap_share_col:
+                player_patch["nil_cap_share"] = round(float(nil_cap_share), 6)
             hometown = str(row.get("type", "")).strip()
             if hometown and hometown not in ("nan", ""):
                 player_patch["hometown"] = hometown

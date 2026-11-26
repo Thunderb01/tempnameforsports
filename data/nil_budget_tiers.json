@@ -1,0 +1,17 @@
+{
+  "_comment": "Single source of truth for NIL budget tiers. Read by torvik_metrics.py (valuation) and src/lib/nilBudget.js (roster builder). A player's valuation is capped at max_player_share of their tier's team budget, not at a flat dollar amount. competition_factor is the V term in the NIL curve (discounts mid-range production at lower levels). Conferences not listed fall to default_tier.",
+  "max_player_share": 0.30,
+  "default_tier": "LM",
+  "tiers": {
+    "HM":  { "label": "High Major",      "team_budget": 20000000, "competition_factor": 1.0 },
+    "HMM": { "label": "High Mid Major",  "team_budget": 12000000, "competition_factor": 0.8 },
+    "MM":  { "label": "Mid Major",       "team_budget":  8000000, "competition_factor": 0.7 },
+    "LM":  { "label": "Low Major",       "team_budget":  4500000, "competition_factor": 0.6 }
+  },
+  "conferences": {
+    "ACC": "HM", "B10": "HM", "B12": "HM", "SEC": "HM", "BE": "HM",
+    "A10": "HMM", "MWC": "HMM", "WCC": "HMM", "Amer": "HMM", "P12": "HMM",
+    "MVC": "MM", "CUSA": "MM", "SB": "MM", "MAC": "MM", "CAA": "MM",
+    "Horz": "MM", "WAC": "MM", "BW": "MM", "Ivy": "MM", "SC": "MM"
+  }
+}

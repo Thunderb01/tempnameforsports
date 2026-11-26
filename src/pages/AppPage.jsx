@@ -18,6 +18,7 @@ import { money, letterGrade, gradeColor } from "@/lib/display";
 import { MultiSelectFilter, RangeFilter, FilterChips, parseHeight, formatHeight, playerHeightInches } from "@/components/Filters";
 import { getTeamConference, getCanonicalTeamName } from "@/lib/teamLookup";
 import { LEAVING_PLAYER_STATUSES } from "@/lib/playerStatus";
+import { teamBudgetForConference, LEGACY_PLAYER_CEILING, HM_PLAYER_CEILING } from "@/lib/nilBudget";
 import {
   POSITIONS, DEFAULT_STARTER_COUNTS, positionsFor, positionLabel,
   slotWeight, assignToPositions, computeOptimalLineup, scoreRoster,
@@ -284,7 +285,10 @@ function btpPlayerScoreDisplay(p) {
   const cdi    = (s.cdi || 0) * 4000;
   // NB: parens around the boolean OR — without them the `??` binds the wrong side
   // and `_priorYearEval === false` short-circuits to `false`, zeroing market entirely.
-  const market = (p.marketHigh || 0) * ((p._priorYearEval || isPriorYearEval(p)) ? 0.8 : 1.0);
+  // Normalized to the legacy $3M-cap dollar scale so the budget-tier revamp
+  // (high-major values doubled) doesn't double market's weight here — must
+  // match useRosterBoard's MARKET_SCORE_SCALE.
+  const market = (p.marketHigh || 0) * (LEGACY_PLAYER_CEILING / HM_PLAYER_CEILING) * ((p._priorYearEval || isPriorYearEval(p)) ? 0.8 : 1.0);
   return sei * 0.50 + market * 0.15 + ath * 0.13 + ris * 0.08 + dds * 0.08 + cdi * 0.06;
 }
 
@@ -1378,13 +1382,13 @@ export function AppPage() {
 
   const calc = board.calc;
 
-  const NIL_BY_LEVEL = { "High Major": 10_000_000, "Mid Major": 3_000_000, "Low Major": 1_500_000 };
-
-  async function handleSettingChange(key, value) {
+  function handleSettingChange(key, value) {
     let next = { ...board.state.settings, [key]: key === "program" ? value : Number(value) };
+    // Picking a program defaults the NIL budget to its conference tier
+    // (HM $20M / high MM $12M / MM $8M / LM $4.5M — data/nil_budget_tiers.json).
+    // Replaces the old 3-level teams.level lookup.
     if (key === "program" && value) {
-      const { data } = await supabase.from("teams").select("level").eq("name", value).maybeSingle();
-      if (data?.level && NIL_BY_LEVEL[data.level]) next = { ...next, nilTotal: NIL_BY_LEVEL[data.level] };
+      next = { ...next, nilTotal: teamBudgetForConference(getTeamConference(value)) };
     }
     board.commitSettings(next);
     setSettings(next);

@@ -1,0 +1,33 @@
+-- ============================================================
+-- NIL budget-tier revamp: per-player share of a team NIL budget.
+--
+-- players.nil_cap_share = nil_valuation / (player's conference-tier team
+-- budget), 0 .. max_player_share (0.30). Written by torvik_metrics.py;
+-- read by the roster builder to price a player against ANY team's
+-- projected NIL spend (share × that team's budget). See
+-- data/nil_budget_tiers.json and src/lib/nilBudget.js.
+--
+-- Men's only for now -- torvik_metrics_w.py hasn't moved to budget tiers.
+--
+-- Order: run this BEFORE the next torvik_metrics.py run that should write
+-- the column (the pipeline probes for it and skips it with a warning if
+-- missing, so running the pipeline first is safe, just a no-op for share).
+-- Safe to run more than once.
+-- ============================================================
+
+alter table public.players add column if not exists nil_cap_share numeric;
+
+-- ============================================================
+-- MANUAL STEP -- expose it on vw_players.
+-- The live vw_players definition has drifted from the copies in this repo
+-- (e.g. archetype / archetype_overwrite were added in Supabase Studio -- see
+-- archetype_defs.sql), so recreating it from a repo file could silently drop
+-- columns. Instead: Supabase Studio -> Database -> Views -> vw_players ->
+-- copy its current definition, append
+--     , p.nil_cap_share
+-- as the LAST item in the SELECT list (right before FROM), keep the
+-- `WHERE p.on_board = true` filter, and run the CREATE OR REPLACE VIEW.
+-- It must go LAST: CREATE OR REPLACE VIEW only allows appending columns
+-- (inserting mid-list fails with ERROR 42P16).
+-- Then: notify pgrst, 'reload schema';
+-- ============================================================
