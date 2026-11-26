@@ -16,6 +16,7 @@ that fails the build if a callsite skips the helper.
 |---|---|---|
 | Team → conference        | `getTeamConference(team)` from `@/lib/teamLookup`     | `data/team_conferences.csv` (single source of truth, imported via Vite `?raw`) |
 | Team name canonicalization | `getCanonicalTeamName(team)` from `@/lib/teamLookup` | Same CSV + `EXPLICIT_ALIASES` map in `teamLookup.js`                       |
+| Conference → NIL budget tier | `teamBudgetForConference(getTeamConference(team))` / `valueForTeamBudget(player, budget)` from `@/lib/nilBudget` | `data/nil_budget_tiers.json` (shared with `torvik_metrics.py`, imported via JSON import attributes) |
 | Player name matching (Python pipeline) | `norm_name(name)` / `match_player(...)` from `match_utils` | `FIRST_NAME_ALIASES` dict + fuzzy fallback (rapidfuzz, else `difflib`) in `match_utils.py` |
 
 Why this matters: `vw_players.current_team` carries strings like
@@ -536,6 +537,33 @@ print a diagnostic count of players hitting each limit when the pipeline
 runs — spec note: "a large number means the range needs widening." The
 spec's "ignore rim for Bigs" Shot Creation variant is explicitly a *test*
 variant, not implemented as default behavior.
+
+### NIL budget tiers — the cap is a share of a TEAM budget, not a flat per-player number
+
+`data/nil_budget_tiers.json` is the single source of truth, read by
+`torvik_metrics.py` (valuation) and `src/lib/nilBudget.js` (frontend). Four
+tiers by conference: HM $20M (ACC/B10/B12/SEC/BE), HMM $12M (A10/MWC/WCC/
+Amer/P12), MM $8M (MVC/CUSA/SB/MAC/CAA/Horz/WAC/BW/Ivy/SC — a proposed split),
+LM $4.5M (everything else). No player is valued above `max_player_share`
+(30%) of their tier's budget — this replaced the old flat `$3M × V` cap.
+The curve is otherwise unchanged (`ceiling × W³ × blend`, V = the tier's
+`competition_factor`), so high-major dollar values exactly doubled.
+
+`players.nil_cap_share` (`supabase/add_nil_cap_share.sql`) = nil_valuation /
+tier budget. It's budget-independent: the roster builder prices a player for
+*your* team as `share × settings.nilTotal` (default offers, returning-player
+NIL), and new roster builds default `nilTotal` to the team's tier budget.
+The pipeline probes for the column and skips it if the migration hasn't run.
+
+**Dollar-scale consumers:** OVR (`overallRating`/`overallFor`),
+`projectedTier`, PortalRankings `grade()` and the Board's NIL filter ranges
+were calibrated to the legacy $3M cap; they now take a `ceiling` and rescale
+(`valueCeilingFor({ sport, season })`). Women's (`torvik_metrics_w.py` is
+still on the old formula) and men's archived seasons < 2027 stay on the legacy
+scale. Roster-score `market` terms (`useRosterBoard`'s `MARKET_SCORE_SCALE`,
+`AppPage`'s `btpPlayerScoreDisplay`) normalize back to the legacy scale so
+market's weight against the BTP metrics didn't double. Team-needs/fit
+adjustment is deliberately not built yet.
 
 ---
 

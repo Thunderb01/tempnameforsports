@@ -15,6 +15,7 @@ import { supabase }         from "@/lib/supabase";
 import { exportRosterPDF }  from "@/lib/exportRoster";
 import { track }            from "@/lib/track";
 import { money, letterGrade, gradeColor } from "@/lib/display";
+import { LEGACY_PLAYER_CEILING } from "@/lib/nilBudget";
 import { MultiSelectFilter, RangeFilter, FilterChips, parseHeight, formatHeight, playerHeightInches } from "@/components/Filters";
 import { getTeamConference } from "@/lib/teamLookup";
 import { LEAVING_PLAYER_STATUSES } from "@/lib/playerStatus";
@@ -1468,7 +1469,7 @@ export function WomensAppPage() {
                   filtered.length === 0
                     ? <div className="empty">No players match your filters.</div>
                     : filtered.map(p => (
-                      <PlayerCard key={p.id} player={p}
+                      <PlayerCard key={p.id} player={p} valueCeiling={LEGACY_PLAYER_CEILING}
                         inRoster={board.inRoster(p.id)} inShortlist={board.inShort(p.id)}
                         onRoster={id => { track("roster_add", { player_id: id }); board.addToRoster(id); }}
                         onShortlist={id => { track("shortlist_add", { player_id: id }); board.addToShortlist(id); }}

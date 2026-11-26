@@ -27,6 +27,14 @@ const RULES = [
     allow:  new Set(["src/lib/teamLookup.js"]),
     message: 'Use `getTeamConference(team)` or `getCanonicalTeamName(team)` from "@/lib/teamLookup" — going through the CSV directly misses name variants like "Murray State" vs "Murray St." and aliases like "UConn" / "Connecticut".',
   },
+  {
+    name: "nilBudgetTiers",
+    // data/nil_budget_tiers.json is shared with torvik_metrics.py; the
+    // frontend reads it only through src/lib/nilBudget.js.
+    pattern: /from\s+["'][^"']*nil_budget_tiers\.json/,
+    allow:  new Set(["src/lib/nilBudget.js"]),
+    message: 'Use `teamBudgetForConference(getTeamConference(team))` / `valueForTeamBudget(player, budget)` from "@/lib/nilBudget" — don\'t read the tier config directly.',
+  },
   // Add more rules here as you build more lookup helpers.
 ];
 

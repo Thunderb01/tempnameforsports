@@ -1,5 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { money, nilRange, letterGrade, tierColor, projectedTier, overallFor, overallColor } from "@/lib/display";
+import { valueCeilingFor } from "@/lib/nilBudget";
 import { positionLabel } from "@/lib/positions";
 import { useNilVisible } from "@/hooks/useNilVisible";
 
@@ -414,7 +415,7 @@ export function PlayerComparison({ initialIds = [], allPlayers = [], sport = "me
                 <tr>
                   <td style={labelStyle}>Overall</td>
                   {players.map((p, i) => {
-                    const ovr = p ? overallFor(p) : null;
+                    const ovr = p ? overallFor(p, valueCeilingFor({ sport })) : null;
                     return (
                       <td key={i} style={{ padding: "6px 8px", textAlign: "center", fontWeight: 800, color: overallColor(ovr) }}>
                         {ovr ?? <span style={{ opacity: .2 }}>—</span>}
@@ -426,7 +427,7 @@ export function PlayerComparison({ initialIds = [], allPlayers = [], sport = "me
                   <td style={labelStyle}>Tier</td>
                   {players.map((p, i) => {
                     if (!p) return <td key={i} style={{ textAlign: "center", opacity: .2 }}>—</td>;
-                    const lbl = projectedTier(p.nilValuation);
+                    const lbl = projectedTier(p.nilValuation, valueCeilingFor({ sport }));
                     const clr = tierColor(lbl);
                     return (
                       <td key={i} style={{ padding: "6px 8px", textAlign: "center" }}>

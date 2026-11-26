@@ -7,6 +7,7 @@ import {
 } from "@/lib/positions";
 import { getCanonicalTeamName, getTeamConference } from "@/lib/teamLookup";
 import { PLAYER_STATUS_TO_RETENTION, LEAVING_RETENTION_STATUSES } from "@/lib/playerStatus";
+import { MAX_PLAYER_SHARE, HM_PLAYER_CEILING, LEGACY_PLAYER_CEILING, valueForTeamBudget, teamBudgetForConference } from "@/lib/nilBudget";
 
 // Roster-builder localStorage state shape (settings/roster/statusById/
 // retentionById/nilById/removedIncomings/intlPlayers) is identical across
@@ -25,6 +26,9 @@ const STORAGE_VERSION = 15; // bump this whenever the state shape changes
  * share state, exactly as the two separate files never did.
  */
 export function createRosterBoardHook(cfg) {
+  // Per-player dollar ceiling this sport's valuations are computed under
+  // (see valueCeilingFor in src/lib/nilBudget.js).
+  const MARKET_SCORE_SCALE = LEGACY_PLAYER_CEILING / (cfg.valueCeiling ?? LEGACY_PLAYER_CEILING);
   function loadSessionCache() {
     try {
       const raw = sessionStorage.getItem(cfg.sessionBoardKey);
@@ -99,7 +103,7 @@ export function createRosterBoardHook(cfg) {
 
   function defaultState(team = "") {
     return {
-      settings: { program: team, scholarships: 15, nilTotal: 4500000, maxPct: 0.30 },
+      settings: { program: team, scholarships: 15, nilTotal: cfg.defaultNilBudget?.(team) ?? 4500000, maxPct: MAX_PLAYER_SHARE },
       board:            [],
       shortlistIds:     [],
       roster:           [],   // [{ id, nilOffer, source? }]    source: "portal" (default) | "intl"
@@ -249,6 +253,9 @@ export function createRosterBoardHook(cfg) {
         marketLow:         row.open_market_low   ?? 0,
         marketHigh:        row.open_market_high  ?? 0,
         nilValuation:      row.nil_valuation     ?? 0,
+        // Share of a team NIL budget (see src/lib/nilBudget.js). null for rows
+        // the budget-tier pipeline hasn't valued yet, and always for women's.
+        nilCapShare:       row.nil_cap_share     ?? null,
         archetype:         row.archetype         ?? null,
         player_status:      row.player_status      ?? null,
         transfer_status:    row.transfer_status    ?? null,
@@ -357,6 +364,7 @@ export function createRosterBoardHook(cfg) {
             marketLow:         row.open_market_low   ?? 0,
             marketHigh:        row.open_market_high  ?? 0,
             nilValuation:      row.nil_valuation     ?? 0,
+            nilCapShare:       row.nil_cap_share     ?? null,
             archetype: row.archetype ?? null,
             stats: {
               ppg: row.ppg, rpg: row.rpg, apg: row.apg, usg: row.usg,
@@ -411,6 +419,7 @@ export function createRosterBoardHook(cfg) {
             marketLow:      row.open_market_low  ?? 0,
             marketHigh:     row.open_market_high ?? 0,
             nilValuation:   row.nil_valuation    ?? 0,
+            nilCapShare:    row.nil_cap_share    ?? null,
             stats: {
               ppg: row.ppg, rpg: row.rpg, apg: row.apg, usg: row.usg,
               sei: row.sei, ath: row.ath, ris: row.ris, dds: row.dds, cdi: row.cdi,
@@ -509,7 +518,10 @@ export function createRosterBoardHook(cfg) {
             defaultRetention[p.id] = adminStatusMap[p.id] ?? (isGraduating ? "graduating" : "returning");
           }
           if (!s.nilById[p.id] && p.nilValuation > 0) {
-            autoNil[p.id] = Math.round(p.nilValuation);
+            // Priced against this team's own budget when the player has a
+            // stored budget share; otherwise their pipeline valuation.
+            autoNil[p.id] = valueForTeamBudget(p, s.settings.nilTotal, s.settings.maxPct)
+              ?? Math.round(p.nilValuation);
           }
         });
         return {
@@ -627,14 +639,22 @@ export function createRosterBoardHook(cfg) {
       setState(s => ({ ...s, shortlistIds: s.shortlistIds.filter(x => x !== id) }));
     }
 
+    // Starting offer for a newly rostered player: their share of a budget ×
+    // THIS team's projected NIL spend (settings.nilTotal), so the same player
+    // prices differently for a $20M high-major than a $4.5M low-major. Falls
+    // back to the midpoint of their own market range when no share is stored.
+    function defaultOffer(p, settings) {
+      return valueForTeamBudget(p, settings.nilTotal, settings.maxPct)
+        ?? Math.round(((p.marketLow || 0) + (p.marketHigh || 0)) / 2);
+    }
+
     function addToRoster(id) {
       const p = byId(id);
       if (!p || inRoster(id)) return;
-      const offer = Math.round(((p.marketLow || 0) + (p.marketHigh || 0)) / 2);
       setState(s => ({
         ...s,
         shortlistIds: s.shortlistIds.filter(x => x !== id),
-        roster: [{ id, nilOffer: offer, source: "portal" }, ...s.roster],
+        roster: [{ id, nilOffer: defaultOffer(p, s.settings), source: "portal" }, ...s.roster],
       }));
     }
 
@@ -808,7 +828,10 @@ export function createRosterBoardHook(cfg) {
         const ris    = (s.ris || 0) * 4000;
         const dds    = (s.dds || 0) * 4000;
         const cdi    = (s.cdi || 0) * 4000;
-        const market = (p.marketHigh || 0) * (isPriorYearEval(p) ? 0.8 : 1.0);
+        // Normalized back to the legacy $3M-cap dollar scale so the budget-tier
+        // revamp (which doubled high-major dollar values) doesn't silently
+        // double market's weight against the BTP metrics in the roster score.
+        const market = (p.marketHigh || 0) * MARKET_SCORE_SCALE * (isPriorYearEval(p) ? 0.8 : 1.0);
         return sei * 0.50 + market * 0.15 + ath * 0.13 + ris * 0.08 + dds * 0.08 + cdi * 0.06;
       }
       // Incoming freshmen tagged with an impact tier become scoreable pseudo-players.
@@ -899,7 +922,10 @@ const MENS_CONFIG = {
   storageKeyPrefix:           "bp_roster_builder",
   legacyKeys:                 ["bp_roster_builder_v1", "bp_roster_builder"],
   sessionBoardKey:            "bp_board_cache",
-  sessionBoardVer:            25, // 7→8: board rows carry player_status/transfer_* inline instead of a second portal_transfers query. 8→9: added transfer_from_team (its absence blanked the from-team logo). 9→10: force one clean refetch so sessions cached before admin-write invalidation existed don't keep showing players whose status has since changed. 10→11: repair_positions_from_prior_role ran against the live players table (fixing rows stuck at positions=["SF"]), a server-side write the cache has no other way to find out about -- force one more clean refetch so already-cached sessions pick up the corrected positions instead of waiting out the 4h TTL. 11→12: same story for the current_team-on-transfer fix. 12→13: the pos_bucket fix, same story. 13→14: torvik_metrics.py was actually re-run with the pos_bucket fix in place, writing the real corrected ratings. 14→15: repair_departed_on_board flipped on_board=false for departed players directly against Supabase -- same story, no other invalidation path for a direct pipeline/repair write. 15→16: run_season_pipeline.py (2026-11-08) -- data refresh, no other invalidation path. 16→17: run_season_pipeline.py (2026-11-08) -- data refresh, no other invalidation path. 17→18: run_season_pipeline.py (2026-11-12) -- data refresh, no other invalidation path. 18→19: run_season_pipeline.py (2026-11-13) -- data refresh, no other invalidation path. 19→20: run_season_pipeline.py (2026-11-13) -- data refresh, no other invalidation path. 20→21: run_season_pipeline.py (2026-11-13) -- data refresh, no other invalidation path. 21→22: added overall/nilValuationOverall to the per-player shape (multi-season rating blend) -- cached sessions need the new fields, not just a data refresh. 22→23: run_season_pipeline.py (2026-11-13) -- data refresh, no other invalidation path. 23→24: run_season_pipeline.py (2026-11-17) -- data refresh, no other invalidation path. 24→25: run_season_pipeline.py (2026-11-23) -- data refresh, no other invalidation path.
+  valueCeiling:               HM_PLAYER_CEILING,
+  // New roster builds start at the team's conference-tier budget.
+  defaultNilBudget:           team => team ? teamBudgetForConference(getTeamConference(team)) : null,
+  sessionBoardVer:            26, // 7→8: board rows carry player_status/transfer_* inline instead of a second portal_transfers query. 8→9: added transfer_from_team (its absence blanked the from-team logo). 9→10: force one clean refetch so sessions cached before admin-write invalidation existed don't keep showing players whose status has since changed. 10→11: repair_positions_from_prior_role ran against the live players table (fixing rows stuck at positions=["SF"]), a server-side write the cache has no other way to find out about -- force one more clean refetch so already-cached sessions pick up the corrected positions instead of waiting out the 4h TTL. 11→12: same story for the current_team-on-transfer fix. 12→13: the pos_bucket fix, same story. 13→14: torvik_metrics.py was actually re-run with the pos_bucket fix in place, writing the real corrected ratings. 14→15: repair_departed_on_board flipped on_board=false for departed players directly against Supabase -- same story, no other invalidation path for a direct pipeline/repair write. 15→16: run_season_pipeline.py (2026-11-08) -- data refresh, no other invalidation path. 16→17: run_season_pipeline.py (2026-11-08) -- data refresh, no other invalidation path. 17→18: run_season_pipeline.py (2026-11-12) -- data refresh, no other invalidation path. 18→19: run_season_pipeline.py (2026-11-13) -- data refresh, no other invalidation path. 19→20: run_season_pipeline.py (2026-11-13) -- data refresh, no other invalidation path. 20→21: run_season_pipeline.py (2026-11-13) -- data refresh, no other invalidation path. 21→22: added overall/nilValuationOverall to the per-player shape (multi-season rating blend) -- cached sessions need the new fields, not just a data refresh. 22→23: run_season_pipeline.py (2026-11-13) -- data refresh, no other invalidation path. 23→24: run_season_pipeline.py (2026-11-17) -- data refresh, no other invalidation path. 24→25: run_season_pipeline.py (2026-11-23) -- data refresh, no other invalidation path. 25→26: added nilCapShare (budget-tier NIL revamp) to the per-player shape.
 };
 
 const _mens = createRosterBoardHook(MENS_CONFIG);

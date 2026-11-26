@@ -4,6 +4,7 @@ import { PlayerModal } from "@/components/PlayerModal";
 import { BoardPage }   from "@/pages/BoardPage";
 import { supabase }    from "@/lib/supabase";
 import { letterGrade, gradeColor, money, overallRating, overallColor } from "@/lib/display";
+import { valueCeilingFor } from "@/lib/nilBudget";
 import { useNilVisible } from "@/hooks/useNilVisible";
 
 const FIRST_YEAR = 2009; // historical_stats coverage starts here — genuinely fixed, not a season-rollover value
@@ -271,7 +272,7 @@ function LegacyHistoricalBoard({ year, yearSelect }) {
                     <td style={{ ...tdStyle, opacity: .5, fontSize: 12 }}>{r.class_yr}</td>
                     <td style={{ ...tdStyle, opacity: .6, fontSize: 12 }}>{r.pos}</td>
                     {(() => {
-                      const ovr = overallRating(r.nil_valuation);
+                      const ovr = overallRating(r.nil_valuation, valueCeilingFor({ season: year }));
                       return (
                         <td style={{ ...tdStyle, fontWeight: 700, color: overallColor(ovr) }}>
                           {ovr ?? "—"}
@@ -300,7 +301,7 @@ function LegacyHistoricalBoard({ year, yearSelect }) {
         <div style={{ height: 40 }} />
       </div>
 
-      {modal && <PlayerModal player={modal} onClose={() => setModal(null)} />}
+      {modal && <PlayerModal player={modal} season={year} onClose={() => setModal(null)} />}
     </>
   );
 }

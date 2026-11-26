@@ -5,11 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build && npm run check:lookups && npm run test:positions && npm run test:tags",
+    "build": "vite build && npm run check:lookups && npm run test:positions && npm run test:tags && npm run test:nil-budget",
     "preview": "vite preview",
     "check:lookups": "node scripts/check-lookups.mjs",
     "test:positions": "node scripts/test-positions.mjs",
-    "test:tags": "node scripts/test-player-tags.mjs"
+    "test:tags": "node scripts/test-player-tags.mjs",
+    "test:nil-budget": "node scripts/test-nil-budget.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.2",

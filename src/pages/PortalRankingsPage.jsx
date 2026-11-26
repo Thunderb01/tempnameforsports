@@ -4,6 +4,7 @@ import { PlayerModal } from "@/components/PlayerModal";
 import { supabase }   from "@/lib/supabase";
 import { useTeamLogos } from "@/hooks/useTeamLogos";
 import { money, nilValue } from "@/lib/display";
+import { valueCeilingFor, scaleLegacyDollars, HM_PLAYER_CEILING } from "@/lib/nilBudget";
 import { POSITIONS, DEFAULT_STARTER_COUNTS, assignToPositions, positionLabel } from "@/lib/positions";
 
 // ── Previous BTP scoring formula (kept for reference) ─────────────────────
@@ -64,8 +65,10 @@ function scoreTeam(players) {
 }
 
 // Individual player grade — calibrated to single-player NIL market value
-function grade(nilValue) {
-  const v = Number(nilValue) || 0;
+// Cutoffs are on the legacy $3M-cap scale, rescaled to `ceiling` (the per-
+// player cap this sport's values were computed under -- see @/lib/nilBudget).
+function grade(nilValue, ceiling = HM_PLAYER_CEILING) {
+  const v = (Number(nilValue) || 0) / scaleLegacyDollars(1, ceiling);
   if (v >= 2_000_000) return { label: "A+", color: "#4ade80" };  // HM All-American / Pre-Draft
   if (v >= 1_600_000) return { label: "A",  color: "#4ade80" };  // HM All-Conference (high)
   if (v >= 1_200_000) return { label: "A-", color: "#86efac" };  // HM All-Conference
@@ -119,7 +122,7 @@ function toModalPlayer(p) {
   };
 }
 
-function TeamExpandRow({ r, colCount, onOpenModal }) {
+function TeamExpandRow({ r, colCount, onOpenModal, valueCeiling = HM_PLAYER_CEILING }) {
   const sortedPlayers = useMemo(() => {
     // Sort by the position each player was actually assigned to, so the list
     // order matches the position groups rendered above it.
@@ -149,8 +152,8 @@ function TeamExpandRow({ r, colCount, onOpenModal }) {
                 <div key={pos} style={{ flex: "1 1 200px", minWidth: 180, background: "rgba(255,255,255,.04)", borderRadius: 8, padding: "10px 14px" }}>
                   <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".06em", opacity: .5, marginBottom: 8 }}>{pos}</div>
                   {players.map((p, i) => {
-                    const pct = Math.min(((p.open_market_high || 0) / 2_000_000) * 100, 100);
-                    const g = grade(p.open_market_high);
+                    const pct = Math.min(((p.open_market_high || 0) / scaleLegacyDollars(2_000_000, valueCeiling)) * 100, 100);
+                    const g = grade(p.open_market_high, valueCeiling);
                     return (
                       <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
                         <span style={{ background: g.color, color: "#0e1521", fontWeight: 700, fontSize: 10, padding: "1px 6px", borderRadius: 8, minWidth: 26, textAlign: "center" }}>{g.label}</span>
@@ -386,7 +389,7 @@ export function PortalRankingsPage({ sport = "men" }) {
                             }
                           </td>
                         </tr>
-                        {isOpen && <TeamExpandRow key={`${r.team}-expand`} r={r} colCount={COL_COUNT} onOpenModal={p => setModal(toModalPlayer(p))} />}
+                        {isOpen && <TeamExpandRow key={`${r.team}-expand`} r={r} colCount={COL_COUNT} valueCeiling={valueCeilingFor({ sport })} onOpenModal={p => setModal(toModalPlayer(p))} />}
                       </>
                     );
                   })}
